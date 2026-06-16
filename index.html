@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>수학 게임 교실</title>
+    <style>
+        /* 화면 기본 디자인 (배경색, 폰트 등) */
+        body {
+            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+            background-color: #f4f8fe;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+        /* 메뉴판 하얀색 박스 디자인 */
+        .menu-board {
+            background-color: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+        .menu-board h1 {
+            color: #1a73e8;
+            margin-bottom: 5px;
+        }
+        .menu-board p {
+            color: #5f6368;
+            margin-bottom: 25px;
+        }
+        /* 버튼 디자인 */
+        .game-btn {
+            display: block;
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            text-decoration: none;
+            padding: 15px;
+            margin-bottom: 12px;
+            border-radius: 10px;
+            font-size: 18px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+        }
+        /* 버튼에 마우스 올렸을 때 색상 변화 */
+        .game-btn:hover {
+            background-color: #1a73e8;
+            color: white;
+            box-shadow: 0 4px 6px rgba(26, 115, 232, 0.3);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="menu-board">
+        <h1>🎲 즐거운 수학 교실</h1>
+        <p>오늘 할 활동을 선택해 주세요!</p>
+
+        <!-- 아래부터 게임 목록입니다. 마음껏 수정하고 추가하세요! -->
+        
+        <a href="game1.html" class="game-btn">1. 연립방정식 도미노 게임</a>
+        
+        <a href="game2.html" class="game-btn">2. 지수법칙 룰렛 게임</a>
+        
+        <a href="game3.html" class="game-btn">3. 실시간 수학 줄다리기 게임</a>
+
+        <a href="game6.html" class="game-btn">6. 기울기 알까기 게임</a>
+
+        <!-- 게임을 4번, 5번 계속 추가하려면 위 한 줄(<a href... </a>)을 그대로 복사해서 이 아래에 붙여넣기 하면 됩니다. -->
+
+    </div>
+
+</body>
+</html>
