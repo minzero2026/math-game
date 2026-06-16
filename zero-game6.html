@@ -1,0 +1,1806 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>기울기 알까기 게임</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- 안정성을 위해 unpkg 대신 cdnjs를 사용합니다. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.6/babel.min.js" crossorigin="anonymous"></script>
+  
+  <style>
+    /* 스크롤바 바운스 및 화면 흔들림 원천 방지용 전체 고정 스타일 */
+    html, body {
+      overflow: hidden;
+      height: 100%;
+      max-height: 100vh;
+      width: 100%;
+      position: fixed;
+      touch-action: manipulation;
+    }
+    @keyframes wiggle {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(-4deg) translateX(-2px); }
+      75% { transform: rotate(4deg) translateX(2px); }
+    }
+    .animate-wiggle {
+      animation: wiggle 0.15s ease-in-out infinite;
+    }
+    @keyframes scaleUp {
+      from { transform: scale(0.95); opacity: 0; }
+      to { transform: scale(1); opacity: 1; }
+    }
+    .animate-scale-up {
+      animation: scaleUp 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    .animate-fade-in {
+      animation: fadeIn 0.2s ease-out forwards;
+    }
+
+    /* 네이티브 숫자 입력란 스핀 버튼 제거 */
+    input::-webkit-outer-spin-button,
+    input::-webkit-inner-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] {
+      -moz-appearance: textfield;
+    }
+
+    /* 구글 사이트 도구 등 iframe 높이가 좁은 환경에서도 좌표평면 크기가 무너지지 않도록 반응형 스케일 계산 적용 */
+    .board-wrapper {
+      width: min(540px, min(calc(100vh - 110px), calc(100vw - 380px)));
+      height: min(540px, min(calc(100vh - 110px), calc(100vw - 380px)));
+      min-width: 250px;
+      min-height: 250px;
+      aspect-ratio: 1 / 1;
+    }
+
+    /* 세로형 알 보드 높이 유연하게 조절 */
+    .egg-container {
+      min-height: 280px;
+      width: 130px !important;
+    }
+
+    /* 스크롤바 숨기기 */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* 모바일 세로 모드 대응 */
+    @media (max-width: 639px) and (orientation: portrait) {
+      .board-wrapper {
+        width: min(400px, calc(100vw - 32px)) !important;
+        height: min(400px, calc(100vw - 32px)) !important;
+      }
+    }
+
+    /* 기기 높이가 좁은 모바일/태블릿 가로 및 구글 사이트 임베드 환경 극단적 대응 */
+    @media (max-height: 640px) {
+      header {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+      }
+      header span {
+        font-size: 1.1rem !important;
+      }
+      main {
+        padding: 0.25rem !important;
+        gap: 0.5rem !important;
+      }
+      .board-wrapper {
+        max-width: min(100%, calc(100vh - 80px)) !important;
+        max-height: min(100%, calc(100vh - 80px)) !important;
+      }
+      .egg-container {
+        height: auto !important;
+        max-height: calc(100vh - 60px);
+        width: 120px !important;
+        padding: 0.25rem !important;
+      }
+      .input-container {
+        padding: 0.5rem !important;
+        min-width: 200px !important;
+      }
+    }
+  </style>
+</head>
+<body class="bg-[#b0bbb6] text-slate-800 font-sans h-screen max-h-screen overflow-hidden flex flex-col select-none">
+  <div id="root" class="flex-1 flex flex-col overflow-hidden"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // ==========================================
+    // --- 자체 SVG 아이콘 및 보조 컴포넌트 선언부 ---
+    // ==========================================
+
+    function SpeakerIcon() {
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7">
+          <path d="M5 9v6h4l5 5V4L9 9H5zm11.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+        </svg>
+      );
+    }
+
+    function MuteIcon() {
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="currentColor" className="w-7 h-7 text-rose-700">
+          <path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.21.05-.42.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+        </svg>
+      );
+    }
+
+    function RestartIcon() {
+      return (
+        <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+          <path d="M23 4v6h-6" />
+          <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" />
+        </svg>
+      );
+    }
+
+    // --- 시간 변환 도우미 함수 ---
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60).toString().padStart(2, '0');
+      const secs = (seconds % 60).toString().padStart(2, '0');
+      return `${mins}:${secs}`;
+    }
+
+    // --- 고성능 터치 스핀 버튼 세트 ---
+    function CustomSpinner({ value, onChange, disabled, widthClass = "w-20", min }) {
+      const handleIncrement = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (disabled) return;
+        const current = value === '' ? 0 : parseInt(value, 10);
+        onChange(current + 1);
+      };
+      
+      const handleDecrement = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (disabled) return;
+        const current = value === '' ? 0 : parseInt(value, 10);
+        if (min !== undefined && current <= min) return;
+        onChange(current - 1);
+      };
+
+      return (
+        <div className={`flex bg-white border-2 border-slate-400 rounded-xl overflow-hidden shadow-md h-12 ${widthClass}`}>
+          <div className="flex-1 h-full flex items-center justify-center font-black text-xl text-slate-900 bg-white select-none">
+            {value === '' ? 0 : value}
+          </div>
+          <div className="flex flex-col border-l border-slate-300 w-8 bg-slate-100 shrink-0">
+            <button
+              type="button"
+              onClick={handleIncrement}
+              disabled={disabled}
+              className="flex-1 flex items-center justify-center hover:bg-slate-200 active:bg-slate-300 border-b border-slate-300 transition-colors disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
+                <polyline points="18 15 12 9 6 15"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleDecrement}
+              disabled={disabled}
+              className="flex-1 flex items-center justify-center hover:bg-slate-200 active:bg-slate-300 transition-colors disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // --- 음수/양수를 자연스럽게 부호와 함께 순간 표현해주는 전용 수식용 스피너 ---
+    function CustomPracticeSpinner({ value, onChange, disabled, widthClass = "w-24" }) {
+      const handleIncrement = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (disabled) return;
+        const current = value === '' ? 0 : parseInt(value, 10);
+        onChange(current + 1);
+      };
+      
+      const handleDecrement = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (disabled) return;
+        const current = value === '' ? 0 : parseInt(value, 10);
+        onChange(current - 1);
+      };
+
+      const displaySign = value === '' || value === 0 ? '' : value > 0 ? '+' : '-';
+      const displayVal = value === '' ? 0 : Math.abs(value);
+
+      return (
+        <div className={`flex bg-white border-2 border-slate-400 rounded-xl overflow-hidden shadow-md h-12 ${widthClass}`}>
+          <div className="flex-1 h-full flex items-center justify-center font-black text-xl text-slate-900 bg-white select-none">
+            {displaySign}{displayVal}
+          </div>
+          <div className="flex flex-col border-l border-slate-300 w-8 bg-slate-100 shrink-0">
+            <button
+              type="button"
+              onClick={handleIncrement}
+              disabled={disabled}
+              className="flex-1 flex items-center justify-center hover:bg-slate-200 active:bg-slate-300 border-b border-slate-300 transition-colors disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
+                <polyline points="18 15 12 9 6 15"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={handleDecrement}
+              disabled={disabled}
+              className="flex-1 flex items-center justify-center hover:bg-slate-200 active:bg-slate-300 transition-colors disabled:opacity-50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" className="text-slate-600">
+                <polyline points="6 9 12 15 18 9"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // --- Web Audio API 사운드 효과음 ---
+    class SoundEffects {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+
+      init() {
+        if (!this.ctx) {
+          try {
+            this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+          } catch (e) {
+            console.warn("AudioContext failed to initialize (Sites restriction):", e);
+            this.muted = true;
+          }
+        }
+      }
+
+      toggleMute() {
+        this.muted = !this.muted;
+        return this.muted;
+      }
+
+      playPlace() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(150, this.ctx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 0.1);
+          gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.1);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.1);
+        } catch (e) {}
+      }
+
+      playSlide() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(200, this.ctx.currentTime);
+          osc.frequency.linearRampToValueAtTime(400, this.ctx.currentTime + 0.6);
+          gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.6);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + 0.6);
+        } catch (e) {}
+      }
+
+      playHit() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc1 = this.ctx.createOscillator();
+          const gain1 = this.ctx.createGain();
+          osc1.type = 'triangle';
+          osc1.frequency.setValueAtTime(300, now);
+          osc1.frequency.exponentialRampToValueAtTime(100, now + 0.15);
+          gain1.gain.setValueAtTime(0.6, now);
+          gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+          osc1.connect(gain1);
+          gain1.connect(this.ctx.destination);
+          osc1.start();
+          osc1.stop(now + 0.15);
+
+          const notes = [523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = 'sine';
+            o.frequency.setValueAtTime(freq, now + 0.08 * idx);
+            g.gain.setValueAtTime(0.2, now + 0.08 * idx);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.08 * idx + 0.3);
+            o.connect(g);
+            g.connect(this.ctx.destination);
+            o.start(now + 0.08 * idx);
+            o.stop(now + 0.08 * idx + 0.35);
+          });
+        } catch (e) {}
+      }
+
+      playMiss() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'sawtooth';
+          osc.frequency.setValueAtTime(220, now);
+          osc.frequency.linearRampToValueAtTime(110, now + 0.4);
+          gain.gain.setValueAtTime(0.2, now);
+          gain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(now + 0.4);
+        } catch (e) {}
+      }
+
+      playFanfare() {
+        if (this.muted) return;
+        this.init();
+        if (!this.ctx) return;
+        try {
+          const now = this.ctx.currentTime;
+          const notes = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99, 1046.50];
+          notes.forEach((freq, idx) => {
+            const o = this.ctx.createOscillator();
+            const g = this.ctx.createGain();
+            o.type = 'sawtooth';
+            o.frequency.setValueAtTime(freq, now + 0.1 * idx);
+            g.gain.setValueAtTime(0.15, now + 0.1 * idx);
+            g.gain.exponentialRampToValueAtTime(0.001, now + 0.1 * idx + 0.5);
+            o.connect(g);
+            g.connect(this.ctx.destination);
+            o.start(now + 0.1 * idx);
+            o.stop(now + 0.1 * idx + 0.6);
+          });
+        } catch (e) {}
+      }
+    }
+
+    const sfx = new SoundEffects();
+
+    // ==========================================
+    // --- 메인 애플리케이션 컴포넌트 ---
+    // ==========================================
+
+    function App() {
+      // --- 게임 대전 모드 및 시간 설정 ---
+      const [gameMode, setGameMode] = useState('TEAM'); 
+      const [gameState, setGameState] = useState('PLACE_WHITE'); 
+      const [successCount, setSuccessCount] = useState(0);
+      const [maxSuccess, setMaxSuccess] = useState(8); 
+      const [muted, setMuted] = useState(false);
+
+      // --- 개인전용 타이머 조절 상태 ---
+      const [timerPreset, setTimerPreset] = useState(5); 
+      const [timeLeft, setTimeLeft] = useState(300);     
+      const [isTimerActive, setIsTimerActive] = useState(false);
+      const [individualHighScore, setIndividualHighScore] = useState(0);
+
+      // --- [연습 모드] 전용 상태 관리 ---
+      const [practiceAttempts, setPracticeAttempts] = useState(0); 
+      const [practiceSuccesses, setPracticeSuccesses] = useState(0); 
+      const [practiceHistory, setPracticeHistory] = useState([]); 
+      const [activeSelection, setActiveSelection] = useState(null); 
+      
+      const [formulaSlots, setFormulaSlots] = useState({
+        y2: { value: '', label: '' },
+        y1: { value: '', label: '' },
+        x2: { value: '', label: '' },
+        x1: { value: '', label: '' }
+      });
+      
+      const [slotErrors, setSlotErrors] = useState({
+        y2: false,
+        y1: false,
+        x2: false,
+        x1: false
+      });
+      
+      const [calcDy, setCalcDy] = useState('');
+      const [calcDx, setCalcDx] = useState('');
+
+      // --- 사용자 입력 상태 (기울기) ---
+      const [whiteStone, setWhiteStone] = useState({ x: null, y: null });
+      const [blackStone, setBlackStone] = useState({ x: null, y: null });
+      const [slopeSign, setSlopeSign] = useState(1);
+      const [inputNum, setInputNum] = useState('');
+      const [inputDen, setInputDen] = useState('');
+
+      // --- 애니메이션 전용 좌표 ---
+      const [animatedWhite, setAnimatedWhite] = useState({ x: null, y: null });
+      const [animatedBlack, setAnimatedBlack] = useState({ x: null, y: null });
+      const [blackOpacity, setBlackOpacity] = useState(1);
+      const [isHitCorrect, setIsHitCorrect] = useState(false);
+      const [feedbackMsg, setFeedbackMsg] = useState('');
+      
+      const [shakeEgg, setShakeEgg] = useState(false);
+      const [shakeConfirmBtn, setShakeConfirmBtn] = useState(false);
+
+      const stepY = maxSuccess > 1 ? Math.min(12, 100 / (maxSuccess - 1)) : 12;
+      const ry = Math.max(1.2, Math.min(5.5, stepY / 2));
+      const progressRatio = successCount / maxSuccess;
+
+      const currentEnergy = successCount * 10;
+      const liquidHeight = Math.min(140, currentEnergy * 1.4);
+
+      const isSubstitutionCorrect = (() => {
+        const sY2 = formulaSlots.y2.value;
+        const sY1 = formulaSlots.y1.value;
+        const sX2 = formulaSlots.x2.value;
+        const sX1 = formulaSlots.x1.value;
+
+        if (sY2 === '' || sY1 === '' || sX2 === '' || sX1 === '') return false;
+        
+        const labelY2 = formulaSlots.y2.label;
+        const labelY1 = formulaSlots.y1.label;
+        const labelX2 = formulaSlots.x2.label;
+        const labelX1 = formulaSlots.x1.label;
+
+        const isY2X2Matching = (labelY2.startsWith('w') && labelX2.startsWith('w')) || (labelY2.startsWith('b') && labelX2.startsWith('b'));
+        const isY1X1Matching = (labelY1.startsWith('w') && labelX1.startsWith('w')) || (labelY1.startsWith('b') && labelX1.startsWith('b'));
+        const isOpposite = labelY2.startsWith('w') !== labelY1.startsWith('w');
+
+        return isY2X2Matching && isY1X1Matching && isOpposite;
+      })();
+
+      const boardSize = 480;
+      const halfSize = boardSize / 2;
+      const gridAreaSize = 400; 
+      const gridCount = 16;     
+      const step = gridAreaSize / gridCount; 
+      const margin = (boardSize - gridAreaSize) / 2; 
+
+      const toSvgCoords = (x, y) => {
+        return {
+          x: halfSize + x * step,
+          y: halfSize - y * step,
+        };
+      };
+
+      const toGridCoords = (px, py) => {
+        const x = Math.round((px - halfSize) / step);
+        const y = Math.round((halfSize - py) / step);
+        return {
+          x: Math.max(-8, Math.min(8, x)),
+          y: Math.max(-8, Math.min(8, y)),
+        };
+      };
+
+      // --- 개인전 전용 타이머 작동 이펙트 ---
+      useEffect(() => {
+        let interval = null;
+        if (isTimerActive && gameMode === 'INDIVIDUAL' && timeLeft > 0 && gameState !== 'GAME_OVER') {
+          interval = setInterval(() => {
+            setTimeLeft((prev) => {
+              if (prev <= 1) {
+                clearInterval(interval);
+                setIsTimerActive(false);
+                sfx.playFanfare();
+                setGameState('GAME_OVER');
+                
+                const finalEnergy = successCount * 10;
+                if (finalEnergy > individualHighScore) {
+                  setIndividualHighScore(finalEnergy);
+                }
+                return 0;
+              }
+              return prev - 1;
+            });
+          }, 1000);
+        } else {
+          clearInterval(interval);
+        }
+        return () => clearInterval(interval);
+      }, [isTimerActive, gameMode, timeLeft, gameState, successCount, individualHighScore]);
+
+      const handleToggleMute = () => {
+        const isMuted = sfx.toggleMute();
+        setMuted(isMuted);
+      };
+
+      const proceedToNextTurn = () => {
+        setWhiteStone({ x: null, y: null });
+        setBlackStone({ x: null, y: null });
+        setAnimatedWhite({ x: null, y: null });
+        setAnimatedBlack({ x: null, y: null });
+        setInputNum('');
+        setInputDen('');
+        setSlopeSign(1);
+        setFeedbackMsg('');
+        setGameState('PLACE_WHITE');
+      };
+
+      const handleFullReset = () => {
+        setSuccessCount(0);
+        setTimeLeft(timerPreset * 60); 
+        setIsTimerActive(false);
+        proceedToNextTurn();
+      };
+
+      const handleModeChange = (mode) => {
+        setGameMode(mode);
+        setSuccessCount(0);
+        
+        if (mode === 'PRACTICE') {
+          setPracticeAttempts(0);
+          setPracticeSuccesses(0);
+          setPracticeHistory([]);
+          setTimeout(() => {
+            generatePracticeProblem();
+          }, 100);
+        } else if (mode === 'INDIVIDUAL') {
+          setTimeLeft(timerPreset * 60);
+          setIsTimerActive(false);
+          proceedToNextTurn();
+        } else {
+          proceedToNextTurn();
+        }
+      };
+
+      const handleSlotClick = (slotKey) => {
+        if (gameState !== 'INPUT_SLOPE') return;
+        
+        if (activeSelection) {
+          const isYSlot = slotKey === 'y2' || slotKey === 'y1';
+          const isXSlot = slotKey === 'x2' || slotKey === 'x1';
+          const isYSelection = activeSelection.label.endsWith('Y');
+          const isXSelection = activeSelection.label.endsWith('X');
+
+          if (isYSlot && isXSelection) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+            setTimeout(() => {
+              setSlotErrors(prev => ({ ...prev, [slotKey]: false }));
+            }, 1000);
+            setActiveSelection(null);
+            return;
+          }
+
+          if (isXSlot && isYSelection) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+            setTimeout(() => {
+              setSlotErrors(prev => ({ ...prev, [slotKey]: false }));
+            }, 1000);
+            setActiveSelection(null);
+            return;
+          }
+
+          if (slotKey === 'x2' && formulaSlots.x1.value !== '' && formulaSlots.x1.label === activeSelection.label) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+            setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+            setActiveSelection(null);
+            return;
+          }
+          if (slotKey === 'x1' && formulaSlots.x2.value !== '' && formulaSlots.x2.label === activeSelection.label) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+            setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+            setActiveSelection(null);
+            return;
+          }
+          if (slotKey === 'y2' && formulaSlots.y1.value !== '' && formulaSlots.y1.label === activeSelection.label) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+            setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+            setActiveSelection(null);
+            return;
+          }
+          if (slotKey === 'y1' && formulaSlots.y2.value !== '' && formulaSlots.y2.label === activeSelection.label) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+            setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+            setActiveSelection(null);
+            return;
+          }
+
+          if (slotKey === 'x2' && formulaSlots.y2.value !== '') {
+            const y2Src = formulaSlots.y2.label.charAt(0);
+            const selSrc = activeSelection.label.charAt(0);
+            if (y2Src !== selSrc) {
+              sfx.playMiss();
+              setFeedbackMsg("❌ 다시 풀어보세요");
+              setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+              setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+              setActiveSelection(null);
+              return;
+            }
+          }
+          if (slotKey === 'y2' && formulaSlots.x2.value !== '') {
+            const x2Src = formulaSlots.x2.label.charAt(0);
+            const selSrc = activeSelection.label.charAt(0);
+            if (x2Src !== selSrc) {
+              sfx.playMiss();
+              setFeedbackMsg("❌ 다시 풀어보세요");
+              setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+              setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+              setActiveSelection(null);
+              return;
+            }
+          }
+          if (slotKey === 'x1' && formulaSlots.y1.value !== '') {
+            const y1Src = formulaSlots.y1.label.charAt(0);
+            const selSrc = activeSelection.label.charAt(0);
+            if (y1Src !== selSrc) {
+              sfx.playMiss();
+              setFeedbackMsg("❌ 다시 풀어보세요");
+              setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+              setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+              setActiveSelection(null);
+              return;
+            }
+          }
+          if (slotKey === 'y1' && formulaSlots.x1.value !== '') {
+            const x1Src = formulaSlots.x1.label.charAt(0);
+            const selSrc = activeSelection.label.charAt(0);
+            if (x1Src !== selSrc) {
+              sfx.playMiss();
+              setFeedbackMsg("❌ 다시 풀어보세요");
+              setSlotErrors(prev => ({ ...prev, [slotKey]: true }));
+              setTimeout(() => setSlotErrors(prev => ({ ...prev, [slotKey]: false })), 1000);
+              setActiveSelection(null);
+              return;
+            }
+          }
+
+          setFormulaSlots(prev => ({
+            ...prev,
+            [slotKey]: { value: activeSelection.value, label: activeSelection.label }
+          }));
+          setActiveSelection(null); 
+          sfx.playPlace();
+          setFeedbackMsg(''); 
+        } else {
+          if (formulaSlots[slotKey].value !== '') {
+            setFormulaSlots(prev => ({
+              ...prev,
+              [slotKey]: { value: '', label: '' }
+            }));
+            sfx.playPlace();
+          }
+        }
+      };
+
+      const generatePracticeProblem = () => {
+        setFeedbackMsg('');
+        setInputNum('');
+        setInputDen('');
+        setCalcDy('');
+        setCalcDx('');
+        setSlopeSign(1);
+        setFormulaSlots({
+          y2: { value: '', label: '' },
+          y1: { value: '', label: '' },
+          x2: { value: '', label: '' },
+          x1: { value: '', label: '' }
+        });
+        setActiveSelection(null);
+
+        const wx = Math.floor(Math.random() * 17) - 8;
+        const wy = Math.floor(Math.random() * 17) - 8;
+        setWhiteStone({ x: wx, y: wy });
+        const whiteSvg = toSvgCoords(wx, wy);
+        setAnimatedWhite({ x: whiteSvg.x, y: whiteSvg.y });
+
+        let bx, by;
+        let attempts = 0;
+        do {
+          bx = Math.floor(Math.random() * 17) - 8;
+          by = Math.floor(Math.random() * 17) - 8;
+          attempts++;
+        } while (
+          (bx === wx || 
+           Math.abs(bx - wx) < 2 || 
+           Math.abs(by - wy) < 2 || 
+           Math.abs(bx - wx) > 7 || 
+           Math.abs(by - wy) > 7) && 
+          attempts < 150
+        );
+
+        setBlackStone({ x: bx, y: by });
+        const blackSvg = toSvgCoords(bx, by);
+        setAnimatedBlack({ x: blackSvg.x, y: blackSvg.y });
+        setBlackOpacity(1);
+
+        setGameState('INPUT_SLOPE');
+      };
+
+      const handleBoardClick = (e) => {
+        if (gameState !== 'PLACE_WHITE') return;
+        if (gameMode === 'INDIVIDUAL' && timeLeft === 0) return;
+        if (gameMode === 'PRACTICE') return; 
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const clickX = e.clientX - rect.left;
+        const clickY = e.clientY - rect.top;
+
+        const scaleX = boardSize / rect.width;
+        const scaleY = boardSize / rect.height;
+
+        const { x, y } = toGridCoords(clickX * scaleX, clickY * scaleY);
+
+        setWhiteStone({ x, y });
+        const whiteSvg = toSvgCoords(x, y);
+        setAnimatedWhite({ x: whiteSvg.x, y: whiteSvg.y });
+        sfx.playPlace();
+
+        setGameState('WAITING_FOR_BLACK');
+        setFeedbackMsg('');
+
+        setTimeout(() => {
+          let bx, by;
+          let attempts = 0;
+          do {
+            bx = Math.floor(Math.random() * 17) - 8; 
+            by = Math.floor(Math.random() * 17) - 8;
+            attempts++;
+          } while (
+            (bx === x || 
+             Math.abs(bx - x) < 2 || 
+             Math.abs(by - y) < 2 || 
+             Math.abs(bx - x) > 6 || 
+             Math.abs(by - y) > 6) && 
+            attempts < 150
+          );
+
+          setBlackStone({ x: bx, y: by });
+          const blackSvg = toSvgCoords(bx, by);
+          setAnimatedBlack({ x: blackSvg.x, y: blackSvg.y });
+          setBlackOpacity(1);
+
+          sfx.playPlace();
+          setGameState('INPUT_SLOPE');
+        }, 800);
+      };
+
+      const handleHitSuccess = (targetX, targetY) => {
+        const nextSuccess = successCount + 1;
+        setSuccessCount(nextSuccess);
+        setFeedbackMsg("정확한 기울기입니다! 나이스 샷!");
+
+        setWhiteStone({ x: targetX, y: targetY });
+        const finalSvg = toSvgCoords(targetX, targetY);
+        setAnimatedWhite({ x: finalSvg.x, y: finalSvg.y });
+
+        if (gameMode === 'TEAM' && nextSuccess >= maxSuccess) {
+          setTimeout(() => {
+            sfx.playFanfare();
+            setGameState('GAME_OVER');
+          }, 800);
+        } else {
+          setTimeout(() => {
+            if (gameMode === 'INDIVIDUAL' && timeLeft === 0) return;
+
+            setAnimatedBlack({ x: null, y: null });
+
+            let bx, by;
+            let attempts = 0;
+            do {
+              bx = Math.floor(Math.random() * 17) - 8;
+              by = Math.floor(Math.random() * 17) - 8;
+              attempts++;
+            } while (
+              (bx === targetX || 
+               Math.abs(bx - targetX) < 2 || 
+               Math.abs(by - targetY) < 2 || 
+               Math.abs(bx - targetX) > 6 || 
+               Math.abs(by - targetY) > 6) && 
+              attempts < 150
+            );
+
+            setBlackStone({ x: bx, y: by });
+            const blackSvg = toSvgCoords(bx, by);
+            setAnimatedBlack({ x: blackSvg.x, y: blackSvg.y });
+            setBlackOpacity(1);
+
+            setInputNum('');
+            setInputDen('');
+            setSlopeSign(1);
+            setFeedbackMsg('');
+            setGameState('INPUT_SLOPE');
+            sfx.playPlace();
+          }, 1200);
+        }
+      };
+
+      const handleHit = () => {
+        if (gameState !== 'INPUT_SLOPE') return;
+
+        if (gameMode === 'PRACTICE') {
+          const sY2 = formulaSlots.y2.value;
+          const sY1 = formulaSlots.y1.value;
+          const sX2 = formulaSlots.x2.value;
+          const sX1 = formulaSlots.x1.value;
+
+          if (sY2 === '' || sY1 === '' || sX2 === '' || sX1 === '') {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setShakeConfirmBtn(true);
+            setTimeout(() => setShakeConfirmBtn(false), 500);
+            return;
+          }
+
+          if (calcDy === '' || calcDx === '' || inputNum === '' || inputDen === '') {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setShakeConfirmBtn(true);
+            setTimeout(() => setShakeConfirmBtn(false), 500);
+            return;
+          }
+
+          const yCoords = [whiteStone.y, blackStone.y];
+          const xCoords = [whiteStone.x, blackStone.x];
+
+          const isYSubscribedCorrectly = 
+            yCoords.includes(parseInt(sY2, 10)) && 
+            yCoords.includes(parseInt(sY1, 10)) &&
+            (parseInt(sY2, 10) !== parseInt(sY1, 10) || blackStone.y === whiteStone.y);
+
+          const isXSubscribedCorrectly = 
+            xCoords.includes(parseInt(sX2, 10)) && 
+            xCoords.includes(parseInt(sX1, 10)) &&
+            (parseInt(sX2, 10) !== parseInt(sX1, 10) || blackStone.x === whiteStone.x);
+
+          if (!isYSubscribedCorrectly || !isXSubscribedCorrectly) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setShakeConfirmBtn(true);
+            setTimeout(() => setShakeConfirmBtn(false), 500);
+            return;
+          }
+
+          const labelY2 = formulaSlots.y2.label;
+          const labelY1 = formulaSlots.y1.label;
+          const labelX2 = formulaSlots.x2.label;
+          const labelX1 = formulaSlots.x1.label;
+
+          const isOrderMatching = 
+            (labelY2.startsWith('w') && labelX2.startsWith('w') && labelY1.startsWith('b') && labelX1.startsWith('b')) ||
+            (labelY2.startsWith('b') && labelX2.startsWith('b') && labelY1.startsWith('w') && labelX1.startsWith('w'));
+
+          if (!isOrderMatching) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setShakeConfirmBtn(true);
+            setTimeout(() => setShakeConfirmBtn(false), 500);
+            return;
+          }
+
+          const expectedDy = parseInt(sY2, 10) - parseInt(sY1, 10);
+          const expectedDx = parseInt(sX2, 10) - parseInt(sX1, 10);
+
+          if (parseInt(calcDy, 10) !== expectedDy || parseInt(calcDx, 10) !== expectedDx) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setShakeConfirmBtn(true);
+            setTimeout(() => setShakeConfirmBtn(false), 500);
+            return;
+          }
+
+          const realDy = blackStone.y - whiteStone.y;
+          const realDx = blackStone.x - whiteStone.x;
+          
+          const numVal = parseInt(inputNum, 10);
+          const denVal = parseInt(inputDen, 10);
+
+          const isFinalFractionCorrect = slopeSign * numVal * realDx === denVal * realDy;
+
+          if (!isFinalFractionCorrect) {
+            sfx.playMiss();
+            setFeedbackMsg("❌ 다시 풀어보세요");
+            setShakeConfirmBtn(true);
+            setTimeout(() => setShakeConfirmBtn(false), 500);
+            return;
+          }
+
+          sfx.playHit();
+          setPracticeAttempts(prev => prev + 1);
+          setPracticeSuccesses(prev => prev + 1);
+          setPracticeHistory(prev => [true, ...prev].slice(0, 5));
+          setSuccessCount(prev => prev + 1); 
+          setFeedbackMsg("🎉 정답입니다! 에너지가 충전되었습니다!");
+
+          setTimeout(() => {
+            generatePracticeProblem();
+          }, 1200);
+          return;
+        }
+
+        if (inputNum === '' || inputDen === '' || isNaN(parseInt(inputNum, 10)) || isNaN(parseInt(inputDen, 10))) {
+          sfx.playMiss();
+          setFeedbackMsg("❌ 숫자를 모두 입력해 주세요!");
+          return;
+        }
+        
+        const num = parseInt(inputNum, 10);
+        const den = parseInt(inputDen, 10);
+
+        if (den === 0) {
+          sfx.playMiss();
+          setFeedbackMsg("❌ 분모는 0이 될 수 없습니다!");
+          return;
+        }
+
+        setGameState('ANIMATING');
+        sfx.playSlide();
+
+        const dy = blackStone.y - whiteStone.y;
+        const dx = blackStone.x - whiteStone.x;
+        const userSlope = slopeSign * (num / den);
+
+        const userSign = slopeSign;
+        const isCorrect = userSign * num * dx === den * dy;
+        setIsHitCorrect(isCorrect);
+
+        const startSvg = toSvgCoords(whiteStone.x, whiteStone.y);
+        const blackSvg = toSvgCoords(blackStone.x, blackStone.y);
+        const angle = Math.atan(userSlope);
+        const direction = dx > 0 ? 1 : -1;
+
+        let progress = 0;
+        const speed = 10;
+
+        const animate = () => {
+          progress += speed;
+          const currentX = startSvg.x + direction * progress * Math.cos(angle);
+          const currentY = startSvg.y - direction * progress * Math.sin(angle);
+          setAnimatedWhite({ x: currentX, y: currentY });
+
+          const distToBlack = Math.hypot(currentX - blackSvg.x, currentY - blackSvg.y);
+
+          if (isCorrect && distToBlack < 22) {
+            sfx.playHit();
+            
+            setBlackStone({ x: null, y: null });
+            
+            let flyFrame = 0;
+            const originalBlackX = blackStone.x;
+            const originalBlackY = blackStone.y;
+
+            const flyAnimate = () => {
+              flyFrame++;
+              setAnimatedBlack(prev => ({
+                x: prev.x + direction * 8,
+                y: prev.y - 8
+              }));
+              setBlackOpacity(prev => Math.max(0, prev - 0.1));
+              
+              if (flyFrame < 10) {
+                requestAnimationFrame(flyAnimate);
+              } else {
+                handleHitSuccess(originalBlackX, originalBlackY);
+              }
+            };
+            flyAnimate();
+            return;
+          }
+
+          const isOutOfBounds = 
+            currentX < -100 || currentX > boardSize + 100 || 
+            currentY < -100 || currentY > boardSize + 100;
+
+          if (isOutOfBounds) {
+            if (isCorrect) {
+              handleHitSuccess(blackStone.x, blackStone.y);
+            } else {
+              sfx.playMiss();
+              
+              setFeedbackMsg("앗! 돌이 빗나갔습니다. 다시 한번 계산해 보세요!");
+              setShakeEgg(true);
+              setTimeout(() => setShakeEgg(false), 500);
+
+              setTimeout(() => {
+                const resetSvg = toSvgCoords(whiteStone.x, whiteStone.y);
+                setAnimatedWhite({ x: resetSvg.x, y: resetSvg.y });
+                setGameState('INPUT_SLOPE');
+              }, 1000);
+            }
+            return;
+          }
+
+          requestAnimationFrame(animate);
+        };
+
+        requestAnimationFrame(animate);
+      };
+
+      const gridLines = Array.from({ length: 17 }, (_, i) => i - 8);
+      const timerStr = formatTime(timeLeft);
+
+      return (
+        <div className="flex-1 flex flex-col justify-start h-full overflow-hidden">
+          
+          <header className="w-full bg-[#c4ccc9] border-b border-slate-400/80 px-6 py-2 flex items-center justify-between shadow-sm shrink-0">
+            <span className="text-xl font-bold text-slate-800 tracking-tight">기울기 알까기 클래스</span>
+            <div className="flex items-center gap-6 text-slate-700">
+              <button onClick={handleToggleMute} className="hover:text-slate-900 active:scale-95 transition-all p-1" title="소리 켜기/끄기">
+                {muted ? <MuteIcon /> : <SpeakerIcon />}
+              </button>
+              <button onClick={handleFullReset} className="hover:text-slate-900 active:scale-95 transition-all p-1" title="처음부터 다시 시작">
+                <RestartIcon />
+              </button>
+            </div>
+          </header>
+
+          <main className="flex-1 flex flex-col landscape:flex-row md:flex-row items-center justify-around p-3 gap-4 md:gap-8 w-full max-w-[1040px] select-none overflow-hidden shrink-0 mx-auto">
+            
+            <section className="egg-container flex flex-col items-center justify-between py-3 px-3 bg-white/20 rounded-2xl border border-slate-300/40 backdrop-blur-sm shadow-md shrink-0 self-center overflow-y-auto no-scrollbar gap-3">
+              
+              <div className="flex bg-slate-200/95 p-0.5 rounded-xl border border-slate-300/80 gap-0.5 w-full shrink-0 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('PRACTICE')}
+                  className={`flex-1 py-1 px-0 flex flex-col items-center justify-center font-black text-[10px] tracking-tighter leading-tight rounded-lg transition-all ${
+                    gameMode === 'PRACTICE' 
+                      ? 'bg-purple-600 text-white shadow-sm scale-105' 
+                      : 'text-slate-600 hover:bg-slate-300/50'
+                  }`}
+                >
+                  <span>공식</span><span>연습</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('INDIVIDUAL')}
+                  className={`flex-1 py-1 px-0 flex flex-col items-center justify-center font-black text-[10px] tracking-tighter leading-tight rounded-lg transition-all ${
+                    gameMode === 'INDIVIDUAL' 
+                      ? 'bg-sky-600 text-white shadow-sm scale-105' 
+                      : 'text-slate-600 hover:bg-slate-300/50'
+                  }`}
+                >
+                  <span>알까기</span><span>개인전</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleModeChange('TEAM')}
+                  className={`flex-1 py-1 px-0 flex flex-col items-center justify-center font-black text-[10px] tracking-tighter leading-tight rounded-lg transition-all ${
+                    gameMode === 'TEAM' 
+                      ? 'bg-[#4ca62a] text-white shadow-sm scale-105' 
+                      : 'text-slate-600 hover:bg-slate-300/50'
+                  }`}
+                >
+                  <span>알까기</span><span>팀전</span>
+                </button>
+              </div>
+
+              {gameMode === 'TEAM' && (
+                <div className="flex bg-[#e2e8f0]/90 p-1 rounded-full border border-slate-300 gap-1.5 items-center justify-between w-[92px] shrink-0 shadow-inner animate-fade-in">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (maxSuccess > 2) {
+                        setMaxSuccess(maxSuccess - 1);
+                        setSuccessCount(0);
+                        proceedToNextTurn();
+                      }
+                    }}
+                    className="w-5 h-5 rounded-full bg-slate-400/20 hover:bg-slate-400/40 flex items-center justify-center font-black text-xs text-slate-700 active:scale-90 transition-all"
+                  >
+                    ▼
+                  </button>
+                  <div className="flex-1 text-center font-black text-sm text-slate-800 select-none">
+                    {maxSuccess}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (maxSuccess < 30) {
+                        setMaxSuccess(maxSuccess + 1);
+                        setSuccessCount(0);
+                        proceedToNextTurn();
+                      }
+                    }}
+                    className="w-5 h-5 rounded-full bg-slate-400/20 hover:bg-slate-400/40 flex items-center justify-center font-black text-xs text-slate-700 active:scale-90 transition-all"
+                  >
+                    ▲
+                  </button>
+                </div>
+              )}
+
+              {gameMode === 'INDIVIDUAL' && (
+                <div className="flex flex-col items-center w-full gap-1 shrink-0 bg-slate-800/10 p-1.5 rounded-xl border border-slate-300/30 animate-fade-in">
+                  <div className="flex bg-white/80 p-0.5 rounded-full border border-slate-300 items-center justify-between w-[86px] shadow-sm shrink-0">
+                    <button
+                      type="button"
+                      disabled={isTimerActive}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (timerPreset > 1) {
+                          const nextPreset = timerPreset - 1;
+                          setTimerPreset(nextPreset);
+                          setTimeLeft(nextPreset * 60);
+                          setSuccessCount(0);
+                          proceedToNextTurn();
+                        }
+                      }}
+                      className="w-5 h-5 rounded-full bg-slate-300 hover:bg-slate-400 flex items-center justify-center font-black text-[10px] text-slate-700 active:scale-90 transition-all disabled:opacity-35"
+                    >
+                      ▼
+                    </button>
+                    <div className="flex-1 text-center font-black text-xs text-slate-800 select-none leading-none pt-0.5">
+                      {timerPreset}분
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isTimerActive}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (timerPreset < 10) {
+                          const nextPreset = timerPreset + 1;
+                          setTimerPreset(nextPreset);
+                          setTimeLeft(nextPreset * 60);
+                          setSuccessCount(0);
+                          proceedToNextTurn();
+                        }
+                      }}
+                      className="w-5 h-5 rounded-full bg-slate-300 hover:bg-slate-400 flex items-center justify-center font-black text-[10px] text-slate-700 active:scale-90 transition-all disabled:opacity-35"
+                    >
+                      ▲
+                    </button>
+                  </div>
+                  <div className={`font-mono font-black text-sm tracking-wider ${timeLeft < 30 ? 'text-rose-600 animate-pulse' : 'text-slate-800'}`}>
+                    ⏱ {timerStr}
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setIsTimerActive(!isTimerActive)}
+                      disabled={timeLeft === 0 || gameState === 'GAME_OVER'}
+                      className={`px-2 py-0.5 rounded-full text-[9px] font-black text-white shadow transition-all active:scale-95 ${
+                        isTimerActive ? 'bg-amber-500 hover:bg-amber-600' : 'bg-sky-600 hover:bg-sky-700'
+                      }`}
+                    >
+                      {isTimerActive ? '정지' : '시작'}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTimeLeft(timerPreset * 60);
+                        setIsTimerActive(false);
+                        setSuccessCount(0);
+                        proceedToNextTurn();
+                      }}
+                      className="px-2 py-0.5 rounded-full text-[9px] font-black text-slate-700 bg-slate-200 hover:bg-slate-300 border border-slate-300 shadow active:scale-95 transition-all"
+                    >
+                      리셋
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="w-full flex-1 flex flex-col items-center justify-center relative min-h-0 py-1">
+                {gameMode === 'TEAM' ? (
+                  <svg viewBox="0 0 100 240" className="w-full h-full max-h-[180px] drop-shadow-[0_4px_8px_rgba(0,0,0,0.12)]">
+                    <defs>
+                      <radialGradient id="eggShellGrad" cx="35%" cy="35%" r="65%">
+                        <stop offset="0%" stopColor="#bbf7d0" />
+                        <stop offset="70%" stopColor="#22c55e" />
+                        <stop offset="100%" stopColor="#15803d" />
+                      </radialGradient>
+                      <radialGradient id="activeOvalGrad" cx="30%" cy="30%" r="70%">
+                        <stop offset="0%" stopColor="#64748b" />
+                        <stop offset="40%" stopColor="#1e293b" />
+                        <stop offset="100%" stopColor="#020617" />
+                      </radialGradient>
+                      <radialGradient id="inactiveOvalGrad" cx="30%" cy="30%" r="70%">
+                        <stop offset="0%" stopColor="#ffffff" />
+                        <stop offset="65%" stopColor="#e2e8f0" />
+                        <stop offset="100%" stopColor="#cbd5e1" />
+                      </radialGradient>
+                    </defs>
+
+                    {gameState !== 'GAME_OVER' ? (
+                      <g>
+                        {Array.from({ length: maxSuccess }).map((_, idx) => {
+                          const isActive = successCount > idx;
+                          const cyPos = 110 - (idx * stepY);
+                          return (
+                            <ellipse 
+                              key={idx}
+                              cx="50" 
+                              cy={cyPos} 
+                              rx="22" 
+                              ry={ry} 
+                              fill={isActive ? "url(#activeOvalGrad)" : "url(#inactiveOvalGrad)"}
+                              stroke={isActive ? "#020617" : "#b2bbc2"}
+                              strokeWidth="1"
+                              opacity={isActive ? "1" : "0.5"}
+                            />
+                          );
+                        })}
+
+                        <path 
+                          d="M 50,120 C 20,120 5,155 5,190 C 5,225 25,235 50,235 C 75,235 95,225 95,190 C 95,155 80,120 50,120 Z" 
+                          fill="url(#eggShellGrad)"
+                          stroke="#14532d"
+                          strokeWidth="1.5"
+                        />
+
+                        {successCount > 0 && (
+                          <g strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
+                            {progressRatio >= 0.12 && (
+                              <>
+                                <path d="M 50,145 L 47,155 L 53,162" stroke="#bbf7d0" strokeWidth="4.5" fill="none" />
+                                <path d="M 50,145 L 47,155 L 53,162" stroke="#064e3b" strokeWidth="1.8" fill="none" />
+                              </>
+                            )}
+                            {progressRatio >= 0.25 && (
+                              <>
+                                <path d="M 53,162 L 45,175 L 52,185" stroke="#bbf7d0" strokeWidth="4.5" fill="none" />
+                                <path d="M 53,162 L 45,175 L 52,185" stroke="#064e3b" strokeWidth="1.8" fill="none" />
+                              </>
+                            )}
+                            {progressRatio >= 0.37 && (
+                              <>
+                                <path d="M 47,155 L 35,150 L 28,158" stroke="#bbf7d0" strokeWidth="4.5" fill="none" />
+                                <path d="M 47,155 L 35,150 L 28,158" stroke="#064e3b" strokeWidth="1.8" fill="none" />
+                              </>
+                            )}
+                            {progressRatio >= 0.50 && (
+                              <>
+                                <path d="M 53,162 L 68,166 L 75,158" stroke="#bbf7d0" strokeWidth="4.5" fill="none" />
+                                <path d="M 53,162 L 68,166 L 75,158" stroke="#064e3b" strokeWidth="1.8" fill="none" />
+                              </>
+                            )}
+                            {progressRatio >= 0.62 && (
+                              <>
+                                <path d="M 45,175 L 35,182 L 38,195" stroke="#bbf7d0" strokeWidth="4.5" fill="none" />
+                                <path d="M 45,175 L 35,182 L 38,195" stroke="#064e3b" strokeWidth="1.8" fill="none" />
+                              </>
+                            )}
+                            {progressRatio >= 0.75 && (
+                              <>
+                                <path d="M 52,185 L 64,190 L 60,202" stroke="#bbf7d0" strokeWidth="4.5" fill="none" />
+                                <path d="M 52,185 L 64,190 L 60,202" stroke="#064e3b" strokeWidth="1.8" fill="none" />
+                              </>
+                            )}
+                            {progressRatio >= 0.87 && (
+                              <>
+                                <path d="M 50,145 L 38,138 L 42,128" stroke="#bbf7d0" strokeWidth="4.5" fill="none" />
+                                <path d="M 50,145 L 38,138 L 42,128" stroke="#064e3b" strokeWidth="1.8" fill="none" />
+                              </>
+                            )}
+                          </g>
+                        )}
+                      </g>
+                    ) : (
+                      <g className="animate-scale-up">
+                        <path d="M 10,185 C 10,235 90,235 90,185 L 78,176 L 64,188 L 50,172 L 36,188 L 22,176 Z" fill="url(#eggShellGrad)" stroke="#14532d" strokeWidth="2.5" />
+                        <ellipse cx="50" cy="148" rx="27" ry="25" fill="#facc15" stroke="#2d251e" strokeWidth="2.5" />
+                        <path d="M 18,155 Q 8,146 12,162 Z" fill="#eab308" stroke="#2d251e" strokeWidth="2" />
+                        <path d="M 82,155 Q 92,146 88,162 Z" fill="#eab308" stroke="#2d251e" strokeWidth="2" />
+                        <circle cx="38" cy="142" r="7.5" fill="#1e293b" />
+                        <circle cx="36" cy="139" r="2.5" fill="#ffffff" />
+                        <circle cx="62" cy="142" r="7.5" fill="#1e293b" />
+                        <circle cx="60" cy="139" r="2.5" fill="#ffffff" />
+                        <ellipse cx="27" cy="151" rx="4.5" ry="3.5" fill="#f87171" opacity="0.75" />
+                        <ellipse cx="73" cy="151" rx="4.5" ry="3.5" fill="#f87171" opacity="0.75" />
+                        <path d="M 33,149 Q 50,162 67,149 Q 50,154 33,149 Z" fill="#fb923c" stroke="#2d251e" strokeWidth="2" />
+                        <path d="M 22,128 Q 50,92 78,128 L 68,135 L 50,123 L 32,135 Z" fill="url(#eggShellGrad)" stroke="#14532d" strokeWidth="2.2" />
+                      </g>
+                    )}
+                  </svg>
+                ) : (
+                  <div className="w-full h-full flex flex-col items-center justify-center p-0.5 min-h-[100px]">
+                    <svg viewBox="0 0 100 200" className="w-full h-20 max-h-[100px] drop-shadow-[0_4px_8px_rgba(56,189,248,0.25)]">
+                      <defs>
+                        <linearGradient id="energyGrad" x1="0%" y1="100%" x2="0%" y2="0%">
+                          <stop offset="0%" stopColor="#0369a1" />
+                          <stop offset="50%" stopColor="#0ea5e9" />
+                          <stop offset="100%" stopColor="#38bdf8" />
+                        </linearGradient>
+                      </defs>
+                      <rect x="25" y="25" width="50" height="150" rx="25" fill="#0f172a" fillOpacity="0.4" stroke="#475569" strokeWidth="3" />
+                      <rect x="35" y="10" width="30" height="15" rx="3" fill="#64748b" stroke="#334155" strokeWidth="1.5" />
+                      <rect x="30" y="175" width="40" height="15" rx="3" fill="#64748b" stroke="#334155" strokeWidth="1.5" />
+                      {successCount > 0 && (
+                        <rect 
+                          x="29" 
+                          y={Math.max(30, 170 - liquidHeight)} 
+                          width="42" 
+                          height={liquidHeight} 
+                          rx="21" 
+                          fill="url(#energyGrad)" 
+                          className="animate-pulse"
+                        />
+                      )}
+                      <path 
+                        d="M52 45 L38 110 L48 110 L44 165 L62 95 L50 95 Z" 
+                        fill={successCount > 0 ? "#ffffff" : "#475569"} 
+                        opacity={successCount > 0 ? "0.9" : "0.3"} 
+                        className={successCount > 0 ? "animate-bounce" : ""}
+                      />
+                    </svg>
+
+                    <div className="text-center mt-2">
+                      <div className="text-[10px] text-slate-800 font-extrabold uppercase tracking-widest leading-none">에너지 충전량</div>
+                      <div className="text-2xl font-black text-blue-900 drop-shadow-sm mt-0.5 leading-none">{currentEnergy} Wh</div>
+                    </div>
+                  </div>
+                )}
+
+                {gameState === 'GAME_OVER' && (
+                  <button
+                    onClick={handleFullReset}
+                    className="absolute bottom-2 px-4 py-1.5 bg-yellow-400 hover:bg-yellow-300 text-slate-900 font-extrabold text-xs rounded-full shadow-md active:scale-95 transition-all animate-bounce"
+                  >
+                    다시 하기
+                  </button>
+                )}
+              </div>
+
+              {gameMode === 'TEAM' && (
+                <div className="w-full text-center text-[10px] font-black text-slate-800 bg-[#cbd5e1]/70 rounded-lg py-1.5 px-1 border border-slate-300/80 shrink-0 shadow-inner leading-tight mt-auto">
+                  팀전 달성
+                  <div className="text-xs font-black mt-1">{successCount} / {maxSuccess} 개</div>
+                </div>
+              )}
+              {gameMode === 'INDIVIDUAL' && (
+                <div className="w-full text-center text-[10px] font-black text-slate-800 bg-[#cbd5e1]/70 rounded-lg py-1.5 px-1 border border-slate-300/80 shrink-0 shadow-inner leading-tight mt-auto">
+                  알까기 개인전
+                  <div className="text-xs font-black mt-1">최대 전력 도달하기</div>
+                </div>
+              )}
+              {gameMode === 'PRACTICE' && (
+                <div className="w-full text-center text-[10px] font-black text-slate-800 bg-[#cbd5e1]/70 rounded-lg py-1.5 px-1 border border-slate-300/80 shrink-0 shadow-inner leading-tight mt-auto">
+                  공식 연습 점수
+                  <div className="text-xs font-black mt-1">{practiceSuccesses * 10} Wh</div>
+                </div>
+              )}
+            </section>
+
+            <section className="board-container flex-initial flex flex-col items-center justify-center min-w-0 min-h-0 shrink-0">
+              {gameMode === 'PRACTICE' ? (
+                <div className="board-wrapper relative bg-[#fef3c7] rounded-2xl p-5 border-4 border-slate-700/80 flex flex-col justify-between items-center text-slate-800 shadow-2xl w-full max-w-[620px] min-h-[480px] transition-all">
+                  
+                  <div className="flex justify-between items-start w-full shrink-0">
+                    <div className="text-left">
+                      <h3 className="text-base font-black text-slate-700 uppercase tracking-widest leading-none">기울기 공식 대입 연습</h3>
+                      <p className="text-[10px] text-slate-600 mt-1 font-bold">좌표 숫자를 터치한 뒤 알맞은 수식 빈칸에 대입해 보세요.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={generatePracticeProblem}
+                      className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-[11px] rounded-full shadow-md active:scale-95 transition-all shrink-0 animate-fade-in"
+                    >
+                      새 문제 도전 🔁
+                    </button>
+                  </div>
+
+                  <div className="flex justify-center items-center gap-2 my-2 w-full bg-white/75 p-3 rounded-xl border border-amber-300 shadow-sm shrink-0">
+                    <span className="text-2xl font-black text-slate-700 mr-2">두 점</span>
+                    <div className="flex items-center text-3xl font-black tracking-wide text-slate-800 bg-white px-4 py-1.5 rounded-2xl border-2 border-slate-300 shadow-sm">
+                      (
+                      <button
+                        type="button"
+                        onClick={() => setActiveSelection({ value: whiteStone.x, label: 'wX' })}
+                        className={`mx-1 px-3 py-1 rounded-xl transition-all ${
+                          activeSelection?.label === 'wX' 
+                            ? 'bg-purple-600 text-white scale-110 shadow-md' 
+                            : 'text-emerald-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {whiteStone.x}
+                      </button>
+                      ,
+                      <button
+                        type="button"
+                        onClick={() => setActiveSelection({ value: whiteStone.y, label: 'wY' })}
+                        className={`mx-1 px-3 py-1 rounded-xl transition-all ${
+                          activeSelection?.label === 'wY' 
+                            ? 'bg-purple-600 text-white scale-110 shadow-md' 
+                            : 'text-emerald-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {whiteStone.y}
+                      </button>
+                      )
+                    </div>
+                    
+                    <span className="text-3xl font-black text-slate-500 mx-1">,</span>
+
+                    <div className="flex items-center text-3xl font-black tracking-wide text-slate-800 bg-white px-4 py-1.5 rounded-2xl border-2 border-slate-300 shadow-sm">
+                      (
+                      <button
+                        type="button"
+                        onClick={() => setActiveSelection({ value: blackStone.x, label: 'bX' })}
+                        className={`mx-1 px-3 py-1 rounded-xl transition-all ${
+                          activeSelection?.label === 'bX' 
+                            ? 'bg-purple-600 text-white scale-110 shadow-md' 
+                            : 'text-rose-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {blackStone.x}
+                      </button>
+                      ,
+                      <button
+                        type="button"
+                        onClick={() => setActiveSelection({ value: blackStone.y, label: 'bY' })}
+                        className={`mx-1 px-3 py-1 rounded-xl transition-all ${
+                          activeSelection?.label === 'bY' 
+                            ? 'bg-purple-600 text-white scale-110 shadow-md' 
+                            : 'text-rose-700 hover:bg-slate-100'
+                        }`}
+                      >
+                        {blackStone.y}
+                      </button>
+                      )
+                    </div>
+                  </div>
+
+                  <div className="flex-1 w-full flex flex-col justify-center items-center py-2 shrink-0">
+                    <div className="grid grid-cols-[max-content_max-content_max-content_max-content_max-content] gap-x-3 gap-y-6 items-center mx-auto">
+                      
+                      <div className="text-2xl font-black text-slate-700 text-right pr-2">기울기</div>
+                      <div className="text-2xl font-black text-slate-400 text-center">=</div>
+                      <div className="flex flex-col items-center gap-1.5 px-2 justify-self-start">
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSlotClick('y2')}
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg border-2 shadow-sm transition-all ${
+                              slotErrors.y2 
+                                ? 'bg-rose-100 border-rose-600 text-rose-800 animate-wiggle'
+                                : formulaSlots.y2.value !== '' 
+                                  ? 'bg-purple-100 border-purple-400 text-purple-800' 
+                                  : 'bg-white border-dashed border-slate-400 text-slate-400'
+                            }`}
+                          >
+                            {formulaSlots.y2.value !== '' ? formulaSlots.y2.value : ''}
+                          </button>
+                          <span className="text-slate-500 font-bold text-sm mx-1">-</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSlotClick('y1')}
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg border-2 shadow-sm transition-all ${
+                              slotErrors.y1 
+                                ? 'bg-rose-100 border-rose-600 text-rose-800 animate-wiggle'
+                                : formulaSlots.y1.value !== '' 
+                                  ? 'bg-purple-100 border-purple-400 text-purple-800' 
+                                  : 'bg-white border-dashed border-slate-400 text-slate-400'
+                            }`}
+                          >
+                            {formulaSlots.y1.value !== '' ? formulaSlots.y1.value : ''}
+                          </button>
+                        </div>
+                        
+                        <div className="w-28 h-0.5 bg-slate-800 rounded-full" />
+                        
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            type="button"
+                            onClick={() => handleSlotClick('x2')}
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg border-2 shadow-sm transition-all ${
+                              slotErrors.x2 
+                                ? 'bg-rose-100 border-rose-600 text-rose-800 animate-wiggle'
+                                : formulaSlots.x2.value !== '' 
+                                  ? 'bg-purple-100 border-purple-400 text-purple-800' 
+                                  : 'bg-white border-dashed border-slate-400 text-slate-400'
+                            }`}
+                          >
+                            {formulaSlots.x2.value !== '' ? formulaSlots.x2.value : ''}
+                          </button>
+                          <span className="text-slate-500 font-bold text-sm mx-1">-</span>
+                          <button
+                            type="button"
+                            onClick={() => handleSlotClick('x1')}
+                            className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-lg border-2 shadow-sm transition-all ${
+                              slotErrors.x1 
+                                ? 'bg-rose-100 border-rose-600 text-rose-800 animate-wiggle'
+                                : formulaSlots.x1.value !== '' 
+                                  ? 'bg-purple-100 border-purple-400 text-purple-800' 
+                                  : 'bg-white border-dashed border-slate-400 text-slate-400'
+                            }`}
+                          >
+                            {formulaSlots.x1.value !== '' ? formulaSlots.x1.value : ''}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="text-2xl font-black text-slate-400 text-center">=</div>
+                      <div className="flex flex-col items-center gap-1.5 px-2 justify-self-start">
+                        <CustomPracticeSpinner
+                          value={calcDy}
+                          onChange={(val) => setCalcDy(val)}
+                          disabled={gameState !== 'INPUT_SLOPE'}
+                          widthClass="w-14"
+                        />
+                        <div className="w-14 h-0.5 bg-slate-800 rounded-full" />
+                        <CustomPracticeSpinner
+                          value={calcDx}
+                          onChange={(val) => setCalcDx(val)}
+                          disabled={gameState !== 'INPUT_SLOPE'}
+                          widthClass="w-14"
+                        />
+                      </div>
+
+                      <div></div>
+                      <div className="text-2xl font-black text-slate-400 text-center">=</div>
+                      <div className="col-span-3 flex items-center gap-3.5 justify-self-start pl-2">
+                        <button
+                          type="button"
+                          disabled={gameState !== 'INPUT_SLOPE'}
+                          onClick={() => setSlopeSign(prev => prev * -1)}
+                          className="w-10 h-10 rounded-full flex items-center justify-center font-extrabold text-xl text-white transition-all shadow-md bg-[#4ca62a] hover:bg-[#439524]"
+                        >
+                          {slopeSign === 1 ? '+' : '-'}
+                        </button>
+
+                        <div className="flex flex-col items-center gap-1.5">
+                          <CustomSpinner
+                            value={inputNum}
+                            onChange={(val) => setInputNum(val)}
+                            disabled={gameState !== 'INPUT_SLOPE'}
+                            widthClass="w-14"
+                            min={0}
+                          />
+                          <div className="w-14 h-0.5 bg-slate-800 rounded-full" />
+                          <CustomSpinner
+                            value={inputDen}
+                            onChange={(val) => setInputDen(val)}
+                            disabled={gameState !== 'INPUT_SLOPE'}
+                            widthClass="w-14"
+                            min={0}
+                          />
+                        </div>
+                        
+                        <button
+                          onClick={handleHit}
+                          disabled={gameState !== 'INPUT_SLOPE' || !isSubstitutionCorrect || calcDy === '' || calcDx === ''}
+                          className={`ml-3 px-6 py-3.5 disabled:bg-slate-300 disabled:text-slate-500 disabled:cursor-not-allowed text-white font-black text-sm rounded-xl shadow-lg transition-all active:scale-[0.98] shrink-0 ${shakeConfirmBtn ? 'bg-rose-600 animate-wiggle' : 'bg-purple-700 hover:bg-purple-600'}`}
+                        >
+                          확인
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-10 w-full mt-2 flex items-center justify-center shrink-0">
+                    <div className={`px-5 py-2 rounded-xl text-center bg-white/95 border border-slate-300 shadow-md transition-all duration-300 ${feedbackMsg ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-2 pointer-events-none'}`}>
+                      <p className={`text-sm font-black ${feedbackMsg.includes('정답') ? 'text-emerald-700' : 'text-rose-600'}`}>
+                        {feedbackMsg}
+                      </p>
+                    </div>
+                  </div>
+
+                </div>
+              ) : (
+                <div className="board-wrapper relative bg-amber-50 rounded-2xl overflow-hidden shadow-2xl border-4 border-slate-700/80">
+                  <svg
+                    viewBox={"0 0 " + boardSize + " " + boardSize}
+                    onClick={handleBoardClick}
+                    className="w-full h-full"
+                  >
+                    <defs>
+                      <radialGradient id="wood" cx="50%" cy="50%" r="75%">
+                        <stop offset="0%" stopColor="#ffd877" />
+                        <stop offset="60%" stopColor="#fcae39" />
+                        <stop offset="100%" stopColor="#df941a" />
+                      </radialGradient>
+                      <filter id="stoneShadow" x="-30%" y="-30%" width="160%" height="160%">
+                        <feDropShadow dx="1.5" dy="4" stdDeviation="2.5" floodColor="#000000" floodOpacity="0.45" />
+                      </filter>
+                      <radialGradient id="whiteStoneGrad" cx="30%" cy="30%" r="70%">
+                        <stop offset="0%" stopColor="#ffffff" />
+                        <stop offset="75%" stopColor="#f8fafc" />
+                        <stop offset="100%" stopColor="#94a3b8" />
+                      </radialGradient>
+                      <radialGradient id="blackStoneGrad" cx="35%" cy="35%" r="65%">
+                        <stop offset="0%" stopColor="#5a6a85" />
+                        <stop offset="25%" stopColor="#1e293b" />
+                        <stop offset="100%" stopColor="#020617" />
+                      </radialGradient>
+                    </defs>
+
+                    <rect width={boardSize} height={boardSize} fill="url(#wood)" />
+
+                    {Array.from({ length: 32 }).map((_, idx) => (
+                      <line
+                        key={`wood-grain-${idx}`}
+                        x1={margin + (gridAreaSize / 32) * idx + (Math.sin(idx) * 2)}
+                        y1={margin}
+                        x2={margin + (gridAreaSize / 32) * idx + (Math.cos(idx) * 2)}
+                        y2={boardSize - margin}
+                        stroke="#854d0e"
+                        strokeWidth="0.8"
+                        opacity="0.08"
+                      />
+                    ))}
+
+                    {gridLines.map((coord) => {
+                      const isAxis = coord === 0;
+                      const { x, y } = toSvgCoords(coord, coord);
+
+                      return (
+                        <g key={coord}>
+                          <line 
+                            x1={x} 
+                            y1={margin} 
+                            x2={x} 
+                            y2={boardSize - margin} 
+                            stroke={isAxis ? '#000000' : '#452b0c'} 
+                            strokeWidth={isAxis ? 3 : 0.85} 
+                            opacity={isAxis ? 0.95 : 0.45} 
+                          />
+                          <line 
+                            x1={margin} 
+                            y1={y} 
+                            x2={boardSize - margin} 
+                            y2={y} 
+                            stroke={isAxis ? '#000000' : '#452b0c'} 
+                            strokeWidth={isAxis ? 3 : 0.85} 
+                            opacity={isAxis ? 0.95 : 0.45} 
+                          />
+                          {coord !== 0 && coord % 2 === 0 && (
+                            <>
+                              <text x={x} y={halfSize + 18} fontSize="14" fontWeight="800" fill="#000000" textAnchor="middle">{coord}</text>
+                              <text x={halfSize - 10} y={y + 4} fontSize="14" fontWeight="800" fill="#000000" textAnchor="end">{coord}</text>
+                            </>
+                          )}
+                        </g>
+                      );
+                    })}
+
+                    <text x={halfSize - 16} y={halfSize + 18} fontSize="16" fontWeight="bold" fill="#000000">O</text>
+                    <text x={boardSize - margin + 12} y={halfSize + 18} fontSize="16" fontWeight="bold" fontStyle="italic" fill="#000000">x</text>
+                    <text x={halfSize + 10} y={margin - 12} fontSize="16" fontWeight="bold" fontStyle="italic" fill="#000000">y</text>
+
+                    <line x1={margin - 15} y1={halfSize} x2={boardSize - margin + 18} y2={halfSize} stroke="#000000" strokeWidth="3" />
+                    <line x1={halfSize} y1={boardSize - margin + 15} x2={halfSize} y2={margin - 18} stroke="#000000" strokeWidth="3" />
+
+                    <polygon points={`${boardSize - margin + 18},${halfSize} ${boardSize - margin + 8},${halfSize - 6} ${boardSize - margin + 8},${halfSize + 6}`} fill="#000000" />
+                    <polygon points={`${halfSize},${margin - 18} ${halfSize - 6},${margin - 8} ${halfSize + 6},${margin - 8}`} fill="#000000" />
+
+                    {animatedWhite.x !== null && (
+                      <g filter="url(#stoneShadow)">
+                        <circle cx={animatedWhite.x} cy={animatedWhite.y} r="12.5" fill="url(#whiteStoneGrad)" />
+                      </g>
+                    )}
+
+                    {animatedBlack.x !== null && (
+                      <g filter="url(#stoneShadow)" opacity={blackOpacity}>
+                        <circle cx={animatedBlack.x} cy={animatedBlack.y} r="12.5" fill="url(#blackStoneGrad)" />
+                        <circle cx={animatedBlack.x - 3} cy={animatedBlack.y - 3} r="2" fill="white" opacity="0.8" />
+                      </g>
+                    )}
+
+                    {whiteStone.x !== null && gameState !== 'PLACE_WHITE' && gameState !== 'ANIMATING' && (
+                      <g transform={`translate(${toSvgCoords(whiteStone.x, whiteStone.y).x}, ${toSvgCoords(whiteStone.x, whiteStone.y).y})`}>
+                        <rect x="-44" y="16" width="88" height="26" rx="13" ry="13" fill="rgba(235, 228, 210, 0.9)" stroke="rgba(45, 37, 30, 0.25)" strokeWidth="1.5" filter="url(#stoneShadow)" />
+                        <text x="0" y="34" fill="#2d251e" fontSize="17" fontWeight="900" textAnchor="middle" letterSpacing="0.2">
+                          ( {whiteStone.x}, {whiteStone.y} )
+                        </text>
+                      </g>
+                    )}
+
+                    {blackStone.x !== null && gameState !== 'PLACE_WHITE' && gameState !== 'ANIMATING' && (
+                      <g transform={`translate(${toSvgCoords(blackStone.x, blackStone.y).x}, ${toSvgCoords(blackStone.x, blackStone.y).y})`}>
+                        <rect x="-44" y="16" width="88" height="26" rx="13" ry="13" fill="rgba(235, 228, 210, 0.9)" stroke="rgba(45, 37, 30, 0.25)" strokeWidth="1.5" filter="url(#stoneShadow)" />
+                        <text x="0" y="34" fill="#2d251e" fontSize="17" fontWeight="900" textAnchor="middle" letterSpacing="0.2">
+                          ( {blackStone.x}, {blackStone.y} )
+                        </text>
+                      </g>
+                    )}
+                  </svg>
+                </div>
+              )}
+            </section>
+
+            {gameMode !== 'PRACTICE' && (
+              <section className="input-container flex flex-col items-center justify-center p-4 bg-[#cbd5e1]/50 border border-slate-300 rounded-3xl shadow-xl w-[260px] shrink-0 animate-fade-in">
+                <h3 className="text-xl font-black text-slate-800 mb-6 tracking-wide">기울기 입력</h3>
+                
+                <div className="flex items-center gap-4 justify-center">
+                  
+                  <button
+                    type="button"
+                    disabled={gameState !== 'INPUT_SLOPE'}
+                    onClick={() => setSlopeSign(prev => prev * -1)}
+                    className={`w-11 h-11 rounded-full flex items-center justify-center font-extrabold text-2xl text-white transition-all shadow-md active:scale-95 ${
+                      gameState !== 'INPUT_SLOPE'
+                        ? 'opacity-40 bg-emerald-700'
+                        : 'bg-[#4ca62a] hover:bg-[#439524] border-2 border-white'
+                    }`}
+                    style={{ boxShadow: '0 4px 6px -1px rgba(0,0,0,0.2)' }}
+                  >
+                    {slopeSign === 1 ? '+' : '-'}
+                  </button>
+
+                  <div className="flex flex-col items-center gap-2">
+                    <CustomSpinner
+                      value={inputNum}
+                      onChange={(val) => setInputNum(val)}
+                      disabled={gameState !== 'INPUT_SLOPE'}
+                      min={0}
+                    />
+                    
+                    <div className="w-16 h-1 bg-slate-800 rounded-full" />
+                    
+                    <CustomSpinner
+                      value={inputDen}
+                      onChange={(val) => setInputDen(val)}
+                      disabled={gameState !== 'INPUT_SLOPE'}
+                      min={0}
+                    />
+                  </div>
+
+                  <button
+                    onClick={handleHit}
+                    disabled={gameState !== 'INPUT_SLOPE'}
+                    className="px-5 py-3.5 bg-[#404040] hover:bg-[#2b2b2b] text-white font-black text-base rounded-full shadow-lg transition-all active:scale-95 disabled:bg-slate-400 disabled:text-slate-200 disabled:cursor-not-allowed border border-slate-600"
+                    style={{ borderRadius: '1.5rem' }}
+                  >
+                    치기
+                  </button>
+                </div>
+
+                <div className={`mt-6 px-4 py-2.5 rounded-xl text-center bg-white/90 border border-slate-300 shadow-md transition-all duration-300 w-full ${feedbackMsg ? 'opacity-100 scale-100' : 'opacity-0 scale-95 pointer-events-none'}`}>
+                  <p className={`text-sm font-black ${isHitCorrect ? 'text-emerald-700' : 'text-rose-600'}`}>
+                    {feedbackMsg || '조준 완료'}
+                  </p>
+                </div>
+              </section>
+            )}
+
+          </main>
+        </div>
+      );
+    }
+
+    const rootElement = document.getElementById("root");
+    const root = ReactDOM.createRoot(rootElement);
+    root.render(<App />);
+  </script>
+</body>
+</html>
