@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연립방정식 도미노 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&display=swap');
+
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            background-color: #F8FAFC;
+            margin: 0;
+            overflow-x: hidden;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(45, 55, 72, 0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-container {
+            background-color: white;
+            border-radius: 40px;
+            width: 720px;
+            max-width: 95%;
+            padding: 60px 50px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        .game-header {
+            background: white;
+            padding: 15px 40px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #E2E8F0;
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .slot-area {
+            height: 170px;
+            background-color: #F1F5F9;
+            background-image: radial-gradient(#CBD5E0 1.5px, transparent 1.5px);
+            background-size: 30px 30px;
+            display: flex;
+            align-items: center;
+            padding: 0 40px;
+            gap: 15px;
+            overflow-x: auto;
+            border-bottom: 2px dashed #E2E8F0;
+        }
+
+        .slot-placeholder {
+            width: 260px;
+            height: 110px;
+            border: 3px dashed #CBD5E0;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #94A3B8;
+            font-size: 28px;
+            font-weight: 900;
+            flex-shrink: 0;
+        }
+
+        .domino-card {
+            width: 260px;
+            height: 110px;
+            background: white;
+            border: 2px solid #5850EC;
+            border-radius: 20px;
+            display: flex;
+            overflow: hidden;
+            flex-shrink: 0;
+            cursor: pointer;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+
+        .domino-card:hover:not(.no-hover) { 
+            transform: translateY(-5px);
+            box-shadow: 0 20px 25px -5px rgba(88, 80, 236, 0.2);
+            border-color: #4338CA;
+        }
+
+        .side-label {
+            width: 32%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: 900;
+            text-align: center;
+            padding: 4px;
+            line-height: 1.2;
+            flex-shrink: 0;
+            white-space: nowrap;
+        }
+
+        .side-content {
+            width: 68%;
+            padding: 4px 8px;
+            display: flex;
+            align-items: center;
+            position: relative;
+            background-color: white;
+            border-left: 1px solid #F1F5F9;
+            flex-grow: 1;
+        }
+
+        .brace {
+            color: #5850EC;
+            font-size: 46px;
+            font-weight: 300;
+            font-family: serif;
+            margin-right: 4px;
+            line-height: 1;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .eq-box { 
+            font-size: 13px;
+            font-weight: 700; 
+            color: #1E293B; 
+            line-height: 1.4; 
+            white-space: nowrap; 
+        }
+
+        .frac {
+            display: inline-block;
+            vertical-align: middle;
+            text-align: center;
+            font-size: 0.9em;
+            margin: 0 1px;
+        }
+        .frac > span { display: block;
+            padding: 0.02em; }
+        .frac span.n { border-bottom: 1.2px solid currentColor;
+        }
+
+        .diff-tag {
+            position: absolute;
+            top: 4px;
+            right: 8px;
+            font-size: 9px;
+            padding: 1px 5px;
+            border-radius: 5px;
+            font-weight: 800;
+        }
+
+        .start-bg { background-color: #FBBF24; color: white;
+        }
+        .ans-bg { background-color: #F8FAFC; color: #4F46E5; border-right: 1px solid #E2E8F0;
+        }
+        
+        .diff-high { background-color: #FEF2F2;
+            color: #EF4444; }
+        .diff-mid { background-color: #FFFBEB; color: #D97706;
+        }
+        .diff-low { background-color: #F0FDF4; color: #22C55E;
+        }
+
+        .hidden { display: none !important;
+        }
+
+        .example-card {
+            width: 200px !important;
+            height: 85px !important;
+            flex-shrink: 0;
+        }
+        .example-card .side-label { font-size: 14px !important;
+        }
+        .example-card .eq-box { font-size: 11px !important;
+        }
+        .example-card .brace { font-size: 34px !important;
+        }
+
+        /* 전체보기 오버레이 전용 스타일 */
+        .tv-card-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+            width: 100%;
+            height: calc(100% - 150px);
+            align-content: center;
+        }
+
+        .overlay-card {
+            width: 100% !important;
+            height: 22vh !important;
+            max-height: 220px;
+            min-height: 100px;
+            border-width: 3px !important;
+        }
+        
+        .overlay-card .side-label { 
+            font-size: clamp(16px, 1.8vw, 24px) !important;
+        }
+        .overlay-card .eq-box { 
+            font-size: clamp(14px, 1.4vw, 20px) !important;
+            line-height: 1.6; 
+        }
+        .overlay-card .brace { 
+            font-size: clamp(40px, 5vw, 70px) !important;
+        }
+        .overlay-card .diff-tag { 
+            font-size: 10px !important;
+            top: 6px; 
+            right: 10px;
+        }
+
+        @keyframes slide-right-soft {
+            0% { transform: translateX(0);
+                opacity: 0.3; }
+            50% { transform: translateX(12px); opacity: 0.8;
+            }
+            100% { transform: translateX(0); opacity: 0.3;
+            }
+        }
+        .animate-guide-arrow { 
+            animation: slide-right-soft 1.5s infinite ease-in-out;
+            color: #818CF8;
+            font-size: 32px;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+
+        .guide-text-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        .guide-main-text {
+            font-size: 26px;
+            font-weight: 900;
+            color: #2D3748;
+            letter-spacing: -0.5px;
+        }
+
+        .underline-blue {
+            border-bottom: 4px solid #4F46E5;
+            display: inline-block;
+            padding-bottom: 1px;
+        }
+
+        .highlight-yellow {
+            color: #F59E0B;
+        }
+
+        @keyframes bounce-right {
+            0%, 100% { transform: translateX(0);
+            }
+            50% { transform: translateX(10px);
+            }
+        }
+        .animate-bounce-right { animation: bounce-right 1s infinite;
+        }
+    </style>
+</head>
+<body class="select-none">
+
+    <div id="rule-modal" class="modal-overlay">
+        <div class="modal-container">
+            <div id="p1">
+                <div class="flex justify-center items-center gap-3 text-3xl font-black mb-12">
+                    <span>🎮</span> 게임 방법 (1/2)
+                </div>
+                <div class="space-y-8 mb-12 text-left">
+                    <div class="flex items-center gap-5">
+                        <div class="w-10 h-10 rounded-full bg-amber-100 text-amber-500 flex items-center justify-center font-bold text-xl flex-shrink-0">1</div>
+                        <div class="text-xl font-bold text-slate-700"><span class="text-amber-500">START</span> 카드를 찾아 첫 번째 도미노를 놓으세요.</div>
+                    </div>
+                    <div class="flex items-center gap-5">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-500 flex items-center justify-center font-bold text-xl flex-shrink-0">2</div>
+                        <div class="text-xl font-bold text-slate-700">연결된 카드의 <span class="text-blue-600">연립방정식 정답(x, y)</span>을 계산하세요.</div>
+                    </div>
+                    <div class="flex items-center gap-5">
+                        <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-500 flex items-center justify-center font-bold text-xl flex-shrink-0">3</div>
+                        <div class="text-xl font-bold text-slate-700">계산한 정답이 카드 <span class="text-indigo-600 border-b-2 border-indigo-600">왼쪽</span>에 적힌 카드를 찾아 연결하세요.</div>
+                    </div>
+                    <div class="flex items-center gap-5 pt-4">
+                        <div class="w-10 h-10 rounded-full bg-red-100 text-red-500 flex items-center justify-center font-bold text-xl flex-shrink-0">!</div>
+                        <div class="text-xl font-bold text-slate-700">틀린 카드를 선택하면 <span class="text-red-500">에너지가 10씩 감소</span>하니 주의하세요!</div>
+                    </div>
+                </div>
+                <button onclick="changePage(2)" class="w-full bg-indigo-600 text-white py-5 rounded-3xl text-2xl font-black shadow-lg hover:bg-indigo-700 transition-all">다음 설명 보기</button>
+            </div>
+
+            <div id="p2" class="hidden">
+                <div class="flex justify-center items-center gap-3 text-3xl font-black mb-12">
+                    <span>🎮</span> 카드 연결 예시 (2/2)
+                </div>
+                <div class="bg-slate-50 rounded-3xl p-8 mb-10 flex flex-col items-center">
+                    <div class="flex flex-row items-center justify-center gap-3 mb-8 w-full">
+                        <div class="domino-card no-hover example-card pointer-events-none shadow-md">
+                            <div class="side-label start-bg">START</div>
+                            <div class="side-content">
+                                <span class="brace">{</span>
+                                <div class="eq-box">x + y = 5<br>x - y = 1</div>
+                            </div>
+                        </div>
+                        <span class="text-indigo-500 text-4xl font-bold animate-bounce-right">→</span>
+                        <div class="domino-card no-hover example-card pointer-events-none shadow-md">
+                            <div class="side-label ans-bg text-indigo-600 font-black">(3, 2)</div>
+                            <div class="side-content">
+                                <span class="brace" style="color:#E2E8F0">{</span>
+                                <div class="eq-box text-slate-300">...</div>
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-center text-slate-600 text-xl font-medium leading-relaxed">
+                        앞선 카드의 연립방정식 정답이 <span class="text-indigo-600 font-black">(3, 2)</span>라면,<br>
+                        다음 카드의 <span class="bg-indigo-100 px-2 rounded text-indigo-700 font-bold">왼쪽</span>이 <span class="text-indigo-600 font-black">(3, 2)</span>인 카드를 선택하세요!
+                    </p>
+                </div>
+                <div class="flex gap-4">
+                    <button onclick="changePage(1)" class="w-1/3 bg-slate-200 text-slate-600 py-5 rounded-3xl text-2xl font-black hover:bg-slate-300 transition-all">이전</button>
+                    <button onclick="startGame()" class="w-2/3 bg-indigo-600 text-white py-5 rounded-3xl text-2xl font-black shadow-lg hover:bg-indigo-700 transition-all">게임 시작하기</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="result-modal" class="modal-overlay hidden">
+        <div class="modal-container text-center">
+            <div class="text-6xl mb-6">🎊</div>
+            <h2 class="text-4xl font-black text-slate-800 mb-2">미션 완료!</h2>
+            <p class="text-slate-500 text-lg mb-10">모든 문제를 순서대로 완벽하게 연결했습니다.</p>
+            <div class="grid grid-cols-2 gap-6 mb-10">
+                <div class="bg-indigo-50 p-6 rounded-3xl">
+                    <div class="text-indigo-400 font-bold text-sm uppercase mb-1">최종 에너지</div>
+                    <div id="result-energy" class="text-indigo-600 text-4xl font-black">100</div>
+                </div>
+                <div class="bg-amber-50 p-6 rounded-3xl">
+                    <div class="text-amber-400 font-bold text-sm uppercase mb-1">소요 시간</div>
+                    <div id="result-time" class="text-amber-600 text-4xl font-black">00:00</div>
+                </div>
+            </div>
+            <button onclick="location.reload()" class="w-full bg-indigo-600 text-white py-5 rounded-3xl text-2xl font-black shadow-lg hover:bg-indigo-700 transition-all">다시 도전하기</button>
+        </div>
+    </div>
+
+    <header class="game-header">
+        <div class="flex items-center gap-4">
+            <div class="bg-indigo-600 w-10 h-10 rounded-lg flex items-center justify-center text-white text-xl">🎲</div>
+            <h1 class="text-2xl font-black text-slate-800">연립방정식 도미노</h1>
+        </div>
+        <div class="flex items-center gap-8">
+            <div class="flex flex-col items-end">
+                <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">Time</span>
+                <span id="timer" class="text-slate-800 text-xl font-black">00:00</span>
+            </div>
+            <div class="flex flex-col items-end">
+                <span class="text-slate-400 font-bold text-xs uppercase tracking-wider">Energy</span>
+                <span id="energy" class="text-indigo-600 text-xl font-black">100</span>
+            </div>
+            <button onclick="toggleOverlay(true)" class="bg-slate-800 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-lg hover:bg-slate-700">전체 보기</button>
+        </div>
+    </header>
+
+    <div id="drop-zone" class="slot-area"></div>
+
+    <div class="p-10 max-w-7xl mx-auto">
+        <div class="flex flex-col md:flex-row items-start md:items-center justify-between mb-8 gap-4">
+            <div class="flex items-center gap-4">
+                <h2 class="text-3xl font-black text-slate-800">카드 보관소</h2>
+                <div class="px-4 py-1 bg-indigo-100 text-indigo-600 rounded-full text-sm font-black">
+                    남은 카드: <span id="storage-count">12</span>장
+                </div>
+            </div>
+            <p class="text-slate-400 font-medium italic">※ 정답 순서쌍에 맞는 카드를 찾아 클릭하세요.</p>
+        </div>
+        <div id="storage-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2"></div>
+    </div>
+
+    <div id="overlay" class="modal-overlay hidden" style="background-color: #0F172A; z-index: 2000;">
+        <div class="w-full h-full p-4 relative flex flex-col items-center justify-center overflow-hidden">
+            <button onclick="toggleOverlay(false)" class="absolute top-4 right-6 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center text-2xl font-bold z-[2100] transition-transform hover:scale-110">×</button>
+            <div class="text-center mb-4">
+                <h2 class="text-white text-3xl font-black mb-1">📺 전체 문항 미리보기</h2>
+                <p class="text-slate-400 text-sm">보유 중인 카드를 크게 확인하세요.</p>
+            </div>
+            <div id="overlay-grid" class="tv-card-grid max-w-[1600px] mx-auto"></div>
+        </div>
+    </div>
+
+    <script>
+        const dominoData = [
+            { id: 1,  l: 'START', q: 'x + y = 4<br>2x - y = 5', a: '(3, 1)', d: '중' },
+            { id: 2,  l: '(3, 1)', q: 'x + y = 7<br>x - y = -1', a: '(3, 4)', d: '하' },
+            { id: 3,  l: '(3, 4)', q: '3x + 2y = 7<br>5x - y = -8', a: '(-1, 5)', d: '중' },
+            { id: 4,  l: '(-1, 5)', q: '0.5x + 0.2y = -0.9<br>0.3x - 0.1y = -0.8', a: '(-2, 5)', d: '상' },
+            { id: 5,  l: '(-2, 5)', q: 'x + y = 0<br>2x - y = -9', a: '(-3, 3)', d: '중' },
+            { id: 6,  l: '(-3, 3)', q: 'x + y = 5<br>x - y = 1', a: '(3, 2)', d: '하' },
+            { id: 7,  l: '(3, 2)', q: '2x + 3y = 7<br>5x - 2y = 36', a: '(8, -3)', d: '중' },
+            { id: 8,  l: '(8, -3)', q: '<div class="frac"><span class="n">x</span><span>2</span></div> + <div class="frac"><span class="n">y</span><span>3</span></div> = 1<br><div class="frac"><span class="n">x</span><span>4</span></div> - <div class="frac"><span class="n">y</span><span>2</span></div> = -2', a: '(-2, 6)', d: '상' },
+            { id: 9,  l: '(-2, 6)', q: 'x + y = 1<br>3x - y = 7', a: '(2, -1)', d: '중' },
+            { id: 10, l: '(2, -1)', q: 'x + y = 9<br>2x - y = 0', a: '(3, 6)', d: '하' },
+            { id: 11, l: '(3, 6)', q: '4x - y = 11<br>3x + 2y = 3', a: '(2, -3)', d: '중' },
+            { id: 12, l: '(2, -3)', q: '🏁', a: 'COMPLETE', d: null }
+        ];
+        let initialShuffledOrder = [];
+        let storage = [];
+        let placed = [];
+        let energy = 100;
+        let timer = 0;
+        let timerInt = null;
+        let isStarted = false;
+
+        function changePage(n) {
+            document.getElementById('p1').classList.toggle('hidden', n !== 1);
+            document.getElementById('p2').classList.toggle('hidden', n !== 2);
+        }
+
+        function startGame() {
+            document.getElementById('rule-modal').classList.add('hidden');
+            initGame();
+        }
+
+        function initGame() {
+            clearInterval(timerInt);
+            timer = 0;
+            energy = 100;
+            isStarted = false;
+            placed = [];
+            
+            document.getElementById('timer').innerText = "00:00";
+            document.getElementById('energy').innerText = "100";
+            document.getElementById('energy').className = "text-indigo-600 text-xl font-black";
+
+            initialShuffledOrder = [...dominoData].sort(() => Math.random() - 0.5);
+            storage = [...initialShuffledOrder];
+            
+            renderStorage();
+            renderDropZone();
+        }
+
+        function renderCard(card, options = {}) {
+            const { noClick = false, isOverlay = false } = options;
+            const div = document.createElement('div');
+            div.className = `domino-card ${noClick ? 'no-hover' : ''} ${isOverlay ? 'overlay-card' : ''}`;
+            const left = document.createElement('div');
+            left.className = `side-label ${card.l === 'START' ? 'start-bg' : 'ans-bg'}`;
+            if(card.l !== 'START') left.classList.add('text-indigo-600', 'font-black');
+            left.innerText = card.l;
+
+            const right = document.createElement('div');
+            right.className = 'side-content';
+            if (card.a === 'COMPLETE') {
+                right.innerHTML = `<div class="w-full h-full flex items-center justify-center font-black text-red-500 italic ${isOverlay ? 'text-3xl' : 'text-xl'}">🏁 COMPLETE</div>`;
+            } else {
+                right.innerHTML = `
+                    <span class="brace">{</span>
+                    <div class="eq-box">${card.q}</div>
+                    ${card.d ?
+                    `<div class="diff-tag ${card.d==='상'?'diff-high':card.d==='중'?'diff-mid':'diff-low'}">${card.d}</div>` : ''}
+                `;
+            }
+
+            div.appendChild(left);
+            div.appendChild(right);
+            if (!noClick) {
+                div.onclick = () => onCardClick(card);
+            }
+            return div;
+        }
+
+        function renderStorage() {
+            const grid = document.getElementById('storage-grid');
+            grid.innerHTML = '';
+            storage.forEach(c => grid.appendChild(renderCard(c)));
+            document.getElementById('storage-count').innerText = storage.length;
+        }
+
+        function renderDropZone() {
+            const zone = document.getElementById('drop-zone');
+            zone.innerHTML = '';
+            if (placed.length === 0) {
+                zone.innerHTML = `
+                    <div class="guide-text-container mx-auto">
+                        <div class="animate-guide-arrow">➔</div>
+                        <div class="guide-main-text">
+                            <span class="underline-blue">카드 보관소</span>에서 <span class="highlight-yellow">START</span> 카드를 찾아 클릭하세요!
+                        </div>
+                    </div>
+                `;
+            } else {
+                placed.forEach(c => zone.appendChild(renderCard(c, { noClick: true })));
+                if (placed[placed.length-1].a !== 'COMPLETE') {
+                    const placeholder = document.createElement('div');
+                    placeholder.className = 'slot-placeholder';
+                    placeholder.innerText = '?';
+                    zone.appendChild(placeholder);
+                }
+            }
+        }
+
+        function onCardClick(card) {
+            if (placed.length === 0) {
+                if (card.l === 'START') {
+                    startTimer();
+                    place(card);
+                }
+                return;
+            }
+
+            const lastCard = placed[placed.length - 1];
+            if (card.l === lastCard.a) {
+                place(card);
+                if (card.a === 'COMPLETE') gameComplete();
+            } else {
+                failAction();
+            }
+        }
+
+        function place(card) {
+            placed.push(card);
+            storage = storage.filter(c => c.id !== card.id);
+            renderStorage();
+            renderDropZone();
+            
+            const zone = document.getElementById('drop-zone');
+            setTimeout(() => {
+                zone.scrollTo({ left: zone.scrollWidth, behavior: 'smooth' });
+            }, 100);
+        }
+
+        function failAction() {
+            energy = energy - 10;
+            document.getElementById('energy').innerText = energy;
+            const energyDisplay = document.getElementById('energy');
+            energyDisplay.classList.add('scale-150', 'text-red-500');
+            setTimeout(() => {
+                energyDisplay.classList.remove('scale-150', 'text-red-500');
+            }, 300);
+        }
+
+        function startTimer() {
+            if (isStarted) return;
+            isStarted = true;
+            timerInt = setInterval(() => {
+                timer++;
+                const m = Math.floor(timer / 60).toString().padStart(2, '0');
+                const s = (timer % 60).toString().padStart(2, '0');
+                document.getElementById('timer').innerText = `${m}:${s}`;
+            }, 1000);
+        }
+
+        function gameComplete() {
+            clearInterval(timerInt);
+            document.getElementById('result-energy').innerText = energy;
+            document.getElementById('result-time').innerText = document.getElementById('timer').innerText;
+            setTimeout(() => {
+                document.getElementById('result-modal').classList.remove('hidden');
+            }, 500);
+        }
+
+        function toggleOverlay(show) {
+            const ov = document.getElementById('overlay');
+            ov.classList.toggle('hidden', !show);
+            if (show) {
+                const grid = document.getElementById('overlay-grid');
+                grid.innerHTML = '';
+                initialShuffledOrder.forEach(c => {
+                    const cardWrapper = document.createElement('div');
+                    cardWrapper.className = "flex justify-center items-center w-full";
+                    const cardEl = renderCard(c, { noClick: true, isOverlay: true });
+                    cardWrapper.appendChild(cardEl);
+                    grid.appendChild(cardWrapper);
+                });
+            }
+        }
+
+        window.onload = () => {
+            const grid = document.getElementById('storage-grid');
+            grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-300 font-bold">안내 확인 후 게임을 시작해주세요!</div>`;
+        };
+    </script>
+</body>
+</html>
