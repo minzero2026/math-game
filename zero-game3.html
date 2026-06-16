@@ -1,0 +1,1276 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실시간 수학 줄다리기 대결 (같은 문제 - 초간단 연결)</title>
+    <!-- Tailwind CSS & FontAwesome & Fonts -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Jua&family=Nanum+Gothic:wght@400;700;800&display=swap" rel="stylesheet">
+    <!-- 실시간 무료 중계를 위한 MQTT 라이브러 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    
+    <style>
+        body { font-family: 'Nanum Gothic', sans-serif; user-select: none; overflow-x: hidden; }
+        .font-jua { font-family: 'Jua', sans-serif; }
+        .key-btn { transition: all 0.1s ease; cursor: pointer; }
+        .key-btn:active { transform: scale(0.92); }
+        @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+        .shake { animation: shake 0.2s cubic-bezier(.36,.07,.19,.97) both; }
+        .rope-gradient { background: repeating-linear-gradient(45deg, #d97706, #d97706 10px, #b45309 10px, #b45309 20px); }
+        
+        /* 정답 피드백 애니메이션 */
+        @keyframes pop {
+            0% { transform: scale(0.5); opacity: 0; }
+            50% { transform: scale(1.3) rotate(-5deg); opacity: 1; }
+            100% { transform: scale(1) rotate(0); opacity: 0; }
+        }
+        .correct-pop { animation: pop 0.8s ease-out forwards; }
+        
+        /* 당기는 모션 효과 */
+        .pull-left { animation: pullLeft 0.5s ease-in-out; }
+        .pull-right { animation: pullRight 0.5s ease-in-out; }
+        @keyframes pullLeft { 
+            0%, 100% { transform: translateX(0); } 
+            25% { transform: translateX(-25px) rotate(-3deg); }
+            75% { transform: translateX(-10px); }
+        }
+        @keyframes pullRight { 
+            0%, 100% { transform: translateX(0); } 
+            25% { transform: translateX(25px) rotate(3deg); }
+            75% { transform: translateX(10px); }
+        }
+
+        /* 커스텀 모달 애니메이션 */
+        @keyframes bounceShort {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-bounce-short {
+            animation: bounceShort 0.4s ease-out;
+        }
+
+        /* 깃발 흔들기 애니메이션 */
+        @keyframes flagWave {
+            0%, 100% { transform: rotate(-12deg); }
+            50% { transform: rotate(12deg); }
+        }
+        .wave-flag-left { animation: flagWave 0.5s ease-in-out infinite; transform-origin: bottom right; }
+        .wave-flag-right { animation: flagWave 0.5s ease-in-out infinite; transform-origin: bottom left; }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen flex flex-col items-center">
+
+    <!-- Header (학생 로그인 시 hidden 처리되어 숨겨짐) -->
+    <header id="global-header" class="w-full bg-white shadow-md p-4 flex justify-between items-center z-10 border-b border-slate-100">
+        <div class="flex items-center gap-2">
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+                <i class="fas fa-people-pulling text-xl"></i>
+            </div>
+            <h1 class="text-xl md:text-2xl font-jua text-indigo-600">실시간 수학 줄다리기 대결 (같은 문제)</h1>
+        </div>
+        <div id="connection-status" class="flex items-center text-sm font-bold text-gray-400">
+            <span id="status-dot" class="w-3 h-3 rounded-full bg-red-400 mr-2 animate-ping"></span> <span id="status-text">접속 대기 중</span>
+        </div>
+    </header>
+
+    <!-- Main Game Area -->
+    <main class="flex-grow w-full max-w-7xl flex flex-col p-4 gap-6 justify-center">
+        
+        <!-- Score Board (학생 로그인 시 hidden 처리되어 숨겨짐) -->
+        <div id="global-scoreboard" class="flex justify-between items-center bg-white rounded-3xl p-6 shadow-md border-2 border-indigo-50 relative overflow-hidden">
+            <!-- 정답 피드백 메시지창 -->
+            <div id="correct-msg" class="absolute inset-0 flex items-center justify-center pointer-events-none z-50 opacity-0">
+                <span id="pop-text" class="bg-yellow-400 text-white font-jua text-3xl md:text-4xl px-8 py-3 rounded-full shadow-2xl border-4 border-white">정답! +10점</span>
+            </div>
+            
+            <!-- Blue Team Score -->
+            <div class="text-center w-1/3">
+                <p class="text-xs text-blue-500 font-black uppercase tracking-widest mb-1">BLUE TEAM</p>
+                <p id="blue-score" class="text-4xl md:text-6xl font-jua text-blue-600">0</p>
+            </div>
+            
+            <!-- Versus Area -->
+            <div class="flex flex-col items-center">
+                <div class="px-4 py-1 bg-indigo-50 rounded-full text-xs font-bold text-indigo-600 mb-1 whitespace-nowrap">
+                    실시간 대결 중 (<span id="current-mode-display">정수 덧셈</span>)
+                </div>
+                <!-- 5문제 승리 규칙 직관적 표기 추가 -->
+                <div class="text-[11px] text-slate-400 font-extrabold mb-2 whitespace-nowrap">
+                    <i class="fas fa-trophy text-amber-500 mr-1"></i>5문제 선승제 (먼저 50점 획득 시 최종 승리)
+                </div>
+                <div id="my-team-badge" class="hidden px-4 py-1 rounded-full text-xs font-bold text-white shadow-sm"></div>
+            </div>
+            
+            <!-- Red Team Score -->
+            <div class="text-center w-1/3">
+                <p class="text-xs text-red-500 font-black uppercase tracking-widest mb-1">RED TEAM</p>
+                <p id="red-score" class="text-4xl md:text-6xl font-jua text-red-600">0</p>
+            </div>
+        </div>
+
+        <!-- Layout for Spectators / Normal Layout for Single Students -->
+        <div id="game-grid-layout" class="grid grid-cols-1 md:grid-cols-4 gap-6 w-full items-stretch">
+            
+            <!-- [TV 전용] 왼쪽 청팀 실시간 스크린 -->
+            <div id="tv-blue-card" class="hidden bg-white rounded-3xl p-6 shadow-md border-t-8 border-blue-500 flex-col items-center justify-between">
+                <div class="text-center w-full">
+                    <span class="bg-blue-100 text-blue-700 text-xs px-3 py-1 rounded-full font-bold">청팀 실시간 화면</span>
+                    <h3 id="tv-blue-question" class="text-3xl font-jua text-slate-700 mt-4 mb-3">대기 중...</h3>
+                    <div id="tv-blue-display" class="w-full bg-slate-50 rounded-2xl h-16 flex items-center justify-center text-3xl font-mono font-bold text-slate-700 border-2 border-dashed border-slate-200">
+                        ?
+                    </div>
+                </div>
+                <!-- 교사 제어용 실시간 작동 청팀 키패드 -->
+                <div class="grid grid-cols-3 gap-2 w-full mt-6">
+                    <button onclick="teacherAddNumber('blue', '1')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">1</button>
+                    <button onclick="teacherAddNumber('blue', '2')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">2</button>
+                    <button onclick="teacherAddNumber('blue', '3')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">3</button>
+                    <button onclick="teacherAddNumber('blue', '4')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">4</button>
+                    <button onclick="teacherAddNumber('blue', '5')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">5</button>
+                    <button onclick="teacherAddNumber('blue', '6')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">6</button>
+                    <button onclick="teacherAddNumber('blue', '7')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">7</button>
+                    <button onclick="teacherAddNumber('blue', '8')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">8</button>
+                    <button onclick="teacherAddNumber('blue', '9')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">9</button>
+                    <button onclick="teacherAddMinusSign('blue')" class="key-btn bg-amber-100 p-3 rounded-xl text-center font-bold text-amber-700 hover:bg-amber-200 text-sm">-</button>
+                    <button onclick="teacherAddNumber('blue', '0')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">0</button>
+                    <button onclick="teacherClearAnswer('blue')" class="key-btn bg-rose-100 p-3 rounded-xl text-center font-bold text-rose-500 hover:bg-rose-200 text-sm"><i class="fas fa-backspace"></i></button>
+                    <button onclick="teacherCheckAnswer('blue')" class="key-btn bg-blue-500 p-3 rounded-xl text-center font-bold text-white hover:bg-blue-600 col-span-3 text-sm mt-1 shadow-md">청팀 정답 제출 (Go)</button>
+                </div>
+            </div>
+
+            <!-- Tug of War Visualizer -->
+            <div id="visualizer-container" class="col-span-1 md:col-span-4 flex flex-col gap-6">
+                <div id="visualizer-card" class="relative h-80 bg-gradient-to-b from-sky-100 to-sky-50 rounded-3xl shadow-lg border-4 border-white overflow-hidden flex items-center justify-center">
+                    <!-- 경기장 그리드 라인 -->
+                    <div class="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-emerald-100 to-transparent pointer-events-none"></div>
+                    <div class="absolute left-1/2 top-0 bottom-0 w-1 bg-red-400 opacity-60 z-0 border-dashed border-r"></div>
+                    <div class="absolute left-1/4 top-0 bottom-0 w-0.5 bg-slate-300/30 z-0"></div>
+                    <div class="absolute right-1/4 top-0 bottom-0 w-0.5 bg-slate-300/30 z-0"></div>
+
+                    <!-- 움직이는 줄 구조 -->
+                    <div id="rope" class="absolute w-[200%] h-48 transition-all duration-500 ease-out z-10 flex items-center justify-center" style="transform: translateX(0%);">
+                        
+                        <!-- 실물 밧줄 레이어 -->
+                        <div class="absolute w-full h-5 rope-gradient border-y-2 border-amber-950 shadow-md top-1/2 -translate-y-1/2"></div>
+                        
+                        <!-- 가운데 장식 (깃발 및 리본) -->
+                        <div class="w-10 h-28 bg-yellow-400 border-4 border-white rounded-lg shadow-2xl relative z-30 flex items-center justify-center">
+                            <div class="w-2 h-full bg-red-500"></div>
+                            <div class="absolute -top-8 left-1/2 -translate-x-1/2 text-3xl animate-bounce">🚩</div>
+                        </div>
+
+                        <!-- 청팀 캐릭터 -->
+                        <div id="char-blue" class="absolute right-[51%] top-1/2 -translate-y-[62%] z-20 transition-transform duration-300">
+                            <svg class="w-20 h-26" viewBox="0 0 100 120" fill="none">
+                                <rect x="30" y="20" width="40" height="40" rx="10" fill="#FAD1B4"/>
+                                <path d="M27 20C27 10 40 7 50 10C60 7 73 10 73 20V27H27V20Z" fill="#1E293B"/>
+                                <rect x="27" y="27" width="46" height="5" fill="#2563EB"/>
+                                <circle cx="43" cy="35" r="3" fill="#1E293B"/>
+                                <circle cx="57" cy="35" r="3" fill="#1E293B"/>
+                                <path d="M40 29Q43 26 46 29" stroke="#1E293B" stroke-width="2" fill="none"/>
+                                <path d="M54 29Q57 26 60 29" stroke="#1E293B" stroke-width="2" fill="none"/>
+                                <path d="M45 47H55" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M30 60H70L65 90H35L30 60Z" fill="#1E40AF"/>
+                                <path d="M40 68L76 75" stroke="#1E40AF" stroke-width="12" stroke-linecap="round"/>
+                                <circle cx="76" cy="75" r="7" fill="#FAD1B4"/>
+                                <path d="M55 70L82 76" stroke="#1E40AF" stroke-width="12" stroke-linecap="round"/>
+                                <circle cx="82" cy="76" r="7" fill="#FAD1B4"/>
+                                <rect x="34" y="90" width="10" height="18" fill="#1E293B" rx="2"/>
+                                <rect x="56" y="90" width="10" height="18" fill="#1E293B" rx="2"/>
+                                <rect x="30" y="105" width="16" height="6" fill="#0F172A" rx="2"/>
+                                <rect x="52" y="105" width="16" height="6" fill="#0F172A" rx="2"/>
+                            </svg>
+                        </div>
+
+                        <!-- 홍팀 캐릭터 -->
+                        <div id="char-red" class="absolute left-[51%] top-1/2 -translate-y-[62%] z-20 transition-transform duration-300">
+                            <svg class="w-20 h-26" viewBox="0 0 100 120" fill="none">
+                                <rect x="30" y="20" width="40" height="40" rx="10" fill="#FAD1B4"/>
+                                <path d="M27 20C27 10 40 7 50 10C60 7 73 10 73 20V27H27V20Z" fill="#1E293B"/>
+                                <rect x="27" y="27" width="46" height="5" fill="#DC2626"/>
+                                <circle cx="43" cy="35" r="3" fill="#1E293B"/>
+                                <circle cx="57" cy="35" r="3" fill="#1E293B"/>
+                                <path d="M40 29Q43 26 46 29" stroke="#1E293B" stroke-width="2" fill="none"/>
+                                <path d="M54 29Q57 26 60 29" stroke="#1E293B" stroke-width="2" fill="none"/>
+                                <path d="M45 47H55" stroke="#1E293B" stroke-width="2.5" stroke-linecap="round"/>
+                                <path d="M30 60H70L65 90H35L30 60Z" fill="#991B1B"/>
+                                <path d="M60 68L24 75" stroke="#991B1B" stroke-width="12" stroke-linecap="round"/>
+                                <circle cx="24" cy="75" r="7" fill="#FAD1B4"/>
+                                <path d="M45 70L18 76" stroke="#991B1B" stroke-width="12" stroke-linecap="round"/>
+                                <circle cx="18" cy="76" r="7" fill="#FAD1B4"/>
+                                <rect x="34" y="90" width="10" height="18" fill="#1E293B" rx="2"/>
+                                <rect x="56" y="90" width="10" height="18" fill="#1E293B" rx="2"/>
+                                <rect x="30" y="105" width="16" height="6" fill="#0F172A" rx="2"/>
+                                <rect x="52" y="105" width="16" height="6" fill="#0F172A" rx="2"/>
+                            </svg>
+                        </div>
+
+                    </div>
+
+                    <!-- 사이드 배경 텍스트 -->
+                    <div class="absolute left-10 bottom-6 text-blue-600 font-black text-3xl md:text-4xl opacity-10 select-none">BLUE STADIUM</div>
+                    <div class="absolute right-10 bottom-6 text-red-600 font-black text-3xl md:text-4xl opacity-10 select-none">RED STADIUM</div>
+                </div>
+            </div>
+
+            <!-- [TV 전용] 오른쪽 홍팀 실시간 스크린 -->
+            <div id="tv-red-card" class="hidden bg-white rounded-3xl p-6 shadow-md border-t-8 border-red-500 flex-col items-center justify-between">
+                <div class="text-center w-full">
+                    <span class="bg-red-100 text-red-700 text-xs px-3 py-1 rounded-full font-bold">홍팀 실시간 화면</span>
+                    <h3 id="tv-red-question" class="text-3xl font-jua text-slate-700 mt-4 mb-3">대기 중...</h3>
+                    <div id="tv-red-display" class="w-full bg-slate-50 rounded-2xl h-16 flex items-center justify-center text-3xl font-mono font-bold text-slate-700 border-2 border-dashed border-slate-200">
+                        ?
+                    </div>
+                </div>
+                <!-- 교사 제어용 실시간 작동 홍팀 키패드 -->
+                <div class="grid grid-cols-3 gap-2 w-full mt-6">
+                    <button onclick="teacherAddNumber('red', '1')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">1</button>
+                    <button onclick="teacherAddNumber('red', '2')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">2</button>
+                    <button onclick="teacherAddNumber('red', '3')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">3</button>
+                    <button onclick="teacherAddNumber('red', '4')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">4</button>
+                    <button onclick="teacherAddNumber('red', '5')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">5</button>
+                    <button onclick="teacherAddNumber('red', '6')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">6</button>
+                    <button onclick="teacherAddNumber('red', '7')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">7</button>
+                    <button onclick="teacherAddNumber('red', '8')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">8</button>
+                    <button onclick="teacherAddNumber('red', '9')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">9</button>
+                    <button onclick="teacherAddMinusSign('red')" class="key-btn bg-amber-100 p-3 rounded-xl text-center font-bold text-amber-700 hover:bg-amber-200 text-sm">-</button>
+                    <button onclick="teacherAddNumber('red', '0')" class="key-btn bg-slate-100 p-3 rounded-xl text-center font-bold text-slate-700 hover:bg-slate-200 text-sm">0</button>
+                    <button onclick="teacherClearAnswer('red')" class="key-btn bg-rose-100 p-3 rounded-xl text-center font-bold text-rose-500 hover:bg-rose-200 text-sm"><i class="fas fa-backspace"></i></button>
+                    <button onclick="teacherCheckAnswer('red')" class="key-btn bg-red-500 p-3 rounded-xl text-center font-bold text-white hover:bg-red-600 col-span-3 text-sm mt-1 shadow-md">홍팀 정답 제출 (Go)</button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Student UI (문제 풀이 전용 컴팩트 모드) -->
+        <div id="student-ui" class="hidden bg-white rounded-3xl p-4 sm:p-6 shadow-xl border-t-[8px] border-indigo-600 flex-col items-center max-w-sm mx-auto w-full transition-all">
+            <div class="mb-2 sm:mb-3 text-center w-full flex flex-col items-center">
+                <!-- 동적 팀 배지 마크업 -->
+                <span id="student-badge-span" class="bg-indigo-100 text-indigo-700 text-xs sm:text-sm px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-bold mb-2 sm:mb-3 select-none">
+                    팀 실시간 화면
+                </span>
+                <h2 id="math-question" class="text-3xl sm:text-4xl md:text-5xl font-jua text-slate-800 tracking-tighter my-1 sm:my-2 leading-none">
+                    로딩 중...
+                </h2>
+                <!-- 가이드 팁 요소 -->
+                <p id="student-help-tip" class="text-[10px] sm:text-xs text-indigo-500 font-bold mt-1 sm:mt-2 animate-pulse hidden">
+                    <i class="fas fa-info-circle mr-1"></i> 교사용 TV 화면이 먼저 켜져야 게임이 시작됩니다!
+                </p>
+            </div>
+
+            <div class="w-full flex flex-col items-center">
+                <!-- 이미지의 점선 입력 공간 디자인 재현 -->
+                <div id="answer-display" class="w-full bg-slate-50/50 rounded-xl sm:rounded-2xl h-12 sm:h-16 flex items-center justify-center text-2xl sm:text-3xl font-mono font-bold text-slate-400 mb-3 sm:mb-4 border-2 border-dashed border-slate-200">
+                    ?
+                </div>
+
+                <!-- 터치용 키패드 (반응형 패딩으로 좁은 샌드박스 화면 높이 완벽 대응) -->
+                <div class="grid grid-cols-3 gap-1.5 sm:gap-2 w-full">
+                    <button onclick="addNumber(1)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">1</button>
+                    <button onclick="addNumber(2)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">2</button>
+                    <button onclick="addNumber(3)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">3</button>
+                    <button onclick="addNumber(4)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">4</button>
+                    <button onclick="addNumber(5)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">5</button>
+                    <button onclick="addNumber(6)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">6</button>
+                    <button onclick="addNumber(7)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">7</button>
+                    <button onclick="addNumber(8)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">8</button>
+                    <button onclick="addNumber(9)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">9</button>
+                    <button onclick="addMinusSign()" class="key-btn bg-amber-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-amber-700 hover:bg-amber-200 shadow-sm">-</button>
+                    <button onclick="addNumber(0)" class="key-btn bg-slate-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-bold text-slate-800 hover:bg-slate-200 shadow-sm">0</button>
+                    <button onclick="clearAnswer()" class="key-btn bg-rose-100 py-2 sm:py-3.5 px-2 rounded-xl sm:rounded-2xl text-lg sm:text-xl font-bold text-rose-500 hover:bg-rose-200 shadow-sm">
+                        <i class="fas fa-backspace"></i>
+                    </button>
+                </div>
+                <!-- 꽉 차는 제출 버튼 -->
+                <button id="student-submit-btn" onclick="checkAnswer()" class="key-btn mt-2.5 sm:mt-4 p-2.5 sm:p-3.5 w-full rounded-xl sm:rounded-2xl text-base sm:text-lg font-bold text-white shadow-md transition-all active:scale-95">
+                    정답 제출하기 (Go)
+                </button>
+            </div>
+        </div>
+
+        <!-- Teacher/TV UI (전광판 제어기) -->
+        <div id="teacher-info" class="hidden text-center p-6 md:p-8 bg-white rounded-3xl shadow-xl border-4 border-dashed border-indigo-100 max-w-2xl mx-auto w-full">
+            <div class="mb-6">
+                <i class="fas fa-tv text-5xl text-indigo-300 mb-2 animate-pulse"></i>
+                <h3 class="text-2xl font-jua text-slate-700 mb-1">교실 TV 중계 및 제어 패널 (같은 문제)</h3>
+                <p class="text-sm text-slate-400 mb-4">양 팀에게 똑같은 문제가 출제되며, 먼저 정답을 제출하는 팀이 줄을 가져옵니다.</p>
+                
+                <!-- 연산 모드 선택 버튼군 -->
+                <div class="flex flex-wrap gap-2 justify-center mb-6">
+                    <button onclick="changeGameMode('+')" id="btn-mode-add" class="px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow-sm text-sm hover:bg-indigo-700 transition-all border border-indigo-300">정수 덧셈 (+)</button>
+                    <button onclick="changeGameMode('-')" id="btn-mode-sub" class="px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200">정수 뺄셈 (-)</button>
+                    <button onclick="changeGameMode('addsub')" id="btn-mode-addsub" class="px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200">정수 덧뺄셈 (±)</button>
+                    <button onclick="changeGameMode('*')" id="btn-mode-mul" class="px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200">정수 곱셈 (×)</button>
+                    <button onclick="changeGameMode('/')" id="btn-mode-div" class="px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200">정수 나눗셈 (÷)</button>
+                    <button onclick="changeGameMode('pow')" id="btn-mode-pow" class="px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200">제곱수 (x²)</button>
+                    <button onclick="changeGameMode('sqrt')" id="btn-mode-sqrt" class="px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200">제곱근 (√)</button>
+                    <button onclick="changeGameMode('mix')" id="btn-mode-mix" class="px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200">사칙믹스 (★)</button>
+                </div>
+            </div>
+            <button onclick="resetGameData()" class="px-10 py-4 bg-slate-800 hover:bg-black rounded-full text-base font-bold text-white shadow-md transition-all active:scale-95">
+                <i class="fas fa-sync-alt mr-2"></i>대결 경기 리셋 (새로운 게임)
+            </button>
+        </div>
+    </main>
+
+    <!-- Role Selection (첫 진입 팝업) -->
+    <div id="startup-overlay" class="fixed inset-0 bg-slate-900/95 flex items-center justify-center z-50 p-6 overflow-y-auto">
+        <div class="bg-white rounded-[2.5rem] p-8 md:p-10 max-w-xl w-full shadow-2xl text-center border-b-8 border-indigo-200 animate-bounce-short">
+            <h2 class="text-3xl md:text-4xl font-jua text-slate-800 mb-2">실시간 수학 줄다리기 (같은 문제)</h2>
+            <p class="text-slate-500 mb-6 font-bold">임의의 숫자 4자리 방 코드를 맞추면 바로 연결됩니다!</p>
+            
+            <!-- 방 코드 입력 섹션 -->
+            <div class="max-w-xs mx-auto mb-8 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
+                <label class="block text-xs font-black text-indigo-500 uppercase tracking-wider mb-2">대결할 방 번호 입력 (예: 1234)</label>
+                <input type="number" id="room-code-input" class="w-full text-center text-2xl font-mono font-bold tracking-widest p-2 border-2 border-indigo-200 rounded-xl bg-white focus:outline-none focus:border-indigo-500" value="7788" min="1" max="99999">
+                <p class="text-[11px] text-slate-400 mt-2 leading-tight">교실의 모든 기기(교사용 TV, 청팀, 홍팀)에 같은 번호를 입력하세요!</p>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6">
+                <div class="grid grid-cols-2 gap-4">
+                    <button onclick="selectRole('blue')" class="p-6 md:p-8 bg-blue-50 border-4 border-blue-200 rounded-3xl hover:bg-blue-100 transition-all hover:-translate-y-2 group shadow-lg">
+                        <div class="text-5xl md:text-6xl mb-4 group-hover:scale-110 transition-transform">🔵</div>
+                        <div class="font-bold text-blue-600 text-lg md:text-xl">블루 팀 학생</div>
+                    </button>
+                    <button onclick="selectRole('red')" class="p-6 md:p-8 bg-red-50 border-4 border-red-200 rounded-3xl hover:bg-red-100 transition-all hover:-translate-y-2 group shadow-lg">
+                        <div class="text-5xl md:text-6xl mb-4 group-hover:scale-110 transition-transform">🔴</div>
+                        <div class="font-bold text-red-600 text-lg md:text-xl">레드 팀 학생</div>
+                    </button>
+                </div>
+                <button onclick="selectRole('teacher')" class="p-6 bg-slate-50 border-4 border-slate-100 rounded-3xl hover:bg-slate-100 transition-all flex items-center justify-center gap-6 shadow-md">
+                    <div class="text-4xl md:text-5xl">📺</div>
+                    <div class="text-left">
+                        <div class="font-bold text-slate-700 text-lg md:text-xl">교사용 (TV 연결 전광판)</div>
+                        <div class="text-sm text-slate-400">실시간 같은 문제 대결 현황을 중계합니다.</div>
+                    </div>
+                </button>
+            </div>
+            
+            <p id="init-msg" class="mt-6 text-indigo-500 text-sm font-bold animate-pulse">실시간 통신망을 탐색하고 있습니다...</p>
+        </div>
+    </div>
+
+    <!-- Custom Alert/Confirm Modal & Game Over Screen -->
+    <div id="custom-modal" class="hidden fixed inset-0 bg-slate-950/70 flex items-center justify-center z-50 p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl border-4 border-indigo-100 text-center animate-bounce-short relative overflow-hidden">
+            <!-- 트로피 & 승리 캐릭터 전용 그래픽 컨테이너 -->
+            <div id="modal-victory-gfx" class="hidden flex-col items-center mb-4">
+                <div class="relative w-40 h-40 flex items-center justify-center">
+                    <!-- 승리 흔드는 캐릭터 SVG -->
+                    <svg id="winner-character-svg" class="w-32 h-32" viewBox="0 0 100 120" fill="none">
+                        <rect x="30" y="35" width="40" height="40" rx="10" fill="#FAD1B4"/>
+                        <rect x="30" y="75" width="40" height="30" fill="#1E40AF" id="victory-shirt-color"/>
+                        <g class="wave-flag-left">
+                            <path d="M30 80L10 65" stroke="#FAD1B4" stroke-width="10" stroke-linecap="round"/>
+                            <rect x="3" y="45" width="5" height="35" fill="#78350F"/>
+                            <path d="M3 45L23 52L3 59Z" fill="#B91C1C" id="v-flag-left-color"/>
+                        </g>
+                        <g class="wave-flag-right">
+                            <path d="M70 80L90 65" stroke="#FAD1B4" stroke-width="10" stroke-linecap="round"/>
+                            <rect x="92" y="45" width="5" height="35" fill="#78350F"/>
+                            <path d="M92 45L72 52L92 59Z" fill="#B91C1C" id="v-flag-right-color"/>
+                        </g>
+                        <circle cx="43" cy="50" r="3" fill="#1E293B"/>
+                        <circle cx="57" cy="50" r="3" fill="#1E293B"/>
+                        <path d="M43 62Q50 68 57 62" stroke="#1E293B" stroke-width="3" stroke-linecap="round" fill="none"/>
+                    </svg>
+                </div>
+                <div class="text-yellow-500 text-5xl mt-2 animate-bounce">
+                    <i class="fas fa-trophy"></i>
+                </div>
+            </div>
+
+            <h3 id="modal-title" class="text-3xl font-jua text-slate-800 mb-4">알림</h3>
+            <p id="modal-message" class="text-slate-600 text-lg mb-8 leading-relaxed font-bold">메시지 내용</p>
+            <div id="modal-actions" class="flex justify-center gap-4">
+                <button id="modal-btn-confirm" class="px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-all active:scale-95">확인</button>
+                <button id="modal-btn-cancel" class="px-8 py-3 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold rounded-2xl transition-all active:scale-95">취소</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // 클라우드 기반 무료 MQTT 통신망 서버 설정 (보안 포트 표준안 설정)
+        const publicBrokerUrl = "wss://broker.emqx.io:8443/mqtt"; 
+        const backupBrokerUrl = "wss://broker.hivemq.com:8884/mqtt"; 
+        
+        let client = null;
+        let myRole = null;
+        let currentRoomCode = "7788";
+        let isHost = false; 
+        let syncInterval = null; 
+        
+        // 로컬 게임 계산 상태 변수들
+        let currentGameState = {
+            blueScore: 0,
+            redScore: 0,
+            ropePos: 0,
+            triggerTeam: '',
+            blueQuestion: '로딩 중...',
+            blueAnswer: 0,
+            blueInput: '',
+            redQuestion: '로딩 중...',
+            redAnswer: 0,
+            redInput: '',
+            gameMode: '+',
+            status: 'playing',
+            winner: '',
+            lastEvent: { team: '', type: '', timestamp: 0 }
+        };
+
+        let currentAnswer = "";
+        let targetAnswer = 0;
+        let isGameOver = false;
+
+        // 효과음 재생용 오디오 합성
+        let globalAudioCtx = null;
+        function getAudioContext() {
+            if (!globalAudioCtx) {
+                const AudioContext = window.AudioContext || window.webkitAudioContext;
+                if (AudioContext) {
+                    globalAudioCtx = new AudioContext();
+                }
+            }
+            if (globalAudioCtx && globalAudioCtx.state === 'suspended') {
+                globalAudioCtx.resume();
+            }
+            return globalAudioCtx;
+        }
+
+        function playSound(type) {
+            try {
+                const ctx = getAudioContext();
+                if (!ctx) return;
+                const now = ctx.currentTime;
+
+                if (type === 'correct') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(523.25, now);
+                    osc.frequency.setValueAtTime(659.25, now + 0.12);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.4);
+                } else if (type === 'incorrect') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(130, now);
+                    osc.frequency.linearRampToValueAtTime(80, now + 0.25);
+                    gain.gain.setValueAtTime(0.12, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.3);
+                } else if (type === 'pull') {
+                    const osc = ctx.createOscillator();
+                    const gain = ctx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(150, now);
+                    osc.frequency.exponentialRampToValueAtTime(550, now + 0.15);
+                    gain.gain.setValueAtTime(0.15, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                    osc.connect(gain);
+                    gain.connect(ctx.destination);
+                    osc.start(now);
+                    osc.stop(now + 0.2);
+                } else if (type === 'win') {
+                    const notes = [261.63, 329.63, 392.00, 523.25, 659.25];
+                    notes.forEach((freq, idx) => {
+                        const osc = ctx.createOscillator();
+                        const gain = ctx.createGain();
+                        osc.type = 'triangle';
+                        osc.frequency.setValueAtTime(freq, now + idx * 0.08);
+                        gain.gain.setValueAtTime(0.1, now + idx * 0.08);
+                        gain.gain.exponentialRampToValueAtTime(0.005, now + idx * 0.08 + 0.5);
+                        osc.connect(gain);
+                        gain.connect(ctx.destination);
+                        osc.start(now + idx * 0.08);
+                        osc.stop(now + idx * 0.08 + 0.5);
+                    });
+                }
+            } catch (e) {
+                console.warn("오디오 플레이어 활성화 오류:", e);
+            }
+        }
+
+        // DOM 캐싱
+        const ropeEl = document.getElementById('rope');
+        const charBlue = document.getElementById('char-blue');
+        const charRed = document.getElementById('char-red');
+        const visualizerCard = document.getElementById('visualizer-card');
+        const visualizerContainer = document.getElementById('visualizer-container');
+        const blueScoreEl = document.getElementById('blue-score');
+        const redScoreEl = document.getElementById('red-score');
+        const mathEl = document.getElementById('math-question');
+        const answerDisplay = document.getElementById('answer-display');
+        
+        const statusDot = document.getElementById('status-dot');
+        const statusText = document.getElementById('status-text');
+        
+        const initMsg = document.getElementById('init-msg');
+        const correctPop = document.getElementById('correct-msg');
+        const popText = document.getElementById('pop-text');
+        const modeDisplay = document.getElementById('current-mode-display');
+
+        // TV 전용 카드 요소 캐싱
+        const tvBlueCard = document.getElementById('tv-blue-card');
+        const tvRedCard = document.getElementById('tv-red-card');
+        const tvBlueQuestion = document.getElementById('tv-blue-question');
+        const tvBlueDisplay = document.getElementById('tv-blue-display');
+        const tvRedQuestion = document.getElementById('tv-red-question');
+        const tvRedDisplay = document.getElementById('tv-red-display');
+
+        window.showCustomAlert = function(title, message, isVictory = false, winnerTeam = '', callback) {
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            
+            const confirmBtn = document.getElementById('modal-btn-confirm');
+            const cancelBtn = document.getElementById('modal-btn-cancel');
+            const victoryGfx = document.getElementById('modal-victory-gfx');
+            
+            cancelBtn.classList.add('hidden'); 
+            
+            if (isVictory) {
+                victoryGfx.classList.remove('hidden');
+                confirmBtn.textContent = "새 대결 시작하기";
+                confirmBtn.className = "px-8 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-2xl shadow-md transition-all active:scale-95";
+                
+                const shirtColor = document.getElementById('victory-shirt-color');
+                const flagLeft = document.getElementById('v-flag-left-color');
+                const flagRight = document.getElementById('v-flag-right-color');
+                if (winnerTeam === 'blue') {
+                    shirtColor.setAttribute('fill', '#1E40AF');
+                    flagLeft.setAttribute('fill', '#2563EB');
+                    flagRight.setAttribute('fill', '#2563EB');
+                } else {
+                    shirtColor.setAttribute('fill', '#991B1B');
+                    flagLeft.setAttribute('fill', '#EF4444');
+                    flagRight.setAttribute('fill', '#EF4444');
+                }
+            } else {
+                victoryGfx.classList.add('hidden');
+                confirmBtn.textContent = "확인";
+                confirmBtn.className = "px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-all active:scale-95";
+            }
+            
+            confirmBtn.onclick = () => {
+                document.getElementById('custom-modal').classList.add('hidden');
+                if (callback) callback();
+            };
+            
+            document.getElementById('custom-modal').classList.remove('hidden');
+        };
+
+        window.showCustomConfirm = function(title, message, onConfirm, onCancel) {
+            document.getElementById('modal-victory-gfx').classList.add('hidden');
+            document.getElementById('modal-title').textContent = title;
+            document.getElementById('modal-message').textContent = message;
+            
+            const confirmBtn = document.getElementById('modal-btn-confirm');
+            const cancelBtn = document.getElementById('modal-btn-cancel');
+            
+            cancelBtn.classList.remove('hidden'); 
+            confirmBtn.textContent = "네";
+            confirmBtn.className = "px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-2xl shadow-md transition-all active:scale-95";
+            cancelBtn.textContent = "아니요";
+            
+            confirmBtn.onclick = () => {
+                document.getElementById('custom-modal').classList.add('hidden');
+                if (onConfirm) onConfirm();
+            };
+            
+            cancelBtn.onclick = () => {
+                document.getElementById('custom-modal').classList.remove('hidden');
+                if (onCancel) onCancel();
+            };
+            
+            document.getElementById('custom-modal').classList.remove('hidden');
+        };
+
+        // 수학 문제 생성기
+        function generateMathProblem(mode) {
+            let n1, n2, question, answer;
+            const currentMode = mode || '+';
+
+            const getAddSubInteger = () => {
+                let val = 0;
+                while (Math.abs(val) < 3) {
+                    val = Math.floor(Math.random() * 41) - 20;
+                }
+                return val;
+            };
+
+            const getMulInteger = () => {
+                let val = 0;
+                while (Math.abs(val) < 2) {
+                    val = Math.floor(Math.random() * 21) - 10;
+                }
+                return val;
+            };
+
+            // 새 기능: 괄호 및 불필요한 부호 정리 포맷팅 함수 (-3 + 5 = ? 또는 3 - 5 = ?)
+            const formatExpression = (n1, op, n2) => {
+                let part1 = n1.toString(); // 첫 숫자는 그대로 출력 (-3 혹은 3)
+                let combinedOp = "";
+                let absN2 = Math.abs(n2);
+                
+                // 수학적 부호 단순화 연산 규칙 적용
+                if (op === '+') {
+                    combinedOp = n2 >= 0 ? " + " : " - ";
+                } else if (op === '-') {
+                    combinedOp = n2 >= 0 ? " - " : " + ";
+                }
+                return `${part1}${combinedOp}${absN2} = ?`;
+            };
+
+            // 곱셈, 나눗셈 등 괄호가 필요한 연산 정리 포맷팅 함수
+            const formatMulDiv = (n1, op, n2) => {
+                const part1 = n1.toString();
+                const part2 = n2 < 0 ? `(${n2})` : `${n2}`; // 두번째 음수만 괄호 처리
+                return `${part1} ${op} ${part2} = ?`;
+            };
+
+            if (currentMode === '+') {
+                const num1 = getAddSubInteger();
+                const num2 = getAddSubInteger();
+                question = formatExpression(num1, '+', num2);
+                answer = num1 + num2;
+            } else if (currentMode === '-') {
+                const num1 = getAddSubInteger();
+                const num2 = getAddSubInteger();
+                question = formatExpression(num1, '-', num2);
+                answer = num1 - num2;
+            } else if (currentMode === 'addsub') {
+                const num1 = getAddSubInteger();
+                const num2 = getAddSubInteger();
+                const isAdd = Math.random() < 0.5;
+                if (isAdd) {
+                    question = formatExpression(num1, '+', num2);
+                    answer = num1 + num2;
+                } else {
+                    question = formatExpression(num1, '-', num2);
+                    answer = num1 - num2;
+                }
+            } else if (currentMode === '*') {
+                const num1 = getMulInteger();
+                const num2 = getMulInteger();
+                question = formatMulDiv(num1, '×', num2);
+                answer = num1 * num2;
+            } else if (currentMode === '/') {
+                const getDivParts = () => {
+                    let val = 0;
+                    while (Math.abs(val) < 2) {
+                        val = Math.floor(Math.random() * 21) - 10;
+                    }
+                    return val;
+                };
+                const divisor = getDivParts(); 
+                const quotient = getDivParts(); 
+                const dividend = divisor * quotient; 
+                
+                question = formatMulDiv(dividend, '÷', divisor);
+                answer = quotient;
+            } else if (currentMode === 'pow') {
+                const base = Math.floor(Math.random() * 24) + 2; 
+                question = `${base}² = ?`;
+                answer = base * base;
+            } else if (currentMode === 'sqrt') {
+                const base = Math.floor(Math.random() * 24) + 2; 
+                const squareValue = base * base;
+                question = `√${squareValue} = ?`;
+                answer = base;
+            } else {
+                // 사칙믹스(mix) 또는 디폴트 선택
+                const modes = ['+', '-', 'addsub', '*', '/'];
+                const randomMode = modes[Math.floor(Math.random() * modes.length)];
+                return generateMathProblem(randomMode);
+            }
+
+            return { question, answer };
+        }
+
+        // 실시간 게임 브로드캐스트 상태 렌더링
+        let lastPlayedEventTime = 0;
+        function renderGame(data) {
+            const oldBlueScore = parseInt(blueScoreEl.textContent) || 0;
+            const oldRedScore = parseInt(redScoreEl.textContent) || 0;
+            
+            blueScoreEl.textContent = data.blueScore || 0;
+            redScoreEl.textContent = data.redScore || 0;
+            
+            // 줄과 캐릭터 애니메이션 이동
+            const pos = data.ropePos || 0;
+            ropeEl.style.transform = `translateX(${pos * 0.15}%)`;
+
+            // 기울기 물리 연출
+            if (pos < 0) {
+                charBlue.style.transform = "translateY(-62%) rotate(-8deg)";
+                charRed.style.transform = "translateY(-62%) rotate(-4deg)";
+            } else if (pos > 0) {
+                charBlue.style.transform = "translateY(-62%) rotate(4deg)";
+                charRed.style.transform = "translateY(-62%) rotate(8deg)";
+            } else {
+                charBlue.style.transform = "translateY(-62%) rotate(0deg)";
+                charRed.style.transform = "translateY(-62%) rotate(0deg)";
+            }
+
+            const modeNames = { 
+                '+': '정수 덧셈', 
+                '-': '정수 뺄셈', 
+                'addsub': '정수 덧뺄셈', 
+                '*': '정수 곱셈', 
+                '/': '정수 나눗셈', 
+                'pow': '제곱수 대결', 
+                'sqrt': '제곱근 대결',
+                'mix': '사칙믹스' 
+            };
+            modeDisplay.textContent = modeNames[data.gameMode || '+'];
+
+            // 흔들림 연출 트리거
+            if (data.triggerTeam === 'blue') {
+                visualizerCard.classList.add('pull-left');
+                setTimeout(() => visualizerCard.classList.remove('pull-left'), 500);
+            } else if (data.triggerTeam === 'red') {
+                visualizerCard.classList.add('pull-right');
+                setTimeout(() => visualizerCard.classList.remove('pull-right'), 500);
+            }
+
+            // 실시간 오디오 및 정답 축하 이벤트 동기화 처리
+            if (data.lastEvent && data.lastEvent.timestamp > lastPlayedEventTime) {
+                lastPlayedEventTime = data.lastEvent.timestamp;
+                const eventType = data.lastEvent.type;
+                const eventTeam = data.lastEvent.team;
+                
+                if (eventType === 'correct') {
+                    playSound('correct');
+                    playSound('pull');
+                } else if (eventType === 'incorrect') {
+                    playSound('incorrect');
+                    if (myRole === eventTeam) {
+                        answerDisplay.classList.add('shake', 'text-red-500');
+                        setTimeout(() => {
+                            answerDisplay.classList.remove('shake', 'text-red-500');
+                            window.clearAnswer();
+                        }, 400);
+                    }
+                }
+            }
+
+            // 점수 증가 팝업 연출
+            if (data.blueScore > oldBlueScore) {
+                triggerScorePop('blue');
+            } else if (data.redScore > oldRedScore) {
+                triggerScorePop('red');
+            }
+
+            // 학생단 문제 실시간 연동 (교사용 TV 방장이 던져주는 상태값을 완벽 추종)
+            if (myRole === 'blue') {
+                if (data.blueQuestion && mathEl.textContent !== data.blueQuestion) {
+                    mathEl.textContent = data.blueQuestion;
+                    targetAnswer = data.blueAnswer;
+                    currentAnswer = "";
+                    answerDisplay.textContent = "?";
+                    
+                    // 가이드 팁 숨기기
+                    const tip = document.getElementById('student-help-tip');
+                    if (tip) tip.classList.add('hidden');
+                }
+            } else if (myRole === 'red') {
+                if (data.redQuestion && mathEl.textContent !== data.redQuestion) {
+                    mathEl.textContent = data.redQuestion;
+                    targetAnswer = data.redAnswer;
+                    currentAnswer = "";
+                    answerDisplay.textContent = "?";
+                    
+                    // 가이드 팁 숨기기
+                    const tip = document.getElementById('student-help-tip');
+                    if (tip) tip.classList.add('hidden');
+                }
+            }
+
+            // 교사용 중계 실시간 렌더러
+            if (myRole === 'teacher') {
+                tvBlueQuestion.textContent = data.blueQuestion || "대기 중...";
+                tvBlueDisplay.textContent = data.blueInput || "?";
+                tvBlueDisplay.className = data.blueInput ? "w-full bg-blue-50/50 rounded-2xl h-16 flex items-center justify-center text-3xl font-mono font-bold text-blue-600 border-2 border-blue-200" : "w-full bg-slate-50 rounded-2xl h-16 flex items-center justify-center text-3xl font-mono font-bold text-slate-300 border-2 border-dashed border-slate-200";
+
+                tvRedQuestion.textContent = data.redQuestion || "대기 중...";
+                tvRedDisplay.textContent = data.redInput || "?";
+                tvRedDisplay.className = data.redInput ? "w-full bg-red-50/50 rounded-2xl h-16 flex items-center justify-center text-3xl font-mono font-bold text-red-600 border-2 border-red-200" : "w-full bg-slate-50 rounded-2xl h-16 flex items-center justify-center text-3xl font-mono font-bold text-slate-300 border-2 border-dashed border-slate-200";
+
+                const currentMode = data.gameMode || '+';
+                const buttons = { 
+                    '+': 'btn-mode-add', 
+                    '-': 'btn-mode-sub', 
+                    'addsub': 'btn-mode-addsub', 
+                    '*': 'btn-mode-mul', 
+                    '/': 'btn-mode-div', 
+                    'pow': 'btn-mode-pow',
+                    'sqrt': 'btn-mode-sqrt',
+                    'mix': 'btn-mode-mix' 
+                };
+                Object.keys(buttons).forEach(key => {
+                    const btn = document.getElementById(buttons[key]);
+                    if (btn) {
+                        if (key === currentMode) {
+                            btn.className = "px-4 py-2 bg-indigo-600 text-white font-bold rounded-xl shadow-md text-sm transition-all border border-indigo-400 scale-105";
+                        } else {
+                            btn.className = "px-4 py-2 bg-white text-slate-700 font-bold rounded-xl shadow-sm text-sm hover:bg-slate-50 transition-all border border-slate-200";
+                        }
+                    }
+                });
+            }
+
+            // 완승 판정 (5문제 선승제)
+            if (data.status === 'finished') {
+                if (!isGameOver) {
+                    isGameOver = true;
+                    playSound('win');
+                    const winningTeam = data.winner === 'blue' ? '블루 팀' : '레드 팀';
+                    showCustomAlert(
+                        `${winningTeam} 승리!`, 
+                        `대결 완료! ${winningTeam}이 수학 줄다리기에서 완벽하게 승리했습니다!`, 
+                        true, 
+                        data.winner, 
+                        () => {
+                            if (myRole === 'teacher') {
+                                resetGameDataQuietly();
+                            }
+                            isGameOver = false;
+                        }
+                    );
+                }
+            } else {
+                isGameOver = false;
+                const modal = document.getElementById('custom-modal');
+                if (!modal.classList.contains('hidden') && (modal.querySelector('h3').textContent.includes("승리") || modal.querySelector('h3').textContent.includes("종료"))) {
+                    modal.classList.add('hidden');
+                }
+            }
+        }
+
+        function triggerScorePop(team) {
+            popText.textContent = team === 'blue' ? "🔵 청팀 득점! +10" : "🔴 홍팀 득점! +10";
+            popText.className = team === 'blue' 
+                ? "bg-blue-500 text-white font-jua text-2xl md:text-4xl px-8 py-3 rounded-full shadow-2xl border-4 border-white"
+                : "bg-red-500 text-white font-jua text-2xl md:text-4xl px-8 py-3 rounded-full shadow-2xl border-4 border-white";
+            
+            correctPop.classList.add('correct-pop');
+            setTimeout(() => correctPop.classList.remove('correct-pop'), 800);
+        }
+
+        // 기기 역할 선택 제어기
+        window.selectRole = (role) => {
+            const inputVal = document.getElementById('room-code-input').value.trim();
+            if (!inputVal) {
+                showCustomAlert("알림", "방 번호를 입력해주세요!");
+                return;
+            }
+            currentRoomCode = inputVal;
+            myRole = role;
+
+            getAudioContext();
+
+            // 교사용 TV 화면이 마스터 방장 역할을 수행합니다
+            if (role === 'teacher') {
+                isHost = true;
+            }
+
+            document.getElementById('startup-overlay').classList.add('hidden');
+
+            if (role === 'teacher') {
+                document.getElementById('teacher-info').classList.remove('hidden');
+                document.getElementById('game-grid-layout').className = "grid grid-cols-1 md:grid-cols-4 gap-6 w-full items-stretch";
+                visualizerContainer.className = "col-span-1 md:col-span-2 flex flex-col gap-6";
+                tvBlueCard.className = "hidden md:flex bg-white rounded-3xl p-6 shadow-md border-t-8 border-blue-500 flex-col items-center justify-between";
+                tvRedCard.className = "hidden md:flex bg-white rounded-3xl p-6 shadow-md border-t-8 border-red-500 flex-col items-center justify-between";
+            } else {
+                // 학생용 전용: 스크롤 완벽 배제를 위해 h-screen overflow-hidden 제거 및 세로 오토 오버플로우 적용
+                document.body.className = "bg-slate-100 min-h-screen overflow-y-auto flex flex-col items-center justify-start p-2 sm:p-4";
+                
+                // 불필요한 메인 헤더, 상단 전광판, 줄다리기 밧줄 그래픽을 완전히 숨깁니다
+                document.getElementById('global-header').classList.add('hidden');
+                document.getElementById('global-scoreboard').classList.add('hidden');
+                document.getElementById('game-grid-layout').classList.add('hidden');
+                
+                // 학생 패널 보이기
+                const studentUI = document.getElementById('student-ui');
+                const badgeSpan = document.getElementById('student-badge-span');
+                const submitBtn = document.getElementById('student-submit-btn');
+                
+                studentUI.classList.remove('hidden');
+                studentUI.classList.add('flex');
+                
+                // 팀에 맞춰 계산기 테마 및 제출 버튼 색상을 동적으로 매칭 시킵니다
+                if (role === 'blue') {
+                    studentUI.className = "bg-white rounded-3xl p-4 sm:p-6 shadow-xl border-t-[12px] border-blue-500 flex flex-col items-center max-w-sm w-full transition-all";
+                    badgeSpan.className = "bg-blue-100 text-blue-700 text-xs sm:text-sm px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-bold mb-2 sm:mb-3 select-none";
+                    badgeSpan.textContent = "청팀 실시간 화면";
+                    submitBtn.className = "key-btn bg-blue-600 hover:bg-blue-700 mt-2.5 sm:mt-4 p-2.5 sm:p-3.5 w-full rounded-xl sm:rounded-2xl text-base sm:text-lg font-bold text-white shadow-md transition-all active:scale-95";
+                    submitBtn.textContent = "청팀 정답 제출 (Go)";
+                } else if (role === 'red') {
+                    studentUI.className = "bg-white rounded-3xl p-4 sm:p-6 shadow-xl border-t-[12px] border-red-500 flex flex-col items-center max-w-sm w-full transition-all flex";
+                    badgeSpan.className = "bg-red-100 text-red-700 text-xs sm:text-sm px-3 sm:px-4 py-1 sm:py-1.5 rounded-full font-bold mb-2 sm:mb-3 select-none";
+                    badgeSpan.textContent = "홍팀 실시간 화면";
+                    submitBtn.className = "key-btn bg-red-600 hover:bg-red-700 mt-2.5 sm:mt-4 p-2.5 sm:p-3.5 w-full rounded-xl sm:rounded-2xl text-base sm:text-lg font-bold text-white shadow-md transition-all active:scale-95";
+                    submitBtn.textContent = "홍팀 정답 제출 (Go)";
+                }
+
+                // 5초 대기 팁 설정 활성화
+                setTimeout(() => {
+                    const currentQuestionText = document.getElementById('math-question').textContent;
+                    if (currentQuestionText === '로딩 중...' || currentQuestionText === '대기 중...') {
+                        const helpTip = document.getElementById('student-help-tip');
+                        if (helpTip) helpTip.classList.remove('hidden');
+                    }
+                }, 5000);
+            }
+
+            // MQTT 네트워크 구독 연동
+            connectToRealtimeMqtt();
+        };
+
+        // MQTT 실시간 중계망 개시
+        function connectToRealtimeMqtt() {
+            statusText.textContent = "통신망 연결 중...";
+            
+            let attemptBackup = false;
+            
+            function tryConnect(url) {
+                if (client) {
+                    try { client.end(); } catch(e) {}
+                }
+                
+                console.log("MQTT 연결 시도 주소:", url);
+                try {
+                    client = mqtt.connect(url, {
+                        connectTimeout: 5000,
+                        reconnectPeriod: 2000,
+                        rejectUnauthorized: false,
+                        clientId: 'tug_' + Math.random().toString(16).substring(2, 10)
+                    });
+                } catch (e) {
+                    handleConnectionError(e);
+                    return;
+                }
+                
+                let connectionTimeout = setTimeout(() => {
+                    if ((!client || !client.connected) && !attemptBackup) {
+                        console.warn("기본 연결 실패. 백업 서버로 전환합니다.");
+                        attemptBackup = true;
+                        tryConnect(backupBrokerUrl);
+                    }
+                }, 5000);
+
+                client.on('connect', () => {
+                    clearTimeout(connectionTimeout);
+                    statusDot.className = "w-3 h-3 rounded-full bg-emerald-500 mr-2";
+                    statusText.textContent = `실시간 방 [${currentRoomCode}] 연결됨`;
+                    
+                    const stateTopic = `tugofwar/sameproblem/${currentRoomCode}/state`;
+                    const actionTopic = `tugofwar/sameproblem/${currentRoomCode}/action`;
+
+                    if (isHost) {
+                        client.subscribe(actionTopic);
+                        
+                        const problem = generateMathProblem('+');
+                        currentGameState = {
+                            blueScore: 0,
+                            redScore: 0,
+                            ropePos: 0,
+                            triggerTeam: '',
+                            blueQuestion: problem.question,
+                            blueAnswer: problem.answer,
+                            blueInput: '',
+                            redQuestion: problem.question,
+                            redAnswer: problem.answer,
+                            redInput: '',
+                            gameMode: '+',
+                            status: 'playing',
+                            winner: '',
+                            lastEvent: { team: '', type: 'reset', timestamp: Date.now() }
+                        };
+                        broadcastState();
+                    } else {
+                        client.subscribe(stateTopic);
+                        
+                        // 주기적 동기화 안전 루프 개시
+                        if (syncInterval) clearInterval(syncInterval);
+                        syncInterval = setInterval(() => {
+                            const qText = document.getElementById('math-question').textContent;
+                            if (qText !== '로딩 중...' && qText !== '대기 중...') {
+                                clearInterval(syncInterval);
+                            } else {
+                                sendActionToHost({ type: 'requestSync' });
+                            }
+                        }, 2000);
+
+                        sendActionToHost({ type: 'requestSync' });
+                    }
+                });
+
+                client.on('message', (topic, message) => {
+                    try {
+                        const data = JSON.parse(message.toString());
+                        if (isHost) {
+                            handleClientAction(data);
+                        } else {
+                            currentGameState = data;
+                            renderGame(data);
+                        }
+                    } catch (e) {
+                        console.error("데이터 수신 분석 오류:", e);
+                    }
+                });
+
+                client.on('error', (err) => {
+                    console.warn("MQTT 에러 발생 가로채기:", err.message);
+                    clearTimeout(connectionTimeout);
+                    
+                    if (!attemptBackup) {
+                        attemptBackup = true;
+                        console.warn("백업 서버 우회 접속 시작...");
+                        tryConnect(backupBrokerUrl);
+                    } else {
+                        statusDot.className = "w-3 h-3 rounded-full bg-red-500 mr-2";
+                        statusText.textContent = "서버 연결 분리됨";
+                    }
+                });
+            }
+            
+            function handleConnectionError(err) {
+                console.error("동기 예외 캡처:", err);
+                if (!attemptBackup) {
+                    attemptBackup = true;
+                    tryConnect(backupBrokerUrl);
+                } else {
+                    statusDot.className = "w-3 h-3 rounded-full bg-red-500 mr-2";
+                    statusText.textContent = "연결 오류";
+                }
+            }
+            
+            tryConnect(publicBrokerUrl);
+        }
+
+        // 마스터(교사용 TV)가 전체 동기화 데이터를 뿌립니다.
+        function broadcastState() {
+            if (!client) return;
+            const stateTopic = `tugofwar/sameproblem/${currentRoomCode}/state`;
+            client.publish(stateTopic, JSON.stringify(currentGameState), { qos: 1, retain: true });
+            
+            // 호스트 자신 화면도 동기화
+            renderGame(currentGameState);
+        }
+
+        // 학생기기가 마스터(교사용 TV)에 원격 액션 신호를 보냅니다.
+        function sendActionToHost(actionObj) {
+            if (!client) return;
+            const actionTopic = `tugofwar/sameproblem/${currentRoomCode}/action`;
+            client.publish(actionTopic, JSON.stringify(actionObj));
+        }
+
+        // [호스트 핵심 제어 연산 로직] 
+        function handleClientAction(action) {
+            if (action.type === 'requestSync') {
+                broadcastState();
+                return;
+            }
+
+            const team = action.team;
+            const inputKey = team === 'blue' ? 'blueInput' : 'redInput';
+            const answerKey = team === 'blue' ? 'blueAnswer' : 'redAnswer';
+            const scoreKey = team === 'blue' ? 'blueScore' : 'redScore';
+
+            if (action.type === 'input') {
+                currentGameState[inputKey] = action.value;
+                broadcastState();
+            } 
+            else if (action.type === 'submit') {
+                const currentInput = currentGameState[inputKey];
+                const targetAns = currentGameState[answerKey];
+
+                if (currentInput === "" || currentInput === "-") return;
+
+                if (parseInt(currentInput) === targetAns) {
+                    // 정답 처리!
+                    const pullPower = team === 'blue' ? -20 : 20;
+                    currentGameState.ropePos += pullPower;
+                    currentGameState[scoreKey] += 10; // 정답당 10점 누적
+                    currentGameState.triggerTeam = team;
+                    currentGameState.lastEvent = { team: team, type: 'correct', timestamp: Date.now() };
+
+                    // 승패 확인 (5문제 누적 선승제 필터링 추가: 50점 도달 또는 줄이 끝까지 닿으면 승리)
+                    if (currentGameState.blueScore >= 50 || currentGameState.ropePos <= -100) {
+                        currentGameState.status = "finished";
+                        currentGameState.winner = "blue";
+                        currentGameState.ropePos = -100; // 밧줄을 완전히 블루팀 쪽 끝으로 고정
+                    } else if (currentGameState.redScore >= 50 || currentGameState.ropePos >= 100) {
+                        currentGameState.status = "finished";
+                        currentGameState.winner = "red";
+                        currentGameState.ropePos = 100; // 밧줄을 완전히 레드팀 쪽 끝으로 고정
+                    }
+
+                    // 다음 새로운 퀴즈 공통 발행
+                    const problem = generateMathProblem(currentGameState.gameMode);
+                    currentGameState.blueQuestion = problem.question;
+                    currentGameState.blueAnswer = problem.answer;
+                    currentGameState.blueInput = "";
+                    currentGameState.redQuestion = problem.question;
+                    currentGameState.redAnswer = problem.answer;
+                    currentGameState.redInput = "";
+
+                    broadcastState();
+                } else {
+                    // 오답 처리!
+                    currentGameState[inputKey] = "";
+                    currentGameState.lastEvent = { team: team, type: 'incorrect', timestamp: Date.now() };
+                    broadcastState();
+                }
+            }
+        }
+
+        // 학생용 키패드 입력 함수 정의 (호스트로 즉시 위임 중계)
+        window.addNumber = (n) => {
+            if (isGameOver) return;
+            if (currentAnswer.length < 5) {
+                currentAnswer += n;
+                answerDisplay.textContent = currentAnswer;
+                sendActionToHost({ type: 'input', team: myRole, value: currentAnswer });
+            }
+        };
+
+        window.addMinusSign = () => {
+            if (isGameOver) return;
+            if (currentAnswer.startsWith("-")) {
+                currentAnswer = currentAnswer.substring(1);
+            } else {
+                currentAnswer = "-" + currentAnswer;
+            }
+            answerDisplay.textContent = currentAnswer === "" || currentAnswer === "-" ? (currentAnswer || "?") : currentAnswer;
+            sendActionToHost({ type: 'input', team: myRole, value: currentAnswer });
+        };
+
+        window.clearAnswer = () => {
+            if (isGameOver) return;
+            currentAnswer = "";
+            answerDisplay.textContent = "?";
+            sendActionToHost({ type: 'input', team: myRole, value: "" });
+        };
+
+        window.checkAnswer = () => {
+            if (currentAnswer === "" || currentAnswer === "-" || isGameOver) return;
+            sendActionToHost({ type: 'submit', team: myRole });
+        };
+
+        // 교사용 로컬 수동 작동 키패드 핸들러
+        window.teacherAddNumber = (team, n) => {
+            if (isGameOver || !isHost) return;
+            const inputKey = team === 'blue' ? 'blueInput' : 'redInput';
+            if (currentGameState[inputKey].length < 5) {
+                currentGameState[inputKey] += n;
+                broadcastState();
+            }
+        };
+
+        window.teacherAddMinusSign = (team) => {
+            if (isGameOver || !isHost) return;
+            const inputKey = team === 'blue' ? 'blueInput' : 'redInput';
+            let val = currentGameState[inputKey];
+            if (val.startsWith("-")) {
+                currentGameState[inputKey] = val.substring(1);
+            } else {
+                currentGameState[inputKey] = "-" + val;
+            }
+            broadcastState();
+        };
+
+        window.teacherClearAnswer = (team) => {
+            if (isGameOver || !isHost) return;
+            const inputKey = team === 'blue' ? 'blueInput' : 'redInput';
+            currentGameState[inputKey] = "";
+            broadcastState();
+        };
+
+        window.teacherCheckAnswer = (team) => {
+            if (isGameOver || !isHost) return;
+            handleClientAction({ type: 'submit', team: team });
+        };
+
+        // 게임 경기 리셋 처리
+        async function resetGameDataQuietly(mode) {
+            if (!isHost) return;
+            const targetMode = mode || currentGameState.gameMode || '+';
+            const problem = generateMathProblem(targetMode);
+
+            currentGameState = {
+                blueScore: 0,
+                redScore: 0,
+                ropePos: 0,
+                triggerTeam: '',
+                blueQuestion: problem.question,
+                blueAnswer: problem.answer,
+                blueInput: '',
+                redQuestion: problem.question,
+                redAnswer: problem.answer,
+                redInput: '',
+                gameMode: targetMode,
+                status: 'playing',
+                winner: '',
+                lastEvent: { team: '', type: 'reset', timestamp: Date.now() }
+            };
+            broadcastState();
+        }
+
+        window.resetGameData = () => {
+            if (!isHost) return;
+            showCustomConfirm("경기장 초기화", "모든 경기 데이터를 원점으로 리셋하고 새로운 줄다리기를 시작하겠습니까?", async () => {
+                await resetGameDataQuietly();
+                isGameOver = false;
+            });
+        };
+
+        window.changeGameMode = (mode) => {
+            if (!isHost) return;
+            const modeNames = { 
+                '+': '정수 덧셈', 
+                '-': '정수 뺄셈', 
+                'addsub': '정수 덧뺄셈', 
+                '*': '정수 곱셈', 
+                '/': '정수 나눗셈', 
+                'pow': '제곱수 대결', 
+                'sqrt': '제곱근 대결',
+                'mix': '사칙믹스' 
+            };
+            showCustomConfirm("연산 규칙 변경", `플레이 규칙을 [${modeNames[mode]}]으로 변경하고 경기장을 초기화하시겠습니까?`, async () => {
+                await resetGameDataQuietly(mode);
+                isGameOver = false;
+            });
+        };
+
+        // 키보드 입력 물리 바인딩
+        document.addEventListener('keydown', (e) => {
+            if (myRole === 'teacher' || !myRole) return;
+            if (e.key >= '0' && e.key <= '9') addNumber(e.key);
+            if (e.key === '-') addMinusSign();
+            if (e.key === 'Backspace') clearAnswer();
+            if (e.key === 'Enter') checkAnswer();
+        });
+
+        // 스타트업 알림 초기 상태 활성화
+        window.onload = () => {
+            initMsg.textContent = "통신 연결 준비 완료! 방 코드를 맞추고 접속하세요.";
+            statusDot.className = "w-3 h-3 rounded-full bg-yellow-400 mr-2";
+            statusText.textContent = "방 개설 대기";
+        };
+
+    </script>
+</body>
+</html>
