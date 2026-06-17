@@ -403,16 +403,19 @@
         const dominoData = [
             { id: 1,  l: 'START', q: 'x + y = 4<br>2x - y = 5', a: '(3, 1)', d: '중' },
             { id: 2,  l: '(3, 1)', q: 'x + y = 7<br>x - y = -1', a: '(3, 4)', d: '하' },
-            // 기존 5x - y = -8에서 5x - y = -10으로 변경하여 연립방정식 해 (-1, 5)가 정확히 성립하도록 수정했습니다.
             { id: 3,  l: '(3, 4)', q: '3x + 2y = 7<br>5x - y = -10', a: '(-1, 5)', d: '중' },
-            { id: 4,  l: '(-1, 5)', q: '0.5x + 0.2y = -0.9<br>0.3x - 0.1y = -0.8', a: '(-2, 5)', d: '상' },
+            // 수정한 카드 (id: 4) - image_bf0e40.png 속의 소수 연립방정식으로 교체되었습니다. 정답은 동일하게 (-2, 5)입니다.
+            { id: 4,  l: '(-1, 5)', q: '0.6x + 0.2y = -0.2<br>0.4x - 0.1y = -1.3', a: '(-2, 5)', d: '상' },
             { id: 5,  l: '(-2, 5)', q: 'x + y = 0<br>2x - y = -9', a: '(-3, 3)', d: '중' },
             { id: 6,  l: '(-3, 3)', q: 'x + y = 5<br>x - y = 1', a: '(3, 2)', d: '하' },
-            { id: 7,  l: '(3, 2)', q: '2x + 3y = 7<br>5x - 2y = 36', a: '(8, -3)', d: '중' },
-            { id: 8,  l: '(8, -3)', q: '<div class="frac"><span class="n">x</span><span>2</span></div> + <div class="frac"><span class="n">y</span><span>3</span></div> = 1<br><div class="frac"><span class="n">x</span><span>4</span></div> - <div class="frac"><span class="n">y</span><span>2</span></div> = -2', a: '(-2, 6)', d: '상' },
+            // 수정한 카드 (id: 7) - image_bf0282.png 속 2번째 식의 상수항을 36에서 46으로 올바르게 수정하여 정답인 (8, -3)이 매끄럽게 계산되도록 해결했습니다.
+            { id: 7,  l: '(3, 2)', q: '2x + 3y = 7<br>5x - 2y = 46', a: '(8, -3)', d: '중' },
+            // 수정한 카드 (id: 8) - 2번째 분수 식의 y의 분모를 2에서 4로 교정하여 계산 결과가 정확히 (-2, 6)이 되도록 수학적 오류를 잡았습니다.
+            { id: 8,  l: '(8, -3)', q: '<div class="frac"><span class="n">x</span><span>2</span></div> + <div class="frac"><span class="n">y</span><span>3</span></div> = 1<br><div class="frac"><span class="n">x</span><span>4</span></div> - <div class="frac"><span class="n">y</span><span>4</span></div> = -2', a: '(-2, 6)', d: '상' },
             { id: 9,  l: '(-2, 6)', q: 'x + y = 1<br>3x - y = 7', a: '(2, -1)', d: '중' },
             { id: 10, l: '(2, -1)', q: 'x + y = 9<br>2x - y = 0', a: '(3, 6)', d: '하' },
-            { id: 11, l: '(3, 6)', q: '4x - y = 11<br>3x + 2y = 3', a: '(2, -3)', d: '중' },
+            // 수정한 카드 (id: 11) - 2번째 수식의 우변을 3에서 0으로 교정하여 정답인 (2, -3)이 완벽하게 나오도록 하였습니다.
+            { id: 11, l: '(3, 6)', q: '4x - y = 11<br>3x + 2y = 0', a: '(2, -3)', d: '중' },
             { id: 12, l: '(2, -3)', q: '🏁', a: 'COMPLETE', d: null }
         ];
         let initialShuffledOrder = [];
