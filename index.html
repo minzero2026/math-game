@@ -3,79 +3,131 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>수학 게임 교실</title>
+    <title>재미있는 수학 게임 모음</title>
+    <!-- Tailwind CSS (디자인을 위해 사용) -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        /* 화면 기본 디자인 (배경색, 폰트 등) */
-        body {
-            font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
-            background-color: #f4f8fe;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            box-sizing: border-box;
+        /* 부드러운 애니메이션 효과 */
+        .game-card {
+            transition: all 0.2s ease-in-out;
         }
-        /* 메뉴판 하얀색 박스 디자인 */
-        .menu-board {
-            background-color: white;
-            padding: 30px;
-            border-radius: 15px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            width: 100%;
-            max-width: 500px;
-            text-align: center;
-        }
-        .menu-board h1 {
-            color: #1a73e8;
-            margin-bottom: 5px;
-        }
-        .menu-board p {
-            color: #5f6368;
-            margin-bottom: 25px;
-        }
-        /* 버튼 디자인 */
-        .game-btn {
-            display: block;
-            background-color: #e8f0fe;
-            color: #1a73e8;
-            text-decoration: none;
-            padding: 15px;
-            margin-bottom: 12px;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: bold;
-            transition: all 0.3s ease;
-            border: 2px solid transparent;
-        }
-        /* 버튼에 마우스 올렸을 때 색상 변화 */
-        .game-btn:hover {
-            background-color: #1a73e8;
-            color: white;
-            box-shadow: 0 4px 6px rgba(26, 115, 232, 0.3);
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
         }
     </style>
 </head>
-<body>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
 
-    <div class="menu-board">
-        <h1>🎲 즐거운 수학 교실</h1>
-        <p>오늘 할 활동을 선택해 주세요!</p>
+    <!-- 상단 헤더 -->
+    <header class="bg-indigo-600 text-white p-8 shadow-md text-center">
+        <h1 class="text-4xl font-extrabold tracking-tight mb-2">🧮 수학 놀이터</h1>
+        <p class="text-indigo-200">중학교 수학을 게임으로 재미있게 배워보세요!</p>
+    </header>
 
-        <!-- 아래부터 게임 목록입니다. 마음껏 수정하고 추가하세요! -->
-        
-        <a href="math2/equation-domino.html" class="game-btn">1. 연립방정식 도미노 게임</a>
-        
-        <a href="zero-game2.html" class="game-btn">2. 지수법칙 룰렛 게임</a>
-        
-        <a href="common/tug.html" class="game-btn">3. 실시간 수학 줄다리기 게임</a>
+    <!-- 메인 콘텐츠가 들어갈 자리 -->
+    <main class="container mx-auto px-4 py-10 max-w-5xl" id="main-content">
+        <!-- 자바스크립트가 여기에 내용을 채워 넣습니다. -->
+    </main>
 
-        <a href="math2/slope-alkkagi.html" class="game-btn">6. 기울기 알까기 게임</a>
+    <!-- 하단 푸터 -->
+    <footer class="bg-slate-200 text-slate-600 text-center p-6 mt-10">
+        <p>© 수학 게임 프로젝트. 꾸준히 새로운 게임이 추가됩니다!</p>
+    </footer>
 
-        <!-- 게임을 4번, 5번 계속 추가하려면 위 한 줄(<a href... </a>)을 그대로 복사해서 이 아래에 붙여넣기 하면 됩니다. -->
+    <script>
+        // =====================================================================
+        // 🚨 게임을 추가할 때는 여기(GAME_DATA)만 수정하시면 됩니다! 🚨
+        // =====================================================================
+        const GAME_DATA = [
+            {
+                category: "중1",
+                icon: "📘",
+                color: "bg-blue-500",
+                games: [
+                    { title: "작도 게임", url: "./중1/작도게임/index.html", desc: "컴퍼스와 눈금 없는 자를 이용해봐요!" },
+                    { title: "소인수분해 탈출", url: "./중1/소인수분해/index.html", desc: "소수로 나누어 방을 탈출하세요." }
+                ]
+            },
+            {
+                category: "중2",
+                icon: "📗",
+                color: "bg-emerald-500",
+                games: [
+                    { title: "지수법칙 룰렛 게임", url: "zero-game2.html"},
+                    { title: "연립방정식 도미노 게임", url: "math2/equation-domino.html""},
+                    { title: "기울기 알까기 게임", url: "math2/slope-alkkagi.html"}
+                ]
+            },
+            {
+                category: "중3",
+                icon: "📙",
+                color: "bg-orange-500",
+                games: [
+                    { title: "이차방정식 레이싱", url: "./중3/이차방정식/index.html", desc: "근의 공식을 이용해 자동차를 가속하세요." },
+                    { title: "피타고라스의 보물찾기", url: "./중3/피타고라스/index.html", desc: "직각삼각형의 빗변을 구해 보물을 찾으세요." }
+                ]
+            },
+            {
+                category: "공통",
+                icon: "🌟",
+                color: "bg-purple-500",
+                games: [
+                    { title: "실시간 수학 줄다리기 게임", url: "common/tug.html" }
+                    
+                ]
+            }
+        ];
+        // =====================================================================
+        // 여기서부터는 화면을 그리는 코드입니다. (수정할 필요 없습니다)
+        // =====================================================================
 
-    </div>
+        function renderGames() {
+            const mainContent = document.getElementById('main-content');
+            let html = '<div class="grid grid-cols-1 md:grid-cols-2 gap-8">';
 
+            GAME_DATA.forEach(section => {
+                html += `
+                    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                        <div class="${section.color} text-white px-6 py-4 flex items-center gap-3">
+                            <span class="text-2xl">${section.icon}</span>
+                            <h2 class="text-2xl font-bold">${section.category} 수학</h2>
+                        </div>
+                        <div class="p-6">
+                            <ul class="space-y-4">
+                `;
+
+                if (section.games.length === 0) {
+                    html += `<li class="text-slate-400 italic text-center py-4">아직 등록된 게임이 없습니다.</li>`;
+                }
+
+                section.games.forEach(game => {
+                    html += `
+                        <li>
+                            <a href="${game.url}" class="game-card block p-4 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-200 text-left">
+                                <h3 class="text-lg font-semibold text-slate-800 mb-1 flex items-center justify-between">
+                                    ${game.title}
+                                    <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                                </h3>
+                                <p class="text-sm text-slate-500">${game.desc}</p>
+                            </a>
+                        </li>
+                    `;
+                });
+
+                html += `
+                            </ul>
+                        </div>
+                    </section>
+                `;
+            });
+
+            html += '</div>';
+            mainContent.innerHTML = html;
+        }
+
+        // 페이지가 로드되면 화면을 그립니다.
+        document.addEventListener('DOMContentLoaded', renderGames);
+    </script>
 </body>
 </html>
