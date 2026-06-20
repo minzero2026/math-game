@@ -45,8 +45,8 @@
                 icon: "📘",
                 color: "bg-blue-500",
                 games: [
-                    { title: "작도 게임", url: "./중1/작도게임/index.html", desc: "컴퍼스와 눈금 없는 자를 이용해봐요!" },
-                    { title: "소인수분해 탈출", url: "./중1/소인수분해/index.html", desc: "소수로 나누어 방을 탈출하세요." }
+                    { title: "작도 게임", url: "./중1/작도게임/index.html" },
+                    { title: "소인수분해 탈출", url: "./중1/소인수분해/index.html" }
                 ]
             },
             {
@@ -54,9 +54,9 @@
                 icon: "📗",
                 color: "bg-emerald-500",
                 games: [
-                    { title: "지수법칙 룰렛 게임", url: "zero-game2.html"},
-                    { title: "연립방정식 도미노 게임", url: "math2/equation-domino.html""},
-                    { title: "기울기 알까기 게임", url: "math2/slope-alkkagi.html"}
+                    { title: "지수법칙 룰렛 게임", url: "zero-game2.html" },
+                    { title: "연립방정식 도미노 게임", url: "math2/equation-domino.html" },
+                    { title: "기울기 알까기 게임", url: "math2/slope-alkkagi.html" }
                 ]
             },
             {
@@ -64,8 +64,8 @@
                 icon: "📙",
                 color: "bg-orange-500",
                 games: [
-                    { title: "이차방정식 레이싱", url: "./중3/이차방정식/index.html", desc: "근의 공식을 이용해 자동차를 가속하세요." },
-                    { title: "피타고라스의 보물찾기", url: "./중3/피타고라스/index.html", desc: "직각삼각형의 빗변을 구해 보물을 찾으세요." }
+                    { title: "이차방정식 레이싱", url: "./중3/이차방정식/index.html" },
+                    { title: "피타고라스의 보물찾기", url: "./중3/피타고라스/index.html" }
                 ]
             },
             {
@@ -74,7 +74,6 @@
                 color: "bg-purple-500",
                 games: [
                     { title: "실시간 수학 줄다리기 게임", url: "common/tug.html" }
-                    
                 ]
             }
         ];
@@ -105,11 +104,10 @@
                     html += `
                         <li>
                             <a href="${game.url}" class="game-card block p-4 rounded-xl bg-slate-50 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-200 text-left">
-                                <h3 class="text-lg font-semibold text-slate-800 mb-1 flex items-center justify-between">
+                                <h3 class="text-lg font-semibold text-slate-800 flex items-center justify-between">
                                     ${game.title}
                                     <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                                 </h3>
-                                <p class="text-sm text-slate-500">${game.desc}</p>
                             </a>
                         </li>
                     `;
