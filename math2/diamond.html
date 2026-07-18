@@ -4,8 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>일차함수 다이아몬드 맞추기</title>
+    <!-- 구글 사이트 시험용: 한 파일로 붙여 넣을 수 있도록 CDN을 사용합니다. -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- 실시간 통신을 위한 MQTT 라이브러리 추가 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
     <style>
         body {
@@ -397,8 +397,8 @@
         
         <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mb-4">
             <label class="block text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">대결할 방 번호 (숫자)</label>
-            <input type="number" id="room-code-input" class="w-full max-w-[190px] text-center text-xl font-mono font-bold tracking-widest p-2 border-2 border-blue-200 rounded-xl bg-white focus:outline-none focus:border-blue-500 mx-auto block" value="7788">
-            <p class="text-xs text-slate-400 mt-2">교사와 학생 모두 같은 방 번호를 입력해야 만날 수 있습니다.</p>
+            <input type="text" id="room-code-input" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" class="w-full max-w-[230px] text-center text-xl font-mono font-bold tracking-widest p-2 border-2 border-blue-200 rounded-xl bg-white focus:outline-none focus:border-blue-500 mx-auto block" placeholder="6~12자리 숫자">
+            <p class="text-xs text-slate-400 mt-2">수업마다 새로운 6~12자리 방 번호를 정해 교사와 학생이 똑같이 입력하세요.</p>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
@@ -406,7 +406,7 @@
             <div class="bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center">
                 <div class="text-3xl mb-2">👨‍🎓</div>
                 <h3 class="font-bold text-lg text-slate-700 mb-2">학생 모드</h3>
-                <input type="text" id="player-name" autocomplete="name" class="w-full border-2 border-slate-300 p-2 rounded-lg mb-3 text-center focus:border-blue-500 focus:outline-none" placeholder="이름 입력">
+                <input type="text" id="player-name" maxlength="12" autocomplete="off" class="w-full border-2 border-slate-300 p-2 rounded-lg mb-3 text-center focus:border-blue-500 focus:outline-none" placeholder="학번 또는 이름">
                 <button onclick="joinGame('student')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md active:scale-95">입장하기</button>
             </div>
             
@@ -414,7 +414,7 @@
             <div class="bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center justify-between">
                 <div class="text-3xl mb-2">👨‍🏫</div>
                 <h3 class="font-bold text-lg text-slate-700 mb-2">교사 모드</h3>
-                <p class="text-xs text-slate-500 mb-3">학생들의 진행 상황을 통제하고 실시간 순위표를 확인합니다.</p>
+                <p class="text-xs text-slate-500 mb-2">학생들의 진행 상황을 통제하고 실시간 순위표를 확인합니다.</p>
                 <button onclick="joinGame('teacher')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md active:scale-95">제어판 열기</button>
             </div>
         </div>
@@ -650,28 +650,33 @@
 </div>
 
 <script>
-    // --- MQTT 통신 설정: 줄다리기 게임의 상태 방송 + 재동기화 방식을 적용 ---
-    const publicBrokerUrl = "wss://broker.emqx.io:8084/mqtt";
-    const backupBrokerUrl = "wss://broker.hivemq.com:8884/mqtt"; // 방화벽 우회용 백업 서버 추가
-    let client = null;
-    let myRole = ""; // 'student', 'teacher', 'single'
-    let currentRoomCode = "7788";
-    let myId = "user_" + Math.random().toString(16).slice(2, 10);
-    let teacherLeaderboard = {}; // 교사용 기록 저장 객체
-    let latestStudentLeaderboard = []; // 학생 화면이 마지막으로 받은 순위표
+    // --- MQTT 통신 설정 ---
+    // 모든 기기가 반드시 같은 브로커를 사용해야 같은 방에서 만날 수 있습니다.
+    const realtimeBrokerUrl = "wss://broker.emqx.io:8084/mqtt";
 
-    // 줄다리기 게임처럼 교사가 현재 상태를 계속 보관하고, 학생은 주기적으로 동기화를 요청합니다.
+    const ROOM_CODE_PATTERN = /^\d{6,12}$/;
+    const MAX_PLAYER_NAME_LENGTH = 12;
+    const MAX_ACCEPTED_SCORE = 100000;
+    let client = null;
+    let myRole = ""; 
+    let currentRoomCode = "";
+    let myId = "user_" + Math.random().toString(16).slice(2, 10);
+    let teacherLeaderboard = {}; 
+    let latestStudentLeaderboard = []; 
+
     let currentGameStatus = 'waiting';
-    let currentProblemMode = 'intercept'; // 'intercept', 'twoPoints', 'collector'
+    let currentProblemMode = 'intercept'; 
     let teacherRoomInitialized = false;
     let syncInterval = null;
     let connectionGeneration = 0;
     let connectionAttemptToken = 0;
     let connectionTimeoutHandle = null;
     let isConnectingRealtime = false;
-    const topicNamespace = 'mathclass/linear-diamond/v4'; // 기존 공개 토픽과 충돌하지 않는 새 통신 채널
+    const topicNamespace = 'mathclass/linear-diamond/v5'; 
+    
+    // 교사 응답 트래픽 제어 변수 (추가됨)
+    let lastBroadcastTime = 0;
 
-    // 새로고침 복구용 로컬 저장 상태
     const storagePrefix = 'linearDiamondLocalV3';
     let gameSessionId = '';
     let pendingStudentSave = null;
@@ -743,7 +748,6 @@
     const gameContainer = document.getElementById('game-container');
     const teacherDashboard = document.getElementById('teacher-dashboard');
 
-    // 함수식 입력 보조 함수들
     function updateAutomaticSign(signElementId, value) {
         const signElement = document.getElementById(signElementId);
         if (!signElement) return;
@@ -964,8 +968,6 @@
     }
 
     function getSafeProblemBounds() {
-        // 기기마다 좌표평면의 실제 표시 범위가 달라지므로,
-        // 테두리에서 한 칸 이상 안쪽이면서 최대 ±5 안에서만 출제합니다.
         return {
             xMin: Math.max(-5, Math.ceil(config.xMin) + 1),
             xMax: Math.min(5, Math.floor(config.xMax) - 1),
@@ -1116,7 +1118,6 @@
                 });
             });
 
-            // 특정 직선에 속하지 않는 방해 점을 약간 넣어 전략성을 높입니다.
             const allGridPoints = [];
             for (let x = bounds.xMin; x <= bounds.xMax; x++) {
                 for (let y = bounds.yMin; y <= bounds.yMax; y++) {
@@ -1133,7 +1134,6 @@
             if (points.length >= 14 && isProblemSafelyVisible(points, 'collector')) return points;
         }
 
-        // 안전한 기본 배치: 세 직선 y=x, y=-x, y=2 위의 점과 방해 점
         const fallback = [
             [-5,-5],[-3,-3],[-1,-1],[1,1],[3,3],[5,5],
             [-5,5],[-3,3],[-1,1],[1,-1],[3,-3],[5,-5],
@@ -1226,7 +1226,6 @@
             }
         };
 
-        // 한 점만 남는 경우도 놓치지 않도록 각 점을 지나는 간단한 직선을 후보에 포함합니다.
         safePoints.forEach(point => {
             addCandidate(0, 1, point.y);
             addCandidate(1, 1, point.y - point.x);
@@ -1239,19 +1238,18 @@
                 const second = safePoints[j];
                 const dx = second.x - first.x;
                 const dy = second.y - first.y;
-                if (dx === 0) continue; // 일차함수는 수직선이 될 수 없습니다.
+                if (dx === 0) continue; 
 
                 const divisor = gcdInteger(dy, dx);
                 let num = dy / divisor;
                 let den = dx / divisor;
                 if (den < 0) { num *= -1; den *= -1; }
                 const bNumerator = first.y * den - num * first.x;
-                if (bNumerator % den !== 0) continue; // 게임 입력 규칙에 맞게 y절편이 정수인 직선만 사용합니다.
+                if (bNumerator % den !== 0) continue; 
                 addCandidate(num, den, bNumerator / den);
             }
         }
 
-        // 같은 점 집합을 지나는 여러 식은 가장 단순한 식 하나만 남깁니다.
         const byMask = new Map();
         Array.from(byKey.values()).forEach(candidate => {
             const key = String(candidate.mask >>> 0);
@@ -1260,7 +1258,6 @@
         });
 
         let candidates = Array.from(byMask.values());
-        // 다른 후보가 완전히 포함하는 직선은 최적 조합에 필요하지 않습니다.
         candidates = candidates.filter((candidate, index) => !candidates.some((other, otherIndex) => {
             if (index === otherIndex || candidate.mask === other.mask) return false;
             return ((candidate.mask | other.mask) >>> 0) === (other.mask >>> 0);
@@ -1498,7 +1495,6 @@
         if (currentProblemMode === 'collector') {
             const progress = getCollectorProgress();
             if (progress.showOptimal && progress.optimalResult) {
-                // 학생의 답은 흐린 점선, 컴퓨터의 최적 답은 선명한 실선으로 함께 비교합니다.
                 progress.lines.forEach(line => drawOneGraphLine(line, '#64748b', { alpha: 0.38, lineWidth: 2, dash: [7, 6] }));
                 const optimalColors = ['#f97316', '#8b5cf6', '#0ea5e9'];
                 progress.optimalResult.lines.forEach((line, index) =>
@@ -1672,6 +1668,43 @@
 
     window.onload = () => { resizeCanvases(); updateGameModeUI(); };
 
+    function sanitizeRoomCode(value) {
+        return String(value ?? '').replace(/\D/g, '').slice(0, 12);
+    }
+
+    function sanitizePlayerName(value) {
+        return String(value ?? '')
+            .replace(/[\u0000-\u001F\u007F]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, MAX_PLAYER_NAME_LENGTH);
+    }
+
+    function normalizeLeaderboardEntry(entry) {
+        if (!entry || typeof entry !== 'object') return null;
+        const id = String(entry.id ?? '').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 64);
+        const name = sanitizePlayerName(entry.name) || '이름 없음';
+        const rawScore = Number(entry.score);
+        const score = Number.isFinite(rawScore)
+            ? Math.max(0, Math.min(MAX_ACCEPTED_SCORE, Math.trunc(rawScore)))
+            : 0;
+        const timestampValue = Number(entry.timestamp);
+        const timestamp = Number.isFinite(timestampValue) ? timestampValue : Date.now();
+        const sessionId = String(entry.sessionId ?? '').slice(0, 80);
+        if (!id) return null;
+        return { id, name, score, timestamp, sessionId };
+    }
+
+    function createRankNode(rank) {
+        if (rank === 1) return document.createTextNode('🥇');
+        if (rank === 2) return document.createTextNode('🥈');
+        if (rank === 3) return document.createTextNode('🥉');
+        const rankSpan = document.createElement('span');
+        rankSpan.className = 'font-bold text-slate-500 min-w-8 text-center';
+        rankSpan.textContent = `${rank}등`;
+        return rankSpan;
+    }
+
     function getTopics() {
         const base = `${topicNamespace}/${currentRoomCode}`;
         return {
@@ -1762,7 +1795,6 @@
     function loadStudentLocal() {
         pendingStudentSave = readLocalJson(studentStorageKey());
         if (pendingStudentSave && pendingStudentSave.id) {
-            // 같은 태블릿·같은 방·같은 이름이면 새로고침 후에도 같은 학생으로 인식합니다.
             myId = pendingStudentSave.id;
         }
     }
@@ -1843,15 +1875,16 @@
 
     function getSortedLeaderboard(source = teacherLeaderboard) {
         const values = Array.isArray(source) ? source : Object.values(source || {});
-        return values.slice().sort((a, b) => {
+        return values
+            .map(normalizeLeaderboardEntry)
+            .filter(Boolean)
+            .sort((a, b) => {
             const scoreDiff = Number(b.score || 0) - Number(a.score || 0);
             if (scoreDiff !== 0) return scoreDiff;
             return Number(a.timestamp || 0) - Number(b.timestamp || 0);
         });
     }
 
-    // 같은 점수는 같은 등수로 처리합니다.
-    // 예: 40, 10, 10, 0점 → 1등, 공동 2등, 공동 2등, 4등
     function getRankedLeaderboard(source = teacherLeaderboard) {
         const sorted = getSortedLeaderboard(source);
         let previousScore = null;
@@ -1868,8 +1901,6 @@
     }
 
     function getTopRankedEntries(source = teacherLeaderboard, maxRank = 3) {
-        // 최종 TOP 3에는 실제로 점수를 얻은 학생만 표시합니다.
-        // 0점 학생은 참가 여부와 관계없이 순위 팝업에서 제외됩니다.
         return getRankedLeaderboard(source).filter(entry => entry.score > 0 && entry.rank <= maxRank);
     }
 
@@ -1883,7 +1914,6 @@
             timestamp: Date.now()
         };
 
-        // 종료 신호에는 3위 이내 공동 순위 학생을 모두 넣어 같은 결과를 보여 줍니다.
         if (currentGameStatus === 'ended') {
             payload.top3 = getTopRankedEntries().map(entry => ({
                 id: entry.id,
@@ -1907,15 +1937,23 @@
     }
 
     function startStudentSyncLoop() {
-        if (syncInterval) clearInterval(syncInterval);
+        if (syncInterval) clearTimeout(syncInterval);
         requestGameState();
-        // 시작/종료 신호를 한 번 놓쳐도 3초 안에 교사 상태를 다시 받습니다.
-        syncInterval = setInterval(requestGameState, 3000);
+
+        const scheduleNextSync = () => {
+            // 학생 30명의 요청이 한순간에 몰리지 않도록 12~16초 사이로 분산합니다.
+            const delay = 12000 + Math.floor(Math.random() * 4000);
+            syncInterval = setTimeout(() => {
+                requestGameState();
+                scheduleNextSync();
+            }, delay);
+        };
+        scheduleNextSync();
     }
 
     function stopRealtimeTimers() {
         if (syncInterval) {
-            clearInterval(syncInterval);
+            clearTimeout(syncInterval);
             syncInterval = null;
         }
         if (connectionTimeoutHandle) {
@@ -1925,7 +1963,6 @@
     }
 
     function disconnectRealtime() {
-        // 이전 연결의 비동기 이벤트가 이후 재입장에 개입하지 못하도록 토큰을 폐기합니다.
         connectionAttemptToken += 1;
         isConnectingRealtime = false;
         stopRealtimeTimers();
@@ -1956,7 +1993,6 @@
                 done();
             }
 
-            // 일부 브라우저에서 종료 콜백이 늦어져도 재입장이 멈추지 않도록 안전 해제합니다.
             setTimeout(done, 500);
         });
     }
@@ -1976,8 +2012,6 @@
     }
 
     window.returnToStart = () => {
-        // 페이지와 실시간 통신 연결은 그대로 유지하고, 화면만 첫 화면으로 전환합니다.
-        // 교사가 잠시 나가 있어도 학생 점수를 계속 수집하므로 재입장 시 즉시 복구됩니다.
         const previousRole = myRole;
         if (previousRole === 'teacher') saveTeacherLocal();
         if (previousRole === 'student') saveStudentLocal();
@@ -1995,7 +2029,6 @@
         startupOverlay.classList.remove('hidden');
         startupOverlay.style.display = 'flex';
 
-        // 학생은 같은 이름으로 쉽게 재입장할 수 있도록 입력값을 유지합니다.
         if (previousRole === 'student' && state.playerName) {
             document.getElementById('player-name').value = state.playerName;
         }
@@ -2019,19 +2052,30 @@
             return;
         }
 
-        const codeInput = document.getElementById('room-code-input').value.trim();
-        const requestedRoomCode = codeInput || currentRoomCode;
+        const roomInput = document.getElementById('room-code-input');
+        const requestedRoomCode = sanitizeRoomCode(roomInput.value || currentRoomCode);
+        roomInput.value = requestedRoomCode;
+
         const enteredName = mode === 'student'
-            ? document.getElementById('player-name').value.trim()
+            ? sanitizePlayerName(document.getElementById('player-name').value)
             : '';
 
-        if (mode === 'student' && !enteredName) {
-            alert("이름을 입력해주세요!");
+        if (mode !== 'single' && !ROOM_CODE_PATTERN.test(requestedRoomCode)) {
+            alert('방 번호는 6~12자리 숫자로 입력해주세요.');
+            roomInput.focus();
             return;
         }
 
-        // 첫 화면으로만 나갔다가 같은 모드·같은 방으로 돌아오는 경우,
-        // 기존 MQTT 연결을 그대로 사용하여 서버 재접속 없이 즉시 복귀합니다.
+        if (mode === 'student' && !enteredName) {
+            alert('학번 또는 이름을 입력해주세요!');
+            document.getElementById('player-name').focus();
+            return;
+        }
+
+        if (mode === 'student') {
+            document.getElementById('player-name').value = enteredName;
+        }
+
         const sameStudent = mode !== 'student' || enteredName === state.playerName;
         if (
             mode !== 'single' &&
@@ -2067,7 +2111,6 @@
             return;
         }
 
-        // 역할·방 번호·학생 이름이 달라졌거나 기존 연결이 끊긴 경우에만 새 연결을 만듭니다.
         if (client) await disconnectRealtime();
 
         myRole = mode;
@@ -2101,177 +2144,153 @@
     };
 
     function connectRealtime(mode) {
-        let attemptedBackup = false;
         const attemptToken = ++connectionAttemptToken;
+        const generation = ++connectionGeneration;
 
-        function connectTo(url) {
-            if (attemptToken !== connectionAttemptToken) return;
-            const generation = ++connectionGeneration;
-
-            const previousClient = client;
-            if (previousClient) {
-                try {
-                    if (previousClient.options) previousClient.options.reconnectPeriod = 0;
-                    previousClient.end(true);
-                } catch (e) {}
-            }
-
-            const localClient = mqtt.connect(url, {
-                clientId: 'dia_' + myId + '_' + generation,
-                clean: true,
-                keepalive: 30,
-                connectTimeout: 6000,
-                reconnectPeriod: 2000,
-                rejectUnauthorized: false
-            });
-            client = localClient;
-
-            if (connectionTimeoutHandle) clearTimeout(connectionTimeoutHandle);
-            connectionTimeoutHandle = setTimeout(() => {
-                if (attemptToken !== connectionAttemptToken || client !== localClient || localClient.connected) return;
-                if (!attemptedBackup) {
-                    attemptedBackup = true;
-                    setInitMessage("메인 통신망 지연. 백업 통신망으로 우회 접속 중...");
-                    try {
-                        if (localClient.options) localClient.options.reconnectPeriod = 0;
-                        localClient.end(true);
-                    } catch (e) {}
-                    connectTo(backupBrokerUrl);
-                } else {
-                    isConnectingRealtime = false;
-                    setInitMessage("연결 실패! 잠시 후 다시 입장하거나 네트워크를 확인해주세요.", true);
-                }
-            }, 6000);
-
-            localClient.on('connect', () => {
-                if (attemptToken !== connectionAttemptToken || client !== localClient) return;
-                if (connectionTimeoutHandle) {
-                    clearTimeout(connectionTimeoutHandle);
-                    connectionTimeoutHandle = null;
-                }
-                isConnectingRealtime = false;
-                startupOverlay.classList.add('hidden');
-
-                const topics = getTopics();
-
-                if (mode === 'teacher') {
-                    document.getElementById('display-room-code').innerText = currentRoomCode;
-                    teacherDashboard.classList.remove('hidden');
-                    teacherDashboard.style.display = 'flex';
-
-                    localClient.subscribe([topics.score, topics.action], { qos: 1 }, (err) => {
-                        if (err) {
-                            console.error('교사용 토픽 구독 실패:', err);
-                            alert('실시간 통신 구독에 실패했습니다. 페이지를 새로고침해 주세요.');
-                            return;
-                        }
-
-                        // 새로고침한 경우 이 기기에 저장된 상태와 순위표를 복구합니다.
-                        if (!teacherRoomInitialized) {
-                            loadTeacherLocal();
-                            teacherRoomInitialized = true;
-                        }
-                        renderTeacherLeaderboard();
-                        updateTeacherControlUI(currentGameStatus, false);
-                        saveTeacherLocal();
-                        broadcastGameState();
-                        publishLeaderboard();
-                    });
-                } else if (mode === 'student') {
-                    // 상태를 받기 전에도 학생에게 대기 화면을 명확히 보여 줍니다.
-                    handleGameStateChange('waiting');
-
-                    localClient.subscribe([topics.state, topics.leaderboard], { qos: 1 }, (err) => {
-                        if (err) {
-                            console.error('학생용 토픽 구독 실패:', err);
-                            alert('실시간 통신 구독에 실패했습니다. 페이지를 새로고침해 주세요.');
-                            return;
-                        }
-                        startStudentSyncLoop();
-                    });
-                }
-            });
-
-            localClient.on('message', (topic, message) => {
-                if (attemptToken !== connectionAttemptToken || client !== localClient) return;
-                try {
-                    const data = JSON.parse(message.toString());
-                    const topics = getTopics();
-
-                    if (topic === topics.state && myRole === 'student') {
-                        if (data && typeof data.status === 'string') {
-                            currentProblemMode = normalizeProblemMode(data.problemMode);
-                            updateGameModeUI();
-                            const sessionChanged = applyStudentSession(data.sessionId);
-                            const teacherChanged = Boolean(data.teacherId && data.teacherId !== lastTeacherIdSeen);
-                            if (data.teacherId) lastTeacherIdSeen = data.teacherId;
-
-                            handleGameStateChange(data.status, Array.isArray(data.top3) ? data.top3 : null);
-
-                            // 학생 새로고침·교사 새로고침 뒤 점수를 한 번 다시 보내 순위표를 복구합니다.
-                            if (!initialScorePublished || sessionChanged || teacherChanged) {
-                                publishMyScore();
-                                initialScorePublished = true;
-                            }
-                        }
-                    } else if (topic === topics.leaderboard && myRole === 'student') {
-                        renderStudentLeaderboard(Array.isArray(data) ? data : []);
-                    } else if (topic === topics.score && myRole === 'teacher') {
-                        if (data && data.id) {
-                            // 다른 수업 세션의 오래된 점수는 섞지 않습니다.
-                            if (data.sessionId !== gameSessionId) {
-                                broadcastGameState();
-                                return;
-                            }
-                            teacherLeaderboard[data.id] = data;
-                            saveTeacherLocal();
-                            renderTeacherLeaderboard();
-                            publishLeaderboard();
-                        }
-                    } else if (topic === topics.action && myRole === 'teacher') {
-                        if (data && data.type === 'requestSync') {
-                            broadcastGameState();
-                        }
-                    }
-                } catch (e) {
-                    console.error("데이터 통신 중 오류:", e);
-                }
-            });
-
-            localClient.on('reconnect', () => {
-                if (attemptToken === connectionAttemptToken && client === localClient) {
-                    setInitMessage('통신망 재연결 중... (잠시만 기다려주세요)');
-                    console.warn('실시간 통신 재연결 시도 중...');
-                }
-            });
-
-            localClient.on('error', (err) => {
-                if (attemptToken !== connectionAttemptToken || client !== localClient) return;
-                console.warn("MQTT 에러 발생:", err && err.message ? err.message : err);
-                if (!localClient.connected && !attemptedBackup && url === publicBrokerUrl) {
-                    attemptedBackup = true;
-                    if (connectionTimeoutHandle) {
-                        clearTimeout(connectionTimeoutHandle);
-                        connectionTimeoutHandle = null;
-                    }
-                    setInitMessage("메인 통신망 오류. 백업 통신망으로 우회 접속 중...");
-                    try {
-                        if (localClient.options) localClient.options.reconnectPeriod = 0;
-                        localClient.end(true);
-                    } catch (e) {}
-                    connectTo(backupBrokerUrl);
-                }
-            });
-
-            localClient.on('close', () => {
-                if (attemptToken !== connectionAttemptToken || client !== localClient) return;
-                if (!isConnectingRealtime && myRole) {
-                    console.warn('실시간 통신 연결이 닫혔습니다.');
-                }
-            });
+        const previousClient = client;
+        if (previousClient) {
+            try {
+                if (previousClient.options) previousClient.options.reconnectPeriod = 0;
+                previousClient.end(true);
+            } catch (e) {}
         }
 
-        connectTo(publicBrokerUrl);
+        const localClient = mqtt.connect(realtimeBrokerUrl, {
+            clientId: 'dia_' + myId + '_' + generation,
+            clean: true,
+            keepalive: 30,
+            connectTimeout: 10000,
+            reconnectPeriod: 3000
+        });
+        client = localClient;
+
+        if (connectionTimeoutHandle) clearTimeout(connectionTimeoutHandle);
+        connectionTimeoutHandle = setTimeout(() => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient || localClient.connected) return;
+            isConnectingRealtime = false;
+            setInitMessage('연결이 지연되고 있습니다. 학교 와이파이를 확인한 뒤 다시 입장해주세요.', true);
+        }, 12000);
+
+        localClient.on('connect', () => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            if (connectionTimeoutHandle) {
+                clearTimeout(connectionTimeoutHandle);
+                connectionTimeoutHandle = null;
+            }
+            isConnectingRealtime = false;
+            startupOverlay.classList.add('hidden');
+            startupOverlay.style.display = 'none';
+
+            const topics = getTopics();
+
+            if (mode === 'teacher') {
+                document.getElementById('display-room-code').innerText = currentRoomCode;
+                teacherDashboard.classList.remove('hidden');
+                teacherDashboard.style.display = 'flex';
+
+                localClient.subscribe([topics.score, topics.action], { qos: 1 }, (err) => {
+                    if (err) {
+                        console.error('교사용 토픽 구독 실패:', err);
+                        alert('실시간 통신 구독에 실패했습니다. 페이지를 새로고침해 주세요.');
+                        return;
+                    }
+                    if (!teacherRoomInitialized) {
+                        loadTeacherLocal();
+                        teacherRoomInitialized = true;
+                    }
+                    renderTeacherLeaderboard();
+                    updateTeacherControlUI(currentGameStatus, false);
+                    saveTeacherLocal();
+                    broadcastGameState();
+                    publishLeaderboard();
+                });
+            } else if (mode === 'student') {
+                handleGameStateChange('waiting');
+                localClient.subscribe([topics.state, topics.leaderboard], { qos: 1 }, (err) => {
+                    if (err) {
+                        console.error('학생용 토픽 구독 실패:', err);
+                        alert('실시간 통신 구독에 실패했습니다. 페이지를 새로고침해 주세요.');
+                        return;
+                    }
+                    startStudentSyncLoop();
+                });
+            }
+        });
+
+        localClient.on('message', (topic, message) => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            try {
+                const data = JSON.parse(message.toString());
+                const topics = getTopics();
+
+                if (topic === topics.state && myRole === 'student') {
+                    if (data && typeof data.status === 'string') {
+                        currentProblemMode = normalizeProblemMode(data.problemMode);
+                        updateGameModeUI();
+                        const sessionChanged = applyStudentSession(String(data.sessionId || '').slice(0, 80));
+                        const incomingTeacherId = String(data.teacherId || '').slice(0, 80);
+                        const teacherChanged = Boolean(incomingTeacherId && incomingTeacherId !== lastTeacherIdSeen);
+                        if (incomingTeacherId) lastTeacherIdSeen = incomingTeacherId;
+
+                        const incomingStatus = ['waiting', 'playing', 'ended'].includes(data.status)
+                            ? data.status : 'waiting';
+                        handleGameStateChange(incomingStatus, Array.isArray(data.top3) ? data.top3 : null);
+
+                        if (!initialScorePublished || sessionChanged || teacherChanged) {
+                            publishMyScore();
+                            initialScorePublished = true;
+                        }
+                    }
+                } else if (topic === topics.leaderboard && myRole === 'student') {
+                    renderStudentLeaderboard(Array.isArray(data) ? data : []);
+                } else if (topic === topics.score && myRole === 'teacher') {
+                    const normalized = normalizeLeaderboardEntry(data);
+                    if (normalized) {
+                        if (normalized.sessionId !== gameSessionId) {
+                            broadcastGameState();
+                            return;
+                        }
+                        teacherLeaderboard[normalized.id] = normalized;
+                        saveTeacherLocal();
+                        renderTeacherLeaderboard();
+                        queueLeaderboardPublish();
+                    }
+                } else if (topic === topics.action && myRole === 'teacher') {
+                    if (data && data.type === 'requestSync') {
+                        // 학생들의 동기화 요청이 동시에 와도 2초에 한 번만 방송합니다.
+                        const now = Date.now();
+                        if (now - lastBroadcastTime > 2000) {
+                            broadcastGameState();
+                            lastBroadcastTime = now;
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('데이터 통신 중 오류:', e);
+            }
+        });
+
+        localClient.on('reconnect', () => {
+            if (attemptToken === connectionAttemptToken && client === localClient) {
+                setInitMessage('통신망 재연결 중...');
+                console.warn('실시간 통신 재연결 시도 중...');
+            }
+        });
+
+        localClient.on('error', (err) => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            console.warn('MQTT 에러 발생:', err && err.message ? err.message : err);
+            if (!localClient.connected) {
+                setInitMessage('실시간 통신 연결 오류입니다. 학교 와이파이를 확인해주세요.', true);
+            }
+        });
+
+        localClient.on('close', () => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            if (!isConnectingRealtime && myRole) {
+                console.warn('실시간 통신 연결이 닫혔습니다. 자동 재연결을 시도합니다.');
+            }
+        });
     }
 
     function showTop3Results(entries) {
@@ -2291,24 +2310,9 @@
             });
 
             const styleByRank = {
-                1: {
-                    medal: '🥇',
-                    row: 'border-amber-300 bg-amber-50',
-                    title: 'text-amber-900',
-                    score: 'bg-amber-100 text-amber-800 border-amber-300'
-                },
-                2: {
-                    medal: '🥈',
-                    row: 'border-slate-300 bg-slate-50',
-                    title: 'text-slate-800',
-                    score: 'bg-slate-200 text-slate-700 border-slate-300'
-                },
-                3: {
-                    medal: '🥉',
-                    row: 'border-orange-300 bg-orange-50',
-                    title: 'text-orange-900',
-                    score: 'bg-orange-100 text-orange-800 border-orange-300'
-                }
+                1: { medal: '🥇', row: 'border-amber-300 bg-amber-50', title: 'text-amber-900', score: 'bg-amber-100 text-amber-800 border-amber-300' },
+                2: { medal: '🥈', row: 'border-slate-300 bg-slate-50', title: 'text-slate-800', score: 'bg-slate-200 text-slate-700 border-slate-300' },
+                3: { medal: '🥉', row: 'border-orange-300 bg-orange-50', title: 'text-orange-900', score: 'bg-orange-100 text-orange-800 border-orange-300' }
             };
 
             const wrapper = document.createElement('div');
@@ -2391,7 +2395,6 @@
     function startGameInternal() {
         updateStudentNameDisplay();
         updateGameModeUI();
-        // 이미 진행 중인 게임으로 화면만 복귀하는 경우에는 점수를 초기화하지 않고 잠금만 해제합니다.
         if (state.isPlaying) {
             gameContainer.classList.remove('blur-md', 'pointer-events-none');
             return;
@@ -2400,7 +2403,6 @@
         scoreElement.innerText = state.score;
         gameContainer.classList.remove('blur-md', 'pointer-events-none');
 
-        // 저장된 문제가 있으면 그 문제부터, 없으면 새 1번 문제부터 시작합니다.
         if (state.history.length > 0 && state.currentIndex >= 0) {
             loadLevel(state.currentIndex);
         } else {
@@ -2428,11 +2430,7 @@
     }
 
     function updateTeacherControlUI(status, showFeedback = false) {
-        const stateButtons = {
-            waiting: 'btn-state-waiting',
-            playing: 'btn-state-playing',
-            ended: 'btn-state-ended'
-        };
+        const stateButtons = { waiting: 'btn-state-waiting', playing: 'btn-state-playing', ended: 'btn-state-ended' };
 
         const buttons = [
             document.getElementById('btn-state-waiting'),
@@ -2527,7 +2525,6 @@
             return;
         }
 
-        // 한 게임을 종료한 뒤 다시 시작하면 새 게임으로 처리합니다.
         if (newStatus === 'playing' && currentGameStatus === 'ended') {
             gameSessionId = createSessionId();
             teacherLeaderboard = {};
@@ -2540,7 +2537,6 @@
         updateTeacherControlUI(newStatus, true);
 
         if (newStatus === 'ended') {
-            // 종료 순간의 최종 순위를 먼저 고정한 뒤 팝업과 종료 신호를 보냅니다.
             publishLeaderboard();
             showTop3Results(getSortedLeaderboard().slice(0, 3));
         } else {
@@ -2564,6 +2560,16 @@
         alert("교사 순위표와 학생 기기의 저장 점수가 모두 새 게임으로 초기화되었습니다.");
     };
 
+    let leaderboardPublishTimer = null;
+
+    function queueLeaderboardPublish() {
+        if (leaderboardPublishTimer) return;
+        leaderboardPublishTimer = setTimeout(() => {
+            leaderboardPublishTimer = null;
+            publishLeaderboard();
+        }, 300);
+    }
+
     function publishLeaderboard() {
         if (!client || !client.connected) return;
         saveTeacherLocal();
@@ -2578,8 +2584,8 @@
         const topics = getTopics();
         publishJson(topics.score, {
             id: myId,
-            name: state.playerName,
-            score: state.score,
+            name: sanitizePlayerName(state.playerName),
+            score: Math.max(0, Math.min(MAX_ACCEPTED_SCORE, Math.trunc(Number(state.score) || 0))),
             sessionId: gameSessionId,
             timestamp: Date.now()
         }, { qos: 1 });
@@ -2593,66 +2599,86 @@
     function renderTeacherLeaderboard() {
         const targetList = document.getElementById('teacher-leaderboard-list');
         const scores = getRankedLeaderboard();
-        
-        targetList.innerHTML = '';
+
+        targetList.replaceChildren();
         if (scores.length === 0) {
-            targetList.innerHTML = '<li class="text-center text-slate-500 py-8">아직 기록이 없습니다. 학생들이 점수를 얻으면 이곳에 표시됩니다.</li>';
+            const empty = document.createElement('li');
+            empty.className = 'text-center text-slate-500 py-8';
+            empty.textContent = '아직 기록이 없습니다. 학생들이 점수를 얻으면 이곳에 표시됩니다.';
+            targetList.appendChild(empty);
             return;
         }
 
         scores.forEach((entry) => {
             const li = document.createElement('li');
-            li.className = `flex justify-between items-center p-3 rounded-lg border bg-white border-slate-200 shadow-sm`;
-            let rankIcon = `<span class="font-bold text-slate-500 min-w-8 text-center">${entry.rank}등</span>`;
-            if (entry.rank === 1) rankIcon = '🥇';
-            else if (entry.rank === 2) rankIcon = '🥈';
-            else if (entry.rank === 3) rankIcon = '🥉';
+            li.className = 'flex justify-between items-center p-3 rounded-lg border bg-white border-slate-200 shadow-sm';
 
-            li.innerHTML = `
-                <div class="flex items-center gap-3">
-                    ${rankIcon}
-                    <span class="font-bold text-slate-800">${entry.name}</span>
-                </div>
-                <span class="font-bold text-blue-600">${entry.score}점</span>
-            `;
+            const left = document.createElement('div');
+            left.className = 'flex items-center gap-3 min-w-0';
+            left.appendChild(createRankNode(entry.rank));
+
+            const name = document.createElement('span');
+            name.className = 'font-bold text-slate-800 truncate';
+            name.textContent = entry.name;
+            name.title = entry.name;
+            left.appendChild(name);
+
+            const score = document.createElement('span');
+            score.className = 'font-bold text-blue-600 shrink-0';
+            score.textContent = `${entry.score}점`;
+
+            li.append(left, score);
             targetList.appendChild(li);
         });
     }
-    
+
     function renderStudentLeaderboard(scores) {
-        latestStudentLeaderboard = getRankedLeaderboard(Array.isArray(scores) ? scores : []);
-        scores = latestStudentLeaderboard;
+        latestStudentLeaderboard = getRankedLeaderboard(Array.isArray(scores) ? scores : [])
+            .filter(entry => !entry.sessionId || entry.sessionId === gameSessionId);
         const targetList = document.getElementById('student-leaderboard-list');
-        targetList.innerHTML = '';
-        
-        if (scores.length === 0) {
-            targetList.innerHTML = '<li class="text-center text-slate-500 py-4">아직 기록이 없습니다.</li>';
+        targetList.replaceChildren();
+
+        if (latestStudentLeaderboard.length === 0) {
+            const empty = document.createElement('li');
+            empty.className = 'text-center text-slate-500 py-4';
+            empty.textContent = '아직 기록이 없습니다.';
+            targetList.appendChild(empty);
             return;
         }
 
-        scores.forEach((entry) => {
-            const li = document.createElement('li');
+        latestStudentLeaderboard.forEach((entry) => {
             const isMe = entry.id === myId;
-            
+            const li = document.createElement('li');
             li.className = `flex justify-between items-center p-3 rounded-lg border ${isMe ? 'border-blue-500 bg-blue-50 shadow-md' : 'bg-white border-slate-200 shadow-sm'}`;
-            let rankIcon = `<span class="font-bold text-slate-500 min-w-8 text-center">${entry.rank}등</span>`;
-            if (entry.rank === 1) rankIcon = '🥇';
-            else if (entry.rank === 2) rankIcon = '🥈';
-            else if (entry.rank === 3) rankIcon = '🥉';
 
-            li.innerHTML = `
-                <div class="flex items-center gap-3">
-                    ${rankIcon}
-                    <span class="font-bold ${isMe ? 'text-blue-800' : 'text-slate-800'}">${entry.name} ${isMe ? '<span class="text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full ml-1">나</span>' : ''}</span>
-                </div>
-                <span class="font-bold ${isMe ? 'text-blue-700' : 'text-blue-600'}">${entry.score}점</span>
-            `;
+            const left = document.createElement('div');
+            left.className = 'flex items-center gap-3 min-w-0';
+            left.appendChild(createRankNode(entry.rank));
+
+            const nameWrap = document.createElement('span');
+            nameWrap.className = `font-bold truncate ${isMe ? 'text-blue-800' : 'text-slate-800'}`;
+            nameWrap.textContent = entry.name;
+            nameWrap.title = entry.name;
+
+            if (isMe) {
+                const meBadge = document.createElement('span');
+                meBadge.className = 'text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full ml-1';
+                meBadge.textContent = '나';
+                nameWrap.append(' ', meBadge);
+            }
+            left.appendChild(nameWrap);
+
+            const score = document.createElement('span');
+            score.className = `font-bold shrink-0 ${isMe ? 'text-blue-700' : 'text-blue-600'}`;
+            score.textContent = `${entry.score}점`;
+
+            li.append(left, score);
             targetList.appendChild(li);
         });
     }
 
     // Attach to window
-    window.toggleSign = toggleSign; window.checkAnswer = checkAnswer;
+    window.checkAnswer = checkAnswer;
     window.nextLevel = nextLevel; window.prevLevel = prevLevel;
 </script>
 </body>
