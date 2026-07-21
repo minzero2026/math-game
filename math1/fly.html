@@ -1,0 +1,2513 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>데카르트 파리 잡기</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/4.3.7/mqtt.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', 'Malgun Gothic', sans-serif;
+            background-color: #f8fafc;
+            margin: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            overflow: hidden;
+            padding: 10px;
+        }
+
+        #game-container {
+            background-color: white;
+            border-radius: 16px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+            padding: 16px;
+            width: 100%;
+            max-width: 920px;
+            max-height: calc(100dvh - 16px);
+            display: flex;
+            flex-direction: row;
+            gap: 18px;
+            border: 2px solid #e2e8f0;
+            overflow: hidden;
+        }
+        
+        @media (max-width: 900px) {
+            #game-container {
+                flex-direction: column;
+                overflow-y: auto;
+                max-height: calc(100dvh - 12px);
+                padding: 14px;
+                gap: 14px;
+            }
+        }
+
+        #left-panel { flex: 1.85; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+        #right-panel { flex: 1; display: flex; flex-direction: column; gap: 11px; min-width: 0; }
+
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            border: 2px solid #475569;
+            border-radius: 12px;
+            overflow: hidden;
+            background-color: #fff;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* SVG Overlay to handle the animated fly on top of the canvas */
+        #svg-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+
+        .controls-wrapper {
+            background-color: #fef3c7; 
+            border: 2px solid #f59e0b; 
+            border-radius: 14px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+            box-shadow: 0 4px 6px rgba(245, 158, 11, 0.1);
+        }
+
+        .ordered-pair {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 14px;
+            border: 3px solid #96aa82;
+            border-radius: 18px;
+            background: #f9fbec;
+            font-size: 40px;
+            font-family: Georgia, "Times New Roman", serif;
+            color: #243120;
+            margin: 10px 0;
+        }
+
+        .coord-stepper {
+            width: 78px;
+            height: 62px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 20px;
+            overflow: hidden;
+            border: 2px solid #aab99d;
+            border-bottom: 4px solid #44633c;
+            border-radius: 10px 10px 5px 5px;
+            background: #fff;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .coord-stepper:focus-within {
+            border-color: #d59200;
+            border-bottom-color: #d59200;
+            box-shadow: 0 0 0 3px rgba(213, 146, 0, 0.2);
+        }
+
+        .coord-input {
+            width: 100%;
+            min-width: 0;
+            height: 100%;
+            padding: 0 1px 1px 3px;
+            border: 0;
+            outline: none;
+            background: transparent;
+            text-align: center;
+            font: 800 31px/1 "Pretendard", "Noto Sans KR", sans-serif;
+            color: #142316;
+            border-radius: 0;
+            appearance: textfield;
+            -moz-appearance: textfield;
+        }
+
+        .coord-input::-webkit-outer-spin-button,
+        .coord-input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        .coord-stepper-buttons {
+            display: grid;
+            grid-template-rows: 1fr 1fr;
+            border-left: 1px solid #cbd5c2;
+            background: #f4f7ef;
+        }
+
+        .coord-stepper-button {
+            border: 0;
+            padding: 0;
+            margin: 0;
+            min-width: 0;
+            background: transparent;
+            color: #52634d;
+            font-size: 0.68rem;
+            line-height: 1;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        .coord-stepper-button:first-child { border-bottom: 1px solid #cbd5c2; }
+        .coord-stepper-button:hover { background: #e7eee0; color: #243120; }
+        .coord-stepper-button:active { background: #dbe6d2; }
+
+        @media (max-width: 520px) {
+            .ordered-pair { gap: 5px; padding: 10px 8px; font-size: 34px; }
+            .coord-stepper { width: 68px; height: 58px; grid-template-columns: minmax(0, 1fr) 18px; }
+            .coord-input { font-size: 27px; }
+        }
+
+        .action-button {
+            background-color: #ef4444;
+            color: white;
+            font-weight: bold;
+            padding: 14px 24px;
+            border-radius: 12px;
+            font-size: 1.35rem;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+            transition: all 0.2s;
+            box-shadow: 0 4px 6px rgba(239, 68, 68, 0.2);
+        }
+
+        .action-button:hover { background-color: #dc2626; transform: translateY(-2px); box-shadow: 0 6px 12px rgba(239, 68, 68, 0.3); }
+        .action-button:active { transform: translateY(2px); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        .action-button:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+
+        .dashboard-panel {
+            background-color: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        /* Animations */
+        .shake { animation: shake .34s ease; }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20% { transform: translateX(-8px); }
+            40% { transform: translateX(8px); }
+            60% { transform: translateX(-5px); }
+            80% { transform: translateX(5px); }
+        }
+
+        @keyframes bounceShort {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+        .animate-bounce-short { animation: bounceShort 0.4s ease-out; }
+
+        .teacher-state-btn {
+            position: relative;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .teacher-state-btn.selected {
+            border-color: #111827;
+            box-shadow: 0 0 0 5px rgba(17, 24, 39, 0.12);
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        /* Fly Animations */
+        .fly-group {
+            filter: drop-shadow(2px 4px 3px rgba(0,0,0,.35));
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: flyIdle 1.45s ease-in-out infinite alternate;
+            transition: opacity .18s ease;
+        }
+        @keyframes flyIdle {
+            from { transform: translate(0,0) rotate(-2deg); }
+            to { transform: translate(1px,-2px) rotate(2deg); }
+        }
+
+        .fly-wing-left { transform-box: fill-box; transform-origin: 95% 75%; animation: wingLeft .085s linear infinite alternate; }
+        .fly-wing-right { transform-box: fill-box; transform-origin: 5% 75%; animation: wingRight .085s linear infinite alternate; }
+        @keyframes wingLeft { from { transform: rotate(2deg) scaleY(1); } to { transform: rotate(-15deg) scaleY(.84); } }
+        @keyframes wingRight { from { transform: rotate(-2deg) scaleY(1); } to { transform: rotate(15deg) scaleY(.84); } }
+
+        .front-leg-left { transform-box: fill-box; transform-origin: 90% 90%; animation: rubLeft .28s ease-in-out infinite alternate; }
+        .front-leg-right { transform-box: fill-box; transform-origin: 10% 90%; animation: rubRight .28s ease-in-out infinite alternate; }
+        @keyframes rubLeft { from { transform: rotate(-16deg); } to { transform: rotate(18deg) translate(1px,-1px); } }
+        @keyframes rubRight { from { transform: rotate(16deg); } to { transform: rotate(-18deg) translate(-1px,-1px); } }
+
+        .fly-hidden { display: none; }
+        /* 파리채가 파리를 덮었을 때 사진처럼 파리가 그물 아래에 보이도록 유지합니다. */
+        .fly-under-swatter {
+            animation: flyPressed .3s ease-out forwards;
+        }
+        @keyframes flyPressed {
+            from { opacity: 1; transform: scale(1) rotate(0deg); }
+            to { opacity: .72; transform: scale(.82) rotate(7deg); }
+        }
+
+        .splat-dot {
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: splat .65s ease-out forwards;
+        }
+        @keyframes splat {
+            0% { opacity: .82; transform: scale(.2); }
+            45% { opacity: .65; transform: scale(1.2); }
+            100% { opacity: 0; transform: scale(1.55); }
+        }
+
+        /* 파리채: 원점에서 x축 방향, 이어서 y축 방향으로 이동합니다. */
+        #swatter-position { pointer-events: none; }
+        .swatter-hidden { display: none; }
+        #fly-swatter {
+            filter: drop-shadow(2px 4px 3px rgba(0,0,0,.28));
+        }
+        .swatter-head {
+            fill: rgba(239, 68, 68, .18);
+            stroke: #9f2f28;
+            stroke-width: 4;
+        }
+        .swatter-grid {
+            fill: none;
+            stroke: #b43a32;
+            stroke-width: 2;
+            opacity: .82;
+        }
+        .swatter-handle {
+            fill: none;
+            stroke: #7f1d1d;
+            stroke-width: 10;
+            stroke-linecap: round;
+        }
+        .swatter-grip {
+            fill: none;
+            stroke: #b91c1c;
+            stroke-width: 15;
+            stroke-linecap: round;
+        }
+        .swatter-catch {
+            transform-box: fill-box;
+            transform-origin: center;
+            animation: swatterCatch .22s ease-out;
+        }
+        @keyframes swatterCatch {
+            0% { transform: scale(1); }
+            45% { transform: scale(1.08); }
+            100% { transform: scale(1); }
+        }
+
+        /* 시작 화면 */
+        .startup-card {
+            width: min(100%, 520px);
+            max-height: calc(100dvh - 24px);
+            overflow-y: auto;
+        }
+        @media (max-height: 760px) and (min-width: 640px) {
+            .startup-card { transform: scale(0.94); transform-origin: center; }
+        }
+
+        /* 태블릿 세로 화면에서는 교사 제어판 전체를 세로로 스크롤할 수 있습니다. */
+        @media (max-width: 1023px) {
+            #teacher-dashboard {
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            #teacher-dashboard-card {
+                height: auto;
+                min-height: calc(100dvh - 2rem);
+                overflow: visible;
+            }
+            #teacher-dashboard-main {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr);
+                overflow: visible;
+            }
+            #teacher-dashboard-main > section {
+                height: auto;
+                min-height: 0;
+            }
+            #teacher-leaderboard-scroll {
+                min-height: 300px;
+                max-height: 55dvh;
+                overscroll-behavior: contain;
+                -webkit-overflow-scrolling: touch;
+            }
+        }
+
+        #teacher-leaderboard-scroll::-webkit-scrollbar { width: 8px; }
+        #teacher-leaderboard-scroll::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        #teacher-leaderboard-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body>
+
+<div id="startup-overlay" class="fixed inset-0 z-[100] bg-slate-900/90 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="startup-card bg-white rounded-[1.75rem] p-6 shadow-2xl text-center border-b-8 border-blue-200 animate-bounce-short">
+        <h2 class="text-2xl font-bold text-slate-800 mb-1.5 flex items-center justify-center gap-2">
+            <span class="text-3xl">🪰</span> 데카르트 파리 잡기
+        </h2>
+        <p class="text-sm text-slate-500 mb-4 font-medium">학급 전체가 실시간으로 대결하는 멀티플레이 게임입니다.</p>
+        
+        <div class="bg-blue-50/50 p-4 rounded-2xl border border-blue-100 mb-4">
+            <label class="block text-sm font-bold text-blue-600 uppercase tracking-wider mb-2">대결할 방 번호 (숫자)</label>
+            <input type="text" id="room-code-input" inputmode="numeric" pattern="[0-9]*" maxlength="12" autocomplete="off" class="w-full max-w-[230px] text-center text-xl font-mono font-bold tracking-widest p-2 border-2 border-blue-200 rounded-xl bg-white focus:outline-none focus:border-blue-500 mx-auto block" placeholder="6~12자리 숫자">
+            <p class="text-xs text-slate-400 mt-2">수업마다 새로운 6~12자리 방 번호를 정해 교사와 학생이 똑같이 입력하세요.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+            <div class="bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center">
+                <div class="text-3xl mb-2">👨‍🎓</div>
+                <h3 class="font-bold text-lg text-slate-700 mb-2">학생 모드</h3>
+                <input type="text" id="player-name" maxlength="12" autocomplete="off" class="w-full border-2 border-slate-300 p-2 rounded-lg mb-3 text-center focus:border-blue-500 focus:outline-none" placeholder="학번 또는 이름">
+                <button onclick="joinGame('student')" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md active:scale-95 text-base">입장하기</button>
+            </div>
+            
+            <div class="bg-slate-50 border-2 border-slate-200 p-4 rounded-2xl flex flex-col items-center justify-between">
+                <div class="text-3xl mb-2">👨‍🏫</div>
+                <h3 class="font-bold text-lg text-slate-700 mb-2">교사 모드</h3>
+                <p class="text-xs text-slate-500 mb-2">학생들의 진행 상황을 통제하고 실시간 순위표를 확인합니다.</p>
+                <button onclick="joinGame('teacher')" class="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-xl transition-all shadow-md active:scale-95 text-base">제어판 열기</button>
+            </div>
+        </div>
+        
+        <div class="border-t border-slate-200 pt-3">
+            <button onclick="joinGame('single')" class="text-slate-500 hover:text-blue-600 font-bold text-sm transition-colors underline decoration-2 underline-offset-4">🕹️ 방 만들지 않고 혼자 연습하기</button>
+        </div>
+        <p id="init-msg" class="mt-3 text-blue-600 font-bold text-sm animate-pulse hidden">통신망 연결 중... (잠시만 기다려주세요)</p>
+    </div>
+</div>
+
+<div id="teacher-dashboard" class="fixed inset-0 z-[90] bg-slate-100 hidden flex-col p-4 md:p-8 overflow-hidden">
+    <div id="teacher-dashboard-card" class="max-w-5xl w-full h-full mx-auto bg-white rounded-3xl shadow-xl border-t-8 border-slate-800 p-6 flex flex-col gap-5 overflow-hidden">
+        <div class="shrink-0 flex justify-between items-end border-b pb-4">
+            <div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-1">👨‍🏫 교사 제어판</h2>
+                <p class="text-slate-500 font-medium">현재 접속 중인 방 번호: <span id="display-room-code" class="text-blue-600 font-bold font-mono text-lg bg-blue-50 px-2 py-1 rounded"></span></p>
+                <p class="mt-2 inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">🔒 이 교사 화면이 방을 선점하고 있습니다.</p>
+            </div>
+            <button onclick="returnToStart()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-lg font-bold text-sm transition-colors">나가기</button>
+        </div>
+
+        <div id="teacher-dashboard-main" class="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6 items-stretch overflow-hidden">
+            <section class="h-full bg-slate-50 rounded-2xl border-2 border-slate-200 p-5 flex flex-col gap-4">
+                <h3 class="text-2xl font-bold text-slate-800 mb-2">🎮 게임 제어</h3>
+                
+                <button id="btn-state-waiting" onclick="teacherSetState('waiting')" class="teacher-state-btn bg-yellow-400 text-yellow-900 font-bold py-4 px-3 rounded-2xl text-lg flex flex-col items-center justify-center gap-2">
+                    <span class="text-3xl">⏳</span> 대기 상태 (정지)
+                </button>
+                <button id="btn-state-playing" onclick="teacherSetState('playing')" class="teacher-state-btn bg-blue-500 text-white font-bold py-4 px-3 rounded-2xl text-lg flex flex-col items-center justify-center gap-2">
+                    <span class="text-3xl">🚀</span> 게임 시작!
+                </button>
+                <button id="btn-state-ended" onclick="teacherSetState('ended')" class="teacher-state-btn bg-red-500 text-white font-bold py-4 px-3 rounded-2xl text-lg flex flex-col items-center justify-center gap-2">
+                    <span class="text-3xl">🛑</span> 종료 및 순위 집계
+                </button>
+            </section>
+
+            <section class="h-full bg-slate-50 rounded-2xl border-2 border-slate-200 p-5 flex flex-col overflow-hidden">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-2xl font-bold text-slate-800">🏆 실시간 점수</h3>
+                    <button onclick="clearLeaderboard()" class="bg-slate-700 text-white font-bold py-2 px-4 rounded-lg text-sm shadow-sm hover:bg-slate-800">기록 초기화</button>
+                </div>
+                <div id="teacher-leaderboard-scroll" class="flex-1 overflow-y-auto pr-2 bg-white rounded-xl border border-slate-200 p-2">
+                    <ul id="teacher-leaderboard-list" class="flex flex-col gap-2">
+                        <li class="text-center text-slate-500 py-8">아직 기록이 없습니다.</li>
+                    </ul>
+                </div>
+            </section>
+        </div>
+    </div>
+</div>
+
+<!-- 종료 시 상위 3위 결과 창 -->
+<div id="top3-result-modal" class="fixed inset-0 z-[120] hidden items-center justify-center overflow-hidden bg-slate-950/75 p-2 md:p-4 backdrop-blur-sm">
+    <div class="flex w-full max-w-3xl flex-col overflow-hidden rounded-[1.75rem] border-4 border-amber-200 bg-white shadow-2xl animate-bounce-short">
+        <div class="shrink-0 bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-300 px-5 py-3 text-center md:py-4">
+            <div class="text-3xl md:text-4xl">🏆</div>
+            <h2 class="text-2xl md:text-3xl font-extrabold text-slate-900">최종 TOP 3</h2>
+        </div>
+
+        <div id="top3-podium-list" class="p-3 md:p-4"></div>
+
+        <div class="shrink-0 border-t border-slate-200 bg-white px-3 pb-3 pt-2 md:px-4 md:pb-4">
+            <button onclick="dismissTop3Results()" class="w-full rounded-xl bg-slate-800 py-2.5 text-base font-bold text-white shadow-md transition hover:bg-slate-900 active:scale-95">확인</button>
+        </div>
+    </div>
+</div>
+
+<div id="waiting-screen" class="fixed inset-0 z-[80] bg-blue-50/95 hidden flex-col items-center justify-center backdrop-blur-sm">
+    <div class="bg-white p-10 rounded-3xl shadow-xl text-center border-2 border-blue-100 animate-bounce-short">
+        <div class="text-7xl mb-6 animate-bounce">⏳</div>
+        <h2 class="text-4xl font-bold text-blue-600 mb-4">대기 중...</h2>
+        <p class="text-xl text-slate-600 font-medium">선생님이 게임을 시작할 때까지 기다려주세요.</p>
+    </div>
+</div>
+
+<div id="end-screen" class="fixed inset-0 z-[80] bg-slate-900/90 hidden flex-col items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-3xl p-8 flex flex-col items-center w-full max-w-lg shadow-2xl border-t-8 border-red-500 animate-bounce-short">
+        <h2 class="text-4xl font-bold text-red-500 mb-2">시간 종료!</h2>
+        <p class="text-xl font-bold mb-6 text-slate-600">나의 최종 점수: <span id="final-score" class="text-blue-600 text-3xl ml-2">0</span>점</p>
+        <div class="w-full bg-slate-50 rounded-2xl border-2 border-slate-200 p-4 mb-6">
+            <h3 class="text-xl font-bold text-center mb-3 pb-2 border-b border-slate-200 text-slate-800">🏆 최종 순위표 🏆</h3>
+            <div class="max-h-64 overflow-y-auto pr-2">
+                <ul id="student-leaderboard-list" class="flex flex-col gap-2"></ul>
+            </div>
+        </div>
+        <button onclick="returnToStart()" class="bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold py-3 px-12 rounded-xl text-lg transition-colors w-full">처음 화면으로 돌아가기</button>
+    </div>
+</div>
+
+<div id="game-container" class="blur-md transition-all duration-300 pointer-events-none">
+    <div id="left-panel">
+        <h1 class="text-2xl w-full max-w-[600px] font-black text-slate-800 flex items-center justify-between mb-2">
+            <span class="flex items-center gap-2">🪰 데카르트 파리 잡기</span>
+            <span id="student-name-display" class="hidden text-base font-extrabold text-blue-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-full"></span>
+        </h1>
+        
+        <div id="canvas-container">
+            <canvas id="gridCanvas"></canvas>
+            
+            <!-- SVG overlay exactly matching the canvas size to handle animations -->
+            <svg id="svg-overlay" viewBox="0 0 1000 1000" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="bodyGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="#677069"/>
+                        <stop offset=".35" stop-color="#202822"/>
+                        <stop offset="1" stop-color="#070a08"/>
+                    </linearGradient>
+                    <radialGradient id="eyeGrad" cx=".35" cy=".3">
+                        <stop offset="0" stop-color="#ff9c66"/>
+                        <stop offset=".35" stop-color="#8b251f"/>
+                        <stop offset="1" stop-color="#260907"/>
+                    </radialGradient>
+                    <linearGradient id="wingGrad" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stop-color="rgba(255,255,255,.88)"/>
+                        <stop offset="1" stop-color="rgba(170,195,190,.28)"/>
+                    </linearGradient>
+                    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+                        <feGaussianBlur stdDeviation="2.2"/>
+                    </filter>
+                </defs>
+
+                <g id="splatLayer"></g>
+
+                <!-- The Cute Fly: 바깥 그룹은 좌표 위치, 안쪽 그룹은 날갯짓·잡힘 애니메이션 담당 -->
+                <g id="fly-position">
+                    <g id="fly" class="fly-group fly-hidden">
+                    <ellipse cx="2" cy="14" rx="18" ry="8" fill="rgba(0,0,0,.28)" filter="url(#softShadow)"/>
+                    <g class="fly-wing-left">
+                        <path d="M-8,-5 C-28,-31 -46,-30 -47,-13 C-46,4 -28,11 -8,6 Z" fill="url(#wingGrad)" stroke="#8da7a1" stroke-width="1.1"/>
+                        <path d="M-12,-3 C-26,-18 -36,-20 -43,-15 M-15,2 C-30,1 -37,-5 -43,-12" fill="none" stroke="#9cb2ad" stroke-width=".8" opacity=".9"/>
+                    </g>
+                    <g class="fly-wing-right">
+                        <path d="M8,-5 C28,-31 46,-30 47,-13 C46,4 28,11 8,6 Z" fill="url(#wingGrad)" stroke="#8da7a1" stroke-width="1.1"/>
+                        <path d="M12,-3 C26,-18 36,-20 43,-15 M15,2 C30,1 37,-5 43,-12" fill="none" stroke="#9cb2ad" stroke-width=".8" opacity=".9"/>
+                    </g>
+                    <path d="M-9,-5 C-13,-1 -15,9 -10,20 C-6,29 6,29 10,20 C15,9 13,-1 9,-5 Z" fill="url(#bodyGrad)" stroke="#050806" stroke-width="1.4"/>
+                    <path d="M-7,3 C-2,5 2,5 7,3 M-9,10 C-3,12 3,12 9,10 M-8,17 C-3,19 3,19 8,17" fill="none" stroke="#94a048" stroke-width="1.4" opacity=".72"/>
+                    <circle cx="0" cy="-10" r="12" fill="#202722" stroke="#080a08" stroke-width="1.4"/>
+                    <ellipse cx="-6" cy="-12" rx="6.4" ry="8.2" fill="url(#eyeGrad)" stroke="#260907" stroke-width="1"/>
+                    <ellipse cx="6" cy="-12" rx="6.4" ry="8.2" fill="url(#eyeGrad)" stroke="#260907" stroke-width="1"/>
+                    <circle cx="-7.5" cy="-15" r="1.2" fill="#ffd9ba" opacity=".85"/>
+                    <circle cx="4.5" cy="-15" r="1.2" fill="#ffd9ba" opacity=".85"/>
+                    <path d="M-2,-4 Q0,-1 2,-4" fill="none" stroke="#111811" stroke-width="1.5"/>
+                    <path d="M-4,-20 Q-11,-29 -16,-26 M4,-20 Q11,-29 16,-26" fill="none" stroke="#111411" stroke-width="1.5" stroke-linecap="round"/>
+                    <path d="M-7,4 Q-24,5 -32,18 M-8,10 Q-25,16 -30,31 M-7,17 Q-20,27 -19,39" fill="none" stroke="#111411" stroke-width="2.2" stroke-linecap="round"/>
+                    <path d="M7,4 Q24,5 32,18 M8,10 Q25,16 30,31 M7,17 Q20,27 19,39" fill="none" stroke="#111411" stroke-width="2.2" stroke-linecap="round"/>
+                    <g class="front-leg-left">
+                        <path d="M-6,-2 Q-16,-10 -19,-22 Q-17,-28 -12,-24" fill="none" stroke="#101310" stroke-width="2.1" stroke-linecap="round"/>
+                    </g>
+                    <g class="front-leg-right">
+                        <path d="M6,-2 Q16,-10 19,-22 Q17,-28 12,-24" fill="none" stroke="#101310" stroke-width="2.1" stroke-linecap="round"/>
+                    </g>
+                    </g>
+                </g>
+
+                <!-- 파리채 머리의 중심이 현재 좌표를 나타냅니다. 손잡이는 아래로 곧게 뻗습니다. -->
+                <g id="swatter-position" class="swatter-hidden">
+                    <g id="fly-swatter">
+                        <path class="swatter-handle" d="M0,30 L0,133"/>
+                        <path class="swatter-grip" d="M0,103 L0,148"/>
+                        <rect class="swatter-head" x="-40" y="-42" width="80" height="76" rx="5"/>
+                        <path class="swatter-grid" d="M-30,-42 V34 M-20,-42 V34 M-10,-42 V34 M0,-42 V34 M10,-42 V34 M20,-42 V34 M30,-42 V34 M-40,-32 H40 M-40,-22 H40 M-40,-12 H40 M-40,-2 H40 M-40,8 H40 M-40,18 H40 M-40,28 H40"/>
+                    </g>
+                </g>
+            </svg>
+        </div>
+    </div>
+
+    <div id="right-panel">
+        <div class="dashboard-panel">
+            <div class="flex justify-between items-center text-xl font-bold text-slate-600">
+                <span>🎯 점수</span>
+                <span id="score-display" class="text-red-600 text-4xl">0</span>
+            </div>
+            <div class="flex justify-between items-center text-lg font-bold text-slate-600 mt-2">
+                <span>🪰 잡은 파리 수</span>
+                <span id="caught-display" class="text-blue-600 text-2xl">0</span>
+            </div>
+        </div>
+
+        <div class="controls-wrapper" id="controls-wrapper">
+            <span class="text-lg font-bold text-slate-700 bg-white px-5 py-2 rounded-full shadow-sm">파리의 위치</span>
+            
+            <div class="ordered-pair" aria-label="순서쌍 입력">
+                <span>(</span>
+                <span class="coord-stepper">
+                    <input id="input-x" class="coord-input" type="text" inputmode="numeric" autocomplete="off" maxlength="3" value="0" aria-label="x좌표">
+                    <span class="coord-stepper-buttons" aria-hidden="true">
+                        <button type="button" class="coord-stepper-button" onclick="stepCoordinate('input-x', 1)" tabindex="-1">▲</button>
+                        <button type="button" class="coord-stepper-button" onclick="stepCoordinate('input-x', -1)" tabindex="-1">▼</button>
+                    </span>
+                </span>
+                <span>,</span>
+                <span class="coord-stepper">
+                    <input id="input-y" class="coord-input" type="text" inputmode="numeric" autocomplete="off" maxlength="3" value="0" aria-label="y좌표">
+                    <span class="coord-stepper-buttons" aria-hidden="true">
+                        <button type="button" class="coord-stepper-button" onclick="stepCoordinate('input-y', 1)" tabindex="-1">▲</button>
+                        <button type="button" class="coord-stepper-button" onclick="stepCoordinate('input-y', -1)" tabindex="-1">▼</button>
+                    </span>
+                </span>
+                <span>)</span>
+            </div>
+            
+            <button id="catch-button" onclick="checkAnswer()" class="action-button">파리 잡기</button>
+            <div id="game-instruction" class="text-center text-slate-500 text-sm font-medium">▲▼ 버튼으로 x좌표와 y좌표를 조절하세요.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // System Constants & Variables
+    const realtimeBrokerUrl = "wss://broker.emqx.io:8084/mqtt";
+    const topicNamespace = 'mathclass/descartes-fly/v6'; 
+    const ROOM_CODE_PATTERN = /^\d{6,12}$/;
+    const MAX_PLAYER_NAME_LENGTH = 12;
+    const MAX_ACCEPTED_SCORE = 100000;
+    const TEACHER_LOCK_HEARTBEAT_MS = 3000;
+    const TEACHER_LOCK_LEASE_MS = 12000;
+    const TEACHER_LOCK_CHECK_MS = 1300;
+    const TEACHER_LOCK_CONFIRM_MS = 900;
+
+    
+    let client = null;
+    let myRole = ""; 
+    let currentRoomCode = "";
+    let myId = "user_" + Math.random().toString(16).slice(2, 10);
+    let teacherLeaderboard = {}; 
+    let latestStudentLeaderboard = [];
+    let gameSessionId = '';
+    let currentGameStatus = 'waiting';
+    let isConnectingRealtime = false;
+
+    // 30명 동시 수업을 위한 연결·동기화·자동 저장 상태
+    let syncInterval = null;
+    let connectionGeneration = 0;
+    let connectionAttemptToken = 0;
+    let connectionTimeoutHandle = null;
+    let teacherRoomInitialized = false;
+    let lastBroadcastTime = 0;
+    let leaderboardPublishTimer = null;
+    let finalResultsRefreshTimer = null;
+    let finalResultsSettleTimers = [];
+    // 한 번의 종료 집계 회차를 구분하여 확인한 팝업이 재집계 중 다시 열리지 않도록 합니다.
+    let finalResultsCycleId = '';
+    let dismissedFinalResultsCycleId = '';
+    let teacherLockHeartbeatTimer = null;
+    let teacherLockCheckTimer = null;
+    let teacherLockConfirmTimer = null;
+    let teacherLockOwned = false;
+    let teacherLockRecord = null;
+    let observedTeacherLock = null;
+    let teacherLockCandidateActive = false;
+    let teacherLockDecisionCallback = null;
+    let teacherLockLossHandling = false;
+    const teacherAccessId = (() => {
+        const key = 'descartesFlyTeacherTabV5';
+        try {
+            let value = sessionStorage.getItem(key);
+            if (!value) {
+                value = 'teacher_' + Math.random().toString(36).slice(2, 12);
+                sessionStorage.setItem(key, value);
+            }
+            return value;
+        } catch (error) {
+            return 'teacher_' + Math.random().toString(36).slice(2, 12);
+        }
+    })();
+    const storagePrefix = 'descartesFlyLocalV6';
+
+    // 모든 학생에게 한 문제당 같은 애니메이션 시간을 적용합니다.
+    // 파리 위치가 멀거나 가까운지에 따라 문제 풀이 가능 시간이 달라지지 않습니다.
+    const SWATTER_AXIS_DURATION_MS = 820;
+    const NEXT_FLY_MOVE_DURATION_MS = 980;
+    let pendingStudentSave = null;
+    let studentSessionReady = false;
+    let initialScorePublished = false;
+    let lastTeacherIdSeen = '';
+
+    // 학생이 새로 입장했을 때 브로커에 남아 있는 이전 게임의 '종료' retained 메시지를
+    // 바로 적용하지 않도록 입장 이후 상태 수신 여부를 따로 관리합니다.
+    let studentCanReceiveEndedState = false;
+    let studentJoinedAt = 0;
+    let lastAcceptedStateTimestamp = 0;
+
+    // Game State
+    let state = {
+        score: 0,
+        caught: 0,
+        playerName: "",
+        isPlaying: false,
+        isResolvingHits: false,
+        motionToken: 0,
+        sessionId: "",
+        fly: { x: 0, y: 0, visualX: 0, visualY: 0, previousKey: "", active: false },
+        swatter: { x: 0, y: 0, visible: false }
+    };
+
+    // Canvas Configuration: 일차함수 다이아몬드 게임과 같은 좌표평면 설정
+    const config = {
+        gridSize: 40,
+        axisColor: '#1e293b',
+        gridColor: '#e2e8f0',
+        xMin: -10,
+        xMax: 10,
+        yMin: -7,
+        yMax: 7,
+        flySafeMargin: 1
+    };
+
+    // DOM Elements
+    const canvasContainer = document.getElementById('canvas-container');
+    const gridCanvas = document.getElementById('gridCanvas');
+    const gridCtx = gridCanvas.getContext('2d');
+    
+    const svgOverlay = document.getElementById('svg-overlay');
+    const flyPosition = document.getElementById("fly-position");
+    const fly = document.getElementById("fly");
+    const splatLayer = document.getElementById("splatLayer");
+    const swatterPosition = document.getElementById("swatter-position");
+    const flySwatter = document.getElementById("fly-swatter");
+
+    const xInput = document.getElementById("input-x");
+    const yInput = document.getElementById("input-y");
+    const controlsWrapper = document.getElementById("controls-wrapper");
+    const scoreDisplay = document.getElementById("score-display");
+    const caughtDisplay = document.getElementById("caught-display");
+    const catchButton = document.getElementById("catch-button");
+    const top3ResultModal = document.getElementById('top3-result-modal');
+    const top3PodiumList = document.getElementById('top3-podium-list');
+
+    const SVG_NS = "http://www.w3.org/2000/svg";
+
+    function svgEl(name, attrs = {}) {
+        const el = document.createElementNS(SVG_NS, name);
+        for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
+        return el;
+    }
+
+    // Coordinate conversions
+    function toPixelX(x) {
+        return (x - config.xMin) * (gridCanvas.width / (config.xMax - config.xMin));
+    }
+
+    function toPixelY(y) {
+        return gridCanvas.height - (y - config.yMin) * (gridCanvas.height / (config.yMax - config.yMin));
+    }
+
+    function toSvgX(x) {
+        return ((x - config.xMin) / (config.xMax - config.xMin)) * 1000;
+    }
+
+    function toSvgY(y) {
+        return (1 - ((y - config.yMin) / (config.yMax - config.yMin))) * 1000;
+    }
+
+    // 좌표평면에 실제로 표시되는 모든 정수 좌표 범위입니다.
+    // 순서쌍 조절 버튼은 이 범위 전체를 나타낼 수 있습니다.
+    function getPlaneIntegerBounds() {
+        let xMin = Math.ceil(config.xMin);
+        let xMax = Math.floor(config.xMax);
+        let yMin = Math.ceil(config.yMin);
+        let yMax = Math.floor(config.yMax);
+
+        if (xMin > xMax) xMin = xMax = 0;
+        if (yMin > yMax) yMin = yMax = 0;
+
+        return { xMin, xMax, yMin, yMax };
+    }
+
+    // 파리는 날개와 다리까지 좌표평면 안에 들어오는 격자점에만 나타납니다.
+    function getFlyCoordinateBounds() {
+        const plane = getPlaneIntegerBounds();
+        const margin = config.flySafeMargin;
+        let xMin = Math.max(plane.xMin, Math.ceil(config.xMin + margin));
+        let xMax = Math.min(plane.xMax, Math.floor(config.xMax - margin));
+        let yMin = Math.max(plane.yMin, Math.ceil(config.yMin + margin));
+        let yMax = Math.min(plane.yMax, Math.floor(config.yMax - margin));
+
+        // 화면이 매우 작아져도 사용할 수 있는 정수 좌표를 최소 한 개는 보장합니다.
+        if (xMin > xMax) xMin = xMax = Math.max(plane.xMin, Math.min(plane.xMax, 0));
+        if (yMin > yMax) yMin = yMax = Math.max(plane.yMin, Math.min(plane.yMax, 0));
+
+        return { xMin, xMax, yMin, yMax };
+    }
+
+    function isFlyInsideSafeBounds() {
+        const bounds = getFlyCoordinateBounds();
+        return state.fly.x >= bounds.xMin && state.fly.x <= bounds.xMax &&
+               state.fly.y >= bounds.yMin && state.fly.y <= bounds.yMax;
+    }
+
+    // Resize and Redraw logic
+    function resizeCanvases() {
+        const width = canvasContainer.clientWidth;
+        const height = canvasContainer.clientHeight;
+        if (width < 2 || height < 2) return;
+
+        gridCanvas.width = width;
+        gridCanvas.height = height;
+
+        config.xMax = width / (2 * config.gridSize);
+        config.xMin = -config.xMax;
+        config.yMax = height / (2 * config.gridSize);
+        config.yMin = -config.yMax;
+
+        drawGrid();
+
+        if (state.isPlaying) {
+            if (!state.isResolvingHits && !isFlyInsideSafeBounds()) {
+                spawnFly();
+            } else {
+                updateFlyPositionSVG();
+                if (state.swatter.visible) updateSwatterPositionSVG();
+            }
+        }
+    }
+
+    function drawGrid() {
+        gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+        const width = gridCanvas.width;
+        const height = gridCanvas.height;
+        const originX = toPixelX(0);
+        const originY = toPixelY(0);
+
+        gridCtx.beginPath();
+        gridCtx.strokeStyle = config.gridColor;
+        gridCtx.lineWidth = 1;
+        for (let x = Math.ceil(config.xMin); x <= config.xMax; x++) {
+            const px = toPixelX(x);
+            gridCtx.moveTo(px, 0);
+            gridCtx.lineTo(px, height);
+        }
+        for (let y = Math.ceil(config.yMin); y <= config.yMax; y++) {
+            const py = toPixelY(y);
+            gridCtx.moveTo(0, py);
+            gridCtx.lineTo(width, py);
+        }
+        gridCtx.stroke();
+
+        gridCtx.beginPath();
+        gridCtx.strokeStyle = config.axisColor;
+        gridCtx.lineWidth = 2;
+        gridCtx.moveTo(0, originY);
+        gridCtx.lineTo(width, originY);
+        gridCtx.moveTo(originX, 0);
+        gridCtx.lineTo(originX, height);
+        gridCtx.stroke();
+
+        gridCtx.fillStyle = config.axisColor;
+        gridCtx.font = '12px Inter';
+        gridCtx.textAlign = 'center';
+        gridCtx.textBaseline = 'top';
+        for (let x = Math.ceil(config.xMin); x <= config.xMax; x++) {
+            if (x !== 0) gridCtx.fillText(x, toPixelX(x), originY + 8);
+        }
+
+        gridCtx.textAlign = 'right';
+        gridCtx.textBaseline = 'middle';
+        for (let y = Math.ceil(config.yMin); y <= config.yMax; y++) {
+            if (y !== 0) gridCtx.fillText(y, originX - 8, toPixelY(y));
+        }
+
+        gridCtx.textAlign = 'right';
+        gridCtx.textBaseline = 'top';
+        gridCtx.fillText('O', originX - 8, originY + 8);
+    }
+
+    function getRandomInt(min, max) { 
+        return Math.floor(Math.random() * (max - min + 1)) + min; 
+    }
+
+    function updateFlyPositionSVG() {
+        flyPosition.setAttribute("transform", `translate(${toSvgX(state.fly.visualX)} ${toSvgY(state.fly.visualY)})`);
+    }
+
+    function setFlyVisualCoordinate(x, y) {
+        state.fly.visualX = x;
+        state.fly.visualY = y;
+        updateFlyPositionSVG();
+    }
+
+    function updateSwatterPositionSVG() {
+        swatterPosition.setAttribute("transform", `translate(${toSvgX(state.swatter.x)} ${toSvgY(state.swatter.y)})`);
+    }
+
+    function setSwatterCoordinate(x, y) {
+        state.swatter.x = x;
+        state.swatter.y = y;
+        updateSwatterPositionSVG();
+    }
+
+    function showSwatterAtOrigin() {
+        state.swatter.visible = true;
+        // 대기 중에는 파리채를 파리 뒤쪽에 두어 원점의 파리도 가리지 않습니다.
+        svgOverlay.insertBefore(swatterPosition, flyPosition);
+        setSwatterCoordinate(0, 0);
+        swatterPosition.classList.remove("swatter-hidden");
+        flySwatter.classList.remove("swatter-catch");
+    }
+
+    function bringSwatterToFront() {
+        // 잡는 순간에는 사진처럼 그물이 파리 위를 덮도록 맨 앞으로 가져옵니다.
+        svgOverlay.appendChild(swatterPosition);
+    }
+
+    function hideFlySwatter() {
+        state.swatter.visible = false;
+        swatterPosition.classList.add("swatter-hidden");
+        flySwatter.classList.remove("swatter-catch");
+    }
+
+    function chooseNextFlyCoordinate(excludedKey = state.fly.previousKey) {
+        const bounds = getFlyCoordinateBounds();
+        const coordinateCount = (bounds.xMax - bounds.xMin + 1) * (bounds.yMax - bounds.yMin + 1);
+        let x, y, key;
+        do {
+            x = getRandomInt(bounds.xMin, bounds.xMax);
+            y = getRandomInt(bounds.yMin, bounds.yMax);
+            key = `${x},${y}`;
+        } while (coordinateCount > 1 && key === excludedKey);
+        return { x, y, key };
+    }
+
+    function resetCoordinateInputs() {
+        xInput.value = "0";
+        yInput.value = "0";
+        if (!/Mobi|Android/i.test(navigator.userAgent)) xInput.focus();
+    }
+
+    function setAnswerControlsEnabled(enabled) {
+        xInput.disabled = !enabled;
+        yInput.disabled = !enabled;
+        catchButton.disabled = !enabled;
+    }
+
+    function spawnFly() {
+        if (!state.isPlaying) return;
+        const next = chooseNextFlyCoordinate();
+        state.fly.previousKey = next.key;
+        state.fly.x = next.x;
+        state.fly.y = next.y;
+        state.fly.active = true;
+        setFlyVisualCoordinate(next.x, next.y);
+
+        fly.style.opacity = "1";
+        fly.classList.remove("fly-hidden", "fly-under-swatter");
+        showSwatterAtOrigin();
+        resetCoordinateInputs();
+        setAnswerControlsEnabled(true);
+    }
+
+    function delay(ms, token = state.motionToken) {
+        return new Promise(resolve => {
+            setTimeout(() => resolve(token === state.motionToken && state.isPlaying), ms);
+        });
+    }
+
+    function easeInOutCubic(t) {
+        return t < .5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+    }
+
+    function animateCoordinate(setter, from, to, duration, token, curveOffset = 0) {
+        return new Promise(resolve => {
+            const startedAt = performance.now();
+            const midX = (from.x + to.x) / 2;
+            const midY = (from.y + to.y) / 2 + curveOffset;
+
+            function frame(now) {
+                if (token !== state.motionToken || !state.isPlaying) {
+                    resolve(false);
+                    return;
+                }
+
+                const rawT = Math.min(1, (now - startedAt) / Math.max(1, duration));
+                const t = easeInOutCubic(rawT);
+                let x, y;
+
+                if (curveOffset !== 0) {
+                    const u = 1 - t;
+                    x = u * u * from.x + 2 * u * t * midX + t * t * to.x;
+                    y = u * u * from.y + 2 * u * t * midY + t * t * to.y;
+                } else {
+                    x = from.x + (to.x - from.x) * t;
+                    y = from.y + (to.y - from.y) * t;
+                }
+
+                setter(x, y);
+                if (rawT < 1) requestAnimationFrame(frame);
+                else resolve(true);
+            }
+
+            requestAnimationFrame(frame);
+        });
+    }
+
+    function swatterSegmentDuration() {
+        // x축 이동과 y축 이동 시간을 좌표와 관계없이 동일하게 유지합니다.
+        return SWATTER_AXIS_DURATION_MS;
+    }
+
+    function getNearbyFlyStart(catchX, catchY, target) {
+        const bounds = getFlyCoordinateBounds();
+        const dx = target.x === catchX ? (Math.random() < .5 ? -.38 : .38) : Math.sign(target.x - catchX) * .38;
+        const dy = target.y === catchY ? -.28 : Math.sign(target.y - catchY) * .28;
+        return {
+            x: Math.max(bounds.xMin, Math.min(bounds.xMax, catchX + dx)),
+            y: Math.max(bounds.yMin, Math.min(bounds.yMax, catchY + dy))
+        };
+    }
+
+    async function moveNewFlyFromCaughtPosition(catchX, catchY, token) {
+        const next = chooseNextFlyCoordinate(`${catchX},${catchY}`);
+        const start = getNearbyFlyStart(catchX, catchY, next);
+
+        state.fly.previousKey = next.key;
+        state.fly.x = next.x;
+        state.fly.y = next.y;
+        state.fly.active = false;
+
+        setFlyVisualCoordinate(start.x, start.y);
+        fly.classList.remove("fly-hidden", "fly-under-swatter");
+        fly.style.opacity = "0";
+        await delay(40, token);
+        if (token !== state.motionToken || !state.isPlaying) return false;
+        fly.style.opacity = "1";
+
+        const bounds = getFlyCoordinateBounds();
+        const preferredCurve = next.y >= start.y ? -.45 : .45;
+        const curveLimitTop = bounds.yMax - (start.y + next.y) / 2;
+        const curveLimitBottom = bounds.yMin - (start.y + next.y) / 2;
+        const curveOffset = Math.max(curveLimitBottom, Math.min(curveLimitTop, preferredCurve));
+        const moved = await animateCoordinate(
+            setFlyVisualCoordinate,
+            start,
+            { x: next.x, y: next.y },
+            NEXT_FLY_MOVE_DURATION_MS,
+            token,
+            curveOffset
+        );
+        if (moved) {
+            setFlyVisualCoordinate(next.x, next.y);
+            state.fly.active = true;
+        }
+        return moved;
+    }
+
+    function sanitizeInput(input) {
+        let value = input.value.replace(/[^\d-]/g, "");
+        value = value.replace(/(?!^)-/g, "");
+        if (value.startsWith("--")) value = "-" + value.slice(2).replace(/-/g,"");
+        input.value = value.slice(0,3);
+    }
+
+    function getInputBounds(inputId) {
+        // 입력 버튼은 파리의 안전 범위가 아니라 좌표평면에 보이는 모든 정수 좌표를 사용합니다.
+        const bounds = getPlaneIntegerBounds();
+        return inputId === 'input-y'
+            ? { min: bounds.yMin, max: bounds.yMax }
+            : { min: bounds.xMin, max: bounds.xMax };
+    }
+
+    function commitCoordinateInput(input) {
+        sanitizeInput(input);
+        const bounds = getInputBounds(input.id);
+        let value = Number.parseInt(input.value, 10);
+        if (!Number.isFinite(value)) value = 0;
+        input.value = String(Math.max(bounds.min, Math.min(bounds.max, value)));
+        return Number(input.value);
+    }
+
+    function stepCoordinate(inputId, delta) {
+        const input = document.getElementById(inputId);
+        if (!input || input.disabled) return;
+        const bounds = getInputBounds(inputId);
+        const current = commitCoordinateInput(input);
+        input.value = String(Math.max(bounds.min, Math.min(bounds.max, current + delta)));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    
+    xInput.addEventListener("input", () => sanitizeInput(xInput));
+    yInput.addEventListener("input", () => sanitizeInput(yInput));
+    xInput.addEventListener("blur", () => commitCoordinateInput(xInput));
+    yInput.addEventListener("blur", () => commitCoordinateInput(yInput));
+    xInput.addEventListener("keydown", e => {
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            stepCoordinate('input-x', e.key === "ArrowUp" ? 1 : -1);
+        } else if (e.key === "Enter" || e.key === ",") {
+            e.preventDefault();
+            commitCoordinateInput(xInput);
+            yInput.focus();
+            yInput.select();
+        }
+    });
+    yInput.addEventListener("keydown", e => {
+        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+            e.preventDefault();
+            stepCoordinate('input-y', e.key === "ArrowUp" ? 1 : -1);
+        } else if (e.key === "Enter") {
+            e.preventDefault();
+            commitCoordinateInput(yInput);
+            checkAnswer();
+        }
+    });
+
+    function showSplat(svgX, svgY) {
+        const group = svgEl("g", { class: "splat-dot", transform: `translate(${svgX} ${svgY}) scale(0.6)` });
+        const parts = [ [0,0,14,9],[-15,-4,7,5],[15,-5,6,4], [-8,13,5,4],[10,12,5,4],[-18,12,3.5,3],[19,10,3.5,3] ];
+        parts.forEach(([cx,cy,rx,ry], index) => {
+            group.appendChild(svgEl("ellipse", { 
+                cx, cy, rx, ry, 
+                fill: index === 0 ? "#4c534d" : "#303632", 
+                opacity: index === 0 ? .76 : .62, 
+                transform: `rotate(${index * 19 - 35} ${cx} ${cy})` 
+            }));
+        });
+        splatLayer.appendChild(group);
+        setTimeout(() => group.remove(), 700);
+    }
+
+    async function checkAnswer() {
+        if (!state.isPlaying || state.isResolvingHits) return;
+
+        const rawX = xInput.value.trim();
+        const rawY = yInput.value.trim();
+
+        if (rawX === "" || rawY === "" || rawX === "-" || rawY === "-") {
+            shakeUI();
+            return;
+        }
+
+        const hx = Number(rawX);
+        const hy = Number(rawY);
+
+        if (hx !== state.fly.x || hy !== state.fly.y) {
+            shakeUI();
+            xInput.select();
+            return;
+        }
+
+        state.isResolvingHits = true;
+        state.fly.active = false;
+        setAnswerControlsEnabled(false);
+        const token = ++state.motionToken;
+        const catchX = state.fly.x;
+        const catchY = state.fly.y;
+
+        // 정답이 확인되는 순간 점수를 먼저 확정합니다.
+        // 이후 애니메이션 도중 교사가 종료·정지해도 이미 맞힌 점수는 사라지지 않습니다.
+        state.score += 10;
+        state.caught += 1;
+        scoreDisplay.innerText = state.score;
+        caughtDisplay.innerText = state.caught;
+        if (myRole === 'student') {
+            saveStudentLocal();
+            publishMyScore();
+        }
+
+        // 파리채는 먼저 원점에 보인 뒤 x축을 따라 (x, 0)으로 이동합니다.
+        showSwatterAtOrigin();
+        if (!await delay(260, token)) return;
+        if (!await animateCoordinate(
+            setSwatterCoordinate,
+            { x: 0, y: 0 },
+            { x: catchX, y: 0 },
+            swatterSegmentDuration(catchX),
+            token
+        )) return;
+
+        // 이어서 y축 방향으로 이동하여 (x, y)의 파리를 잡습니다.
+        if (!await delay(130, token)) return;
+        if (!await animateCoordinate(
+            setSwatterCoordinate,
+            { x: catchX, y: 0 },
+            { x: catchX, y: catchY },
+            swatterSegmentDuration(catchY),
+            token
+        )) return;
+
+        // 사진처럼 파리채의 사각 그물이 파리를 덮은 모습을 잠시 보여줍니다.
+        bringSwatterToFront();
+        fly.classList.add("fly-under-swatter");
+        flySwatter.classList.remove("swatter-catch");
+        void flySwatter.getBBox();
+        flySwatter.classList.add("swatter-catch");
+        if (!await delay(760, token)) return;
+
+        fly.classList.add("fly-hidden");
+        fly.classList.remove("fly-under-swatter");
+        flySwatter.classList.remove("swatter-catch");
+        hideFlySwatter();
+        if (!await delay(130, token)) return;
+
+        // 다음 파리는 잡힌 파리채 근처에서 나타나 새 정수 좌표까지 날아갑니다.
+        if (!await moveNewFlyFromCaughtPosition(catchX, catchY, token)) return;
+        if (!await delay(120, token)) return;
+
+        showSwatterAtOrigin();
+        resetCoordinateInputs();
+        state.isResolvingHits = false;
+        setAnswerControlsEnabled(true);
+        // 점수는 정답 확인 순간 한 번만 전송합니다.
+        // 애니메이션 종료 후 같은 점수를 다시 보내지 않아 30명 동시 통신량을 줄입니다.
+    }
+
+    function shakeUI() {
+        controlsWrapper.classList.remove("shake");
+        void controlsWrapper.offsetWidth;
+        controlsWrapper.classList.add("shake");
+        setTimeout(() => controlsWrapper.classList.remove("shake"), 380);
+    }
+
+    // Initialization
+    window.addEventListener('resize', resizeCanvases);
+    window.onload = () => {
+        resizeCanvases();
+    };
+
+    function createSessionId() {
+        return 'sess_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    }
+
+    function createFinalResultsCycleId() {
+        return 'result_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+    }
+
+    function getFinalResultsCycleKey(cycleId = finalResultsCycleId) {
+        const normalized = String(cycleId || '').slice(0, 80);
+        if (normalized) return normalized;
+        const sessionKey = String(gameSessionId || state.sessionId || '').slice(0, 80);
+        return sessionKey ? `legacy_${sessionKey}` : '';
+    }
+
+    function sanitizeRoomCode(value) {
+        return String(value || '').replace(/\D/g, '').slice(0, 12);
+    }
+
+    function sanitizePlayerName(value) {
+        return String(value || '')
+            .replace(/[<>]/g, '')
+            .replace(/[\u0000-\u001f\u007f]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim()
+            .slice(0, MAX_PLAYER_NAME_LENGTH);
+    }
+
+    function getTopics() {
+        const base = `${topicNamespace}/${currentRoomCode}`;
+        return {
+            state: `${base}/state`,
+            score: `${base}/score`,
+            leaderboard: `${base}/leaderboard`,
+            action: `${base}/action`,
+            teacherLock: `${base}/teacher-lock`
+        };
+    }
+
+    function setInitMessage(message, isError = false) {
+        const msgEl = document.getElementById('init-msg');
+        if (!msgEl) return;
+        msgEl.classList.remove('hidden', 'text-emerald-600');
+        msgEl.innerText = message;
+        msgEl.classList.toggle('text-red-500', isError);
+        msgEl.classList.toggle('text-blue-600', !isError);
+    }
+
+    function publishJson(topic, payload, options = {}) {
+        if (!client || !client.connected) return false;
+        try {
+            client.publish(topic, JSON.stringify(payload), options);
+            return true;
+        } catch (error) {
+            console.warn('실시간 메시지 전송 실패:', error);
+            return false;
+        }
+    }
+
+    function teacherStorageKey() {
+        return `${storagePrefix}:teacher:${currentRoomCode}`;
+    }
+
+    function studentStorageKey(name = state.playerName) {
+        return `${storagePrefix}:student:${currentRoomCode}:${encodeURIComponent(name || '')}`;
+    }
+
+    function readLocalJson(key) {
+        try {
+            const raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : null;
+        } catch (error) {
+            console.warn('저장 자료 읽기 실패:', error);
+            return null;
+        }
+    }
+
+    function writeLocalJson(key, value) {
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+            return true;
+        } catch (error) {
+            console.warn('저장 자료 쓰기 실패:', error);
+            return false;
+        }
+    }
+
+    function loadTeacherLocal() {
+        const saved = readLocalJson(teacherStorageKey());
+        if (saved && saved.roomCode === currentRoomCode) {
+            gameSessionId = String(saved.gameSessionId || createSessionId()).slice(0, 80);
+            currentGameStatus = ['waiting', 'playing', 'ended'].includes(saved.currentGameStatus)
+                ? saved.currentGameStatus : 'waiting';
+            teacherLeaderboard = saved.teacherLeaderboard && typeof saved.teacherLeaderboard === 'object'
+                ? saved.teacherLeaderboard : {};
+            finalResultsCycleId = String(saved.finalResultsCycleId || '').slice(0, 80);
+            if (currentGameStatus === 'ended' && !finalResultsCycleId) {
+                finalResultsCycleId = getFinalResultsCycleKey();
+            }
+            dismissedFinalResultsCycleId = '';
+            return true;
+        }
+
+        gameSessionId = createSessionId();
+        currentGameStatus = 'waiting';
+        teacherLeaderboard = {};
+        finalResultsCycleId = '';
+        dismissedFinalResultsCycleId = '';
+        return false;
+    }
+
+    function saveTeacherLocal() {
+        if (myRole !== 'teacher' || !currentRoomCode || !gameSessionId) return;
+        writeLocalJson(teacherStorageKey(), {
+            roomCode: currentRoomCode,
+            gameSessionId,
+            currentGameStatus,
+            teacherLeaderboard,
+            finalResultsCycleId,
+            savedAt: Date.now()
+        });
+    }
+
+    function loadStudentLocal() {
+        pendingStudentSave = readLocalJson(studentStorageKey());
+        if (pendingStudentSave && pendingStudentSave.id) {
+            myId = String(pendingStudentSave.id).slice(0, 64);
+        }
+    }
+
+    function serializeFlyState() {
+        return {
+            x: Number(state.fly.x) || 0,
+            y: Number(state.fly.y) || 0,
+            visualX: Number(state.fly.visualX) || 0,
+            visualY: Number(state.fly.visualY) || 0,
+            previousKey: String(state.fly.previousKey || '').slice(0, 30),
+            active: Boolean(state.fly.active && !state.isResolvingHits)
+        };
+    }
+
+    function saveStudentLocal() {
+        if (myRole !== 'student' || !state.playerName || !gameSessionId || !studentSessionReady) return;
+        writeLocalJson(studentStorageKey(), {
+            id: myId,
+            name: state.playerName,
+            roomCode: currentRoomCode,
+            sessionId: gameSessionId,
+            score: Math.max(0, Math.min(MAX_ACCEPTED_SCORE, Math.trunc(Number(state.score) || 0))),
+            caught: Math.max(0, Math.trunc(Number(state.caught) || 0)),
+            fly: serializeFlyState(),
+            savedAt: Date.now()
+        });
+    }
+
+    function resetGameProgressForSession(sessionId) {
+        const normalizedSessionId = String(sessionId || createSessionId()).slice(0, 80);
+        gameSessionId = normalizedSessionId;
+        state.motionToken += 1;
+        state.sessionId = normalizedSessionId;
+        state.score = 0;
+        state.caught = 0;
+        state.isPlaying = false;
+        state.isResolvingHits = false;
+        state.fly = { x: 0, y: 0, visualX: 0, visualY: 0, previousKey: '', active: false };
+        state.swatter = { x: 0, y: 0, visible: false };
+
+        scoreDisplay.innerText = '0';
+        caughtDisplay.innerText = '0';
+        xInput.value = '0';
+        yInput.value = '0';
+        splatLayer.innerHTML = '';
+        hideFlySwatter();
+        fly.classList.add('fly-hidden');
+        setAnswerControlsEnabled(false);
+
+        if (myRole === 'student') {
+            studentSessionReady = true;
+            pendingStudentSave = null;
+            saveStudentLocal();
+        }
+    }
+
+    function restoreFlyState(savedFly) {
+        if (!savedFly || typeof savedFly !== 'object') return false;
+        const x = Number(savedFly.x);
+        const y = Number(savedFly.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+
+        state.fly = {
+            x,
+            y,
+            visualX: Number.isFinite(Number(savedFly.visualX)) ? Number(savedFly.visualX) : x,
+            visualY: Number.isFinite(Number(savedFly.visualY)) ? Number(savedFly.visualY) : y,
+            previousKey: String(savedFly.previousKey || `${x},${y}`).slice(0, 30),
+            active: Boolean(savedFly.active)
+        };
+        if (!isFlyInsideSafeBounds()) state.fly.active = false;
+        return true;
+    }
+
+    function applyStudentSession(sessionId) {
+        const incomingSessionId = String(sessionId || gameSessionId || createSessionId()).slice(0, 80);
+        const sessionChanged = !studentSessionReady || state.sessionId !== incomingSessionId;
+        if (!sessionChanged) return false;
+
+        gameSessionId = incomingSessionId;
+        const saved = pendingStudentSave || readLocalJson(studentStorageKey());
+
+        if (
+            saved &&
+            saved.sessionId === incomingSessionId &&
+            sanitizePlayerName(saved.name) === state.playerName
+        ) {
+            myId = String(saved.id || myId).slice(0, 64);
+            state.sessionId = incomingSessionId;
+            state.score = Math.max(0, Math.min(MAX_ACCEPTED_SCORE, Math.trunc(Number(saved.score) || 0)));
+            state.caught = Math.max(0, Math.trunc(Number(saved.caught) || Math.floor(state.score / 10)));
+            state.isPlaying = false;
+            state.isResolvingHits = false;
+            state.swatter = { x: 0, y: 0, visible: false };
+            if (!restoreFlyState(saved.fly)) {
+                state.fly = { x: 0, y: 0, visualX: 0, visualY: 0, previousKey: '', active: false };
+            }
+            scoreDisplay.innerText = state.score;
+            caughtDisplay.innerText = state.caught;
+            studentSessionReady = true;
+        } else {
+            resetGameProgressForSession(incomingSessionId);
+        }
+
+        pendingStudentSave = null;
+        saveStudentLocal();
+        return true;
+    }
+
+    function normalizeLeaderboardEntry(entry) {
+        if (!entry || typeof entry !== 'object') return null;
+        const id = String(entry.id || '').trim().slice(0, 64);
+        if (!id) return null;
+        const name = sanitizePlayerName(entry.name) || '이름 없음';
+        const rawScore = Number(entry.score);
+        const score = Number.isFinite(rawScore)
+            ? Math.max(0, Math.min(MAX_ACCEPTED_SCORE, Math.trunc(rawScore))) : 0;
+        const caught = Math.max(0, Math.trunc(Number(entry.caught) || Math.floor(score / 10)));
+        const sessionId = String(entry.sessionId || '').slice(0, 80);
+        const timestamp = Math.max(0, Number(entry.timestamp) || 0);
+        const rankValue = Number(entry.rank);
+        const rank = Number.isFinite(rankValue) ? Math.max(1, Math.trunc(rankValue)) : null;
+        return { id, name, score, caught, sessionId, timestamp, rank };
+    }
+
+    function getSortedLeaderboard(source = teacherLeaderboard) {
+        const values = Array.isArray(source) ? source : Object.values(source || {});
+        return values
+            .map(normalizeLeaderboardEntry)
+            .filter(Boolean)
+            .sort((a, b) => b.score - a.score || a.timestamp - b.timestamp || a.name.localeCompare(b.name, 'ko'));
+    }
+
+    function getRankedLeaderboard(source = teacherLeaderboard) {
+        const sorted = getSortedLeaderboard(source);
+        let previousScore = null;
+        let currentRank = 0;
+        return sorted.map((entry, index) => {
+            if (index === 0 || entry.score !== previousScore) currentRank = index + 1;
+            previousScore = entry.score;
+            return { ...entry, rank: currentRank };
+        });
+    }
+
+    function getTopRankedEntries(source = teacherLeaderboard, maxRank = 3) {
+        return getRankedLeaderboard(source).filter(entry => entry.score > 0 && entry.rank <= maxRank);
+    }
+
+    function updateTeacherStateButtons(status = currentGameStatus) {
+        ['waiting', 'playing', 'ended'].forEach(value => {
+            const button = document.getElementById(`btn-state-${value}`);
+            if (button) button.classList.toggle('selected', value === status);
+        });
+    }
+
+    function broadcastGameState() {
+        if (myRole !== 'teacher' || !teacherLockOwned) return;
+        const payload = {
+            status: currentGameStatus,
+            teacherId: myId,
+            sessionId: gameSessionId,
+            timestamp: Date.now()
+        };
+
+        if (currentGameStatus === 'ended') {
+            if (!finalResultsCycleId) finalResultsCycleId = createFinalResultsCycleId();
+            payload.resultsCycleId = finalResultsCycleId;
+            payload.top3 = getTopRankedEntries().map(entry => ({
+                id: entry.id,
+                name: entry.name,
+                score: entry.score,
+                rank: entry.rank
+            }));
+        }
+
+        publishJson(getTopics().state, payload, { qos: 1, retain: true });
+    }
+
+    function requestGameState() {
+        if (myRole !== 'student') return;
+        publishJson(getTopics().action, {
+            type: 'requestSync',
+            requesterId: myId,
+            timestamp: Date.now()
+        }, { qos: 1 });
+    }
+
+    function startStudentSyncLoop() {
+        if (syncInterval) clearTimeout(syncInterval);
+        requestGameState();
+
+        const scheduleNext = () => {
+            // 30명의 요청이 동시에 몰리지 않도록 12~16초 사이로 분산합니다.
+            const delayMs = 12000 + Math.floor(Math.random() * 4000);
+            syncInterval = setTimeout(() => {
+                requestGameState();
+                scheduleNext();
+            }, delayMs);
+        };
+        scheduleNext();
+    }
+
+    function clearFinalResultTimers() {
+        if (finalResultsRefreshTimer) {
+            clearTimeout(finalResultsRefreshTimer);
+            finalResultsRefreshTimer = null;
+        }
+        finalResultsSettleTimers.forEach(timerId => clearTimeout(timerId));
+        finalResultsSettleTimers = [];
+    }
+
+    function refreshFinalResults() {
+        if (myRole !== 'teacher' || currentGameStatus !== 'ended') return;
+        publishLeaderboard();
+        showTop3Results(getTopRankedEntries(), finalResultsCycleId);
+        broadcastGameState();
+    }
+
+    function queueFinalResultsRefresh(delayMs = 180) {
+        if (myRole !== 'teacher' || currentGameStatus !== 'ended') return;
+        if (finalResultsRefreshTimer) clearTimeout(finalResultsRefreshTimer);
+        finalResultsRefreshTimer = setTimeout(() => {
+            finalResultsRefreshTimer = null;
+            refreshFinalResults();
+        }, delayMs);
+    }
+
+    function scheduleFinalResultsSettling() {
+        clearFinalResultTimers();
+        // 학교 와이파이에서 늦게 도착하는 학생 점수를 여러 차례 다시 집계합니다.
+        [400, 1000, 2000, 3500].forEach(delayMs => {
+            const timerId = setTimeout(() => {
+                finalResultsSettleTimers = finalResultsSettleTimers.filter(id => id !== timerId);
+                refreshFinalResults();
+            }, delayMs);
+            finalResultsSettleTimers.push(timerId);
+        });
+    }
+
+    function normalizeTeacherLock(data) {
+        if (!data || typeof data !== 'object') return null;
+        const status = data.status === 'active' ? 'active' : data.status === 'released' ? 'released' : '';
+        const ownerId = String(data.ownerId || '').slice(0, 100);
+        if (!status || !ownerId) return null;
+        return {
+            status,
+            ownerId,
+            acquiredAt: Math.max(0, Number(data.acquiredAt) || 0),
+            updatedAt: Math.max(0, Number(data.updatedAt) || 0),
+            expiresAt: Math.max(0, Number(data.expiresAt) || 0)
+        };
+    }
+
+    function isTeacherLockFresh(lock, now = Date.now()) {
+        return Boolean(lock && lock.status === 'active' && lock.ownerId && lock.expiresAt > now);
+    }
+
+    function compareTeacherLockPriority(first, second) {
+        if (!first) return 1;
+        if (!second) return -1;
+        const firstTime = Math.max(0, Number(first.acquiredAt) || 0);
+        const secondTime = Math.max(0, Number(second.acquiredAt) || 0);
+        if (firstTime !== secondTime) return firstTime - secondTime;
+        return String(first.ownerId).localeCompare(String(second.ownerId));
+    }
+
+    function clearTeacherLockTimers({ keepHeartbeat = false } = {}) {
+        if (teacherLockCheckTimer) {
+            clearTimeout(teacherLockCheckTimer);
+            teacherLockCheckTimer = null;
+        }
+        if (teacherLockConfirmTimer) {
+            clearTimeout(teacherLockConfirmTimer);
+            teacherLockConfirmTimer = null;
+        }
+        if (!keepHeartbeat && teacherLockHeartbeatTimer) {
+            clearInterval(teacherLockHeartbeatTimer);
+            teacherLockHeartbeatTimer = null;
+        }
+    }
+
+    function createOwnTeacherLock(acquiredAt = Date.now()) {
+        const now = Date.now();
+        return {
+            status: 'active',
+            ownerId: teacherAccessId,
+            acquiredAt: Math.max(1, Number(acquiredAt) || now),
+            updatedAt: now,
+            expiresAt: now + TEACHER_LOCK_LEASE_MS
+        };
+    }
+
+    function publishTeacherLock(lock = teacherLockRecord, targetClient = client) {
+        if (!lock || !targetClient || !targetClient.connected || !currentRoomCode) return false;
+        try {
+            targetClient.publish(getTopics().teacherLock, JSON.stringify(lock), { qos: 1, retain: true });
+            return true;
+        } catch (error) {
+            console.warn('교사 접속 잠금 전송 실패:', error);
+            return false;
+        }
+    }
+
+    function sendTeacherLockHeartbeat() {
+        if (!teacherLockOwned || myRole !== 'teacher' || !client || !client.connected) return;
+        const acquiredAt = teacherLockRecord?.acquiredAt || Date.now();
+        teacherLockRecord = createOwnTeacherLock(acquiredAt);
+        observedTeacherLock = teacherLockRecord;
+        publishTeacherLock();
+    }
+
+    function startTeacherLockHeartbeat() {
+        if (teacherLockHeartbeatTimer) clearInterval(teacherLockHeartbeatTimer);
+        sendTeacherLockHeartbeat();
+        teacherLockHeartbeatTimer = setInterval(sendTeacherLockHeartbeat, TEACHER_LOCK_HEARTBEAT_MS);
+    }
+
+    function releaseTeacherLock(targetClient = client) {
+        clearTeacherLockTimers();
+        teacherLockCandidateActive = false;
+        teacherLockDecisionCallback = null;
+        if (teacherLockOwned && targetClient && targetClient.connected && currentRoomCode) {
+            const released = {
+                status: 'released',
+                ownerId: teacherAccessId,
+                acquiredAt: teacherLockRecord?.acquiredAt || 0,
+                updatedAt: Date.now(),
+                expiresAt: 0
+            };
+            publishTeacherLock(released, targetClient);
+        }
+        teacherLockOwned = false;
+        teacherLockRecord = null;
+        if (observedTeacherLock?.ownerId === teacherAccessId) observedTeacherLock = null;
+    }
+
+    function showStartupOverlay() {
+        const startup = document.getElementById('startup-overlay');
+        startup.classList.remove('hidden');
+        startup.style.display = 'flex';
+        const dashboard = document.getElementById('teacher-dashboard');
+        dashboard.classList.add('hidden');
+        dashboard.style.display = 'none';
+    }
+
+    async function denyTeacherAccess(message = '이 방은 이미 다른 교사 화면에서 사용 중입니다.') {
+        teacherLockCandidateActive = false;
+        teacherLockDecisionCallback = null;
+        clearTeacherLockTimers();
+        showStartupOverlay();
+        setInitMessage(`${message} 기존 교사 화면이 나간 뒤 약 12초 후 다시 시도할 수 있습니다.`, true);
+        await disconnectRealtime();
+        myRole = '';
+        teacherRoomInitialized = false;
+        alert(`${message}\n\n기존 교사 화면이 나간 뒤 약 12초 후 다시 시도해주세요.`);
+    }
+
+    function handleTeacherLockLost() {
+        if (teacherLockLossHandling || myRole !== 'teacher') return;
+        teacherLockLossHandling = true;
+        teacherLockOwned = false;
+        clearTeacherLockTimers();
+        setTimeout(async () => {
+            alert('이 방의 교사 제어권이 다른 기기로 넘어가 교사 화면을 종료합니다.');
+            await window.returnToStart();
+            teacherLockLossHandling = false;
+        }, 0);
+    }
+
+    function handleTeacherLockMessage(data) {
+        if (myRole !== 'teacher') return;
+        const incoming = normalizeTeacherLock(data);
+        if (!incoming) return;
+
+        if (incoming.status === 'released') {
+            if (observedTeacherLock?.ownerId === incoming.ownerId) observedTeacherLock = null;
+            return;
+        }
+        if (!isTeacherLockFresh(incoming)) return;
+
+        if (!observedTeacherLock || !isTeacherLockFresh(observedTeacherLock) || compareTeacherLockPriority(incoming, observedTeacherLock) < 0) {
+            observedTeacherLock = incoming;
+        }
+
+        if (incoming.ownerId === teacherAccessId) {
+            if (teacherLockRecord && incoming.acquiredAt) teacherLockRecord.acquiredAt = incoming.acquiredAt;
+            return;
+        }
+
+        if (teacherLockOwned && teacherLockRecord) {
+            if (compareTeacherLockPriority(teacherLockRecord, incoming) <= 0) {
+                // 뒤늦게 들어온 교사 후보가 잠금을 덮어써도 먼저 접속한 교사가 즉시 되찾습니다.
+                sendTeacherLockHeartbeat();
+            } else {
+                handleTeacherLockLost();
+            }
+        }
+    }
+
+    function beginTeacherLockAcquisition(onAcquired) {
+        clearTeacherLockTimers();
+        teacherLockOwned = false;
+        teacherLockCandidateActive = true;
+        teacherLockDecisionCallback = onAcquired;
+        teacherLockRecord = createOwnTeacherLock();
+        setInitMessage('교사 제어판 사용 여부를 확인 중입니다...');
+
+        teacherLockCheckTimer = setTimeout(() => {
+            teacherLockCheckTimer = null;
+            const activeLock = isTeacherLockFresh(observedTeacherLock) ? observedTeacherLock : null;
+
+            if (activeLock && activeLock.ownerId !== teacherAccessId) {
+                denyTeacherAccess();
+                return;
+            }
+            if (activeLock && activeLock.ownerId === teacherAccessId) {
+                teacherLockRecord = createOwnTeacherLock(activeLock.acquiredAt || Date.now());
+            }
+
+            publishTeacherLock(teacherLockRecord);
+            teacherLockConfirmTimer = setTimeout(() => {
+                teacherLockConfirmTimer = null;
+                const winner = isTeacherLockFresh(observedTeacherLock) ? observedTeacherLock : teacherLockRecord;
+                if (winner && winner.ownerId !== teacherAccessId && compareTeacherLockPriority(winner, teacherLockRecord) <= 0) {
+                    denyTeacherAccess();
+                    return;
+                }
+
+                teacherLockOwned = true;
+                teacherLockCandidateActive = false;
+                observedTeacherLock = teacherLockRecord;
+                startTeacherLockHeartbeat();
+                const callback = teacherLockDecisionCallback;
+                teacherLockDecisionCallback = null;
+                if (typeof callback === 'function') callback();
+            }, TEACHER_LOCK_CONFIRM_MS);
+        }, TEACHER_LOCK_CHECK_MS);
+    }
+
+    function stopRealtimeTimers() {
+        clearFinalResultTimers();
+        clearTeacherLockTimers();
+        if (syncInterval) {
+            clearTimeout(syncInterval);
+            syncInterval = null;
+        }
+        if (connectionTimeoutHandle) {
+            clearTimeout(connectionTimeoutHandle);
+            connectionTimeoutHandle = null;
+        }
+        if (leaderboardPublishTimer) {
+            clearTimeout(leaderboardPublishTimer);
+            leaderboardPublishTimer = null;
+        }
+    }
+
+    function disconnectRealtime() {
+        connectionAttemptToken += 1;
+        isConnectingRealtime = false;
+        stopRealtimeTimers();
+
+        const oldClient = client;
+        if (myRole === 'teacher') releaseTeacherLock(oldClient);
+        client = null;
+        if (!oldClient) return Promise.resolve();
+
+        return new Promise(resolve => {
+            let completed = false;
+            const done = () => {
+                if (completed) return;
+                completed = true;
+                resolve();
+            };
+            try {
+                if (oldClient.options) oldClient.options.reconnectPeriod = 0;
+                oldClient.removeAllListeners();
+                oldClient.end(true, {}, done);
+            } catch (error) {
+                console.warn('기존 연결 종료 중 오류:', error);
+                done();
+            }
+            setTimeout(done, 500);
+        });
+    }
+
+    function updateStudentNameDisplay() {
+        const nameDisplay = document.getElementById('student-name-display');
+        if (!nameDisplay) return;
+        if (myRole === 'student' && state.playerName) {
+            nameDisplay.textContent = `👤 ${state.playerName}`;
+            nameDisplay.title = `${state.playerName} 학생`;
+            nameDisplay.classList.remove('hidden');
+        } else {
+            nameDisplay.textContent = '';
+            nameDisplay.classList.add('hidden');
+        }
+    }
+
+    window.joinGame = async (mode) => {
+        if (isConnectingRealtime) {
+            setInitMessage('이미 통신망에 연결 중입니다. 잠시만 기다려주세요.');
+            return;
+        }
+
+        const roomInput = document.getElementById('room-code-input');
+        const requestedRoomCode = sanitizeRoomCode(roomInput.value || currentRoomCode);
+        roomInput.value = requestedRoomCode;
+        const enteredName = mode === 'student'
+            ? sanitizePlayerName(document.getElementById('player-name').value)
+            : '';
+
+        if (mode !== 'single' && !ROOM_CODE_PATTERN.test(requestedRoomCode)) {
+            alert('방 번호는 6~12자리 숫자로 입력해주세요.');
+            roomInput.focus();
+            return;
+        }
+        if (mode === 'student' && !enteredName) {
+            alert('학번 또는 이름을 입력해주세요!');
+            document.getElementById('player-name').focus();
+            return;
+        }
+        if (mode === 'student') document.getElementById('player-name').value = enteredName;
+
+        if (mode !== 'single' && (!window.mqtt || typeof window.mqtt.connect !== 'function')) {
+            const message = '실시간 통신 프로그램을 불러오지 못했습니다. 학교 인터넷에서 cdnjs.cloudflare.com 접속이 가능한지 확인해주세요.';
+            setInitMessage(message, true);
+            alert(message);
+            return;
+        }
+
+        if (client) await disconnectRealtime();
+
+        myRole = mode;
+        currentRoomCode = requestedRoomCode;
+        state.playerName = enteredName;
+        updateStudentNameDisplay();
+
+        if (mode === 'single') {
+            document.getElementById('startup-overlay').classList.add('hidden');
+            gameSessionId = createSessionId();
+            resetGameProgressForSession(gameSessionId);
+            startGameInternal();
+            return;
+        }
+
+        studentCanReceiveEndedState = false;
+        studentJoinedAt = Date.now();
+        lastAcceptedStateTimestamp = 0;
+
+        if (mode === 'student') {
+            studentSessionReady = false;
+            initialScorePublished = false;
+            lastTeacherIdSeen = '';
+            loadStudentLocal();
+            hideTop3Results();
+            handleGameStateChange('waiting');
+        } else {
+            teacherLockOwned = false;
+            teacherLockRecord = null;
+            observedTeacherLock = null;
+            teacherLockLossHandling = false;
+            loadTeacherLocal();
+            teacherRoomInitialized = true;
+        }
+
+        setInitMessage('통신망 연결 중... (잠시만 기다려주세요)');
+        isConnectingRealtime = true;
+        connectRealtime(mode);
+    };
+
+    function connectRealtime(mode) {
+        if (!window.mqtt || typeof window.mqtt.connect !== 'function') {
+            isConnectingRealtime = false;
+            setInitMessage('실시간 통신 프로그램을 불러오지 못했습니다. 인터넷 연결을 확인해주세요.', true);
+            return;
+        }
+        const attemptToken = ++connectionAttemptToken;
+        const generation = ++connectionGeneration;
+
+        const localClient = mqtt.connect(realtimeBrokerUrl, {
+            clientId: `fly_${myId}_${generation}`,
+            clean: true,
+            keepalive: 30,
+            connectTimeout: 10000,
+            reconnectPeriod: 3000
+        });
+        client = localClient;
+
+        if (connectionTimeoutHandle) clearTimeout(connectionTimeoutHandle);
+        connectionTimeoutHandle = setTimeout(() => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient || localClient.connected) return;
+            isConnectingRealtime = false;
+            setInitMessage('연결이 지연되고 있습니다. 학교 와이파이를 확인한 뒤 다시 입장해주세요.', true);
+        }, 12000);
+
+        localClient.on('connect', () => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            if (connectionTimeoutHandle) {
+                clearTimeout(connectionTimeoutHandle);
+                connectionTimeoutHandle = null;
+            }
+            isConnectingRealtime = false;
+            const topics = getTopics();
+
+            if (mode === 'teacher') {
+                document.getElementById('display-room-code').innerText = currentRoomCode;
+                observedTeacherLock = null;
+                teacherLockCandidateActive = true;
+
+                localClient.subscribe([topics.score, topics.action, topics.teacherLock], { qos: 1 }, error => {
+                    if (error) {
+                        console.error('교사용 토픽 구독 실패:', error);
+                        setInitMessage('실시간 통신 구독에 실패했습니다. 페이지를 새로고침해 주세요.', true);
+                        return;
+                    }
+
+                    beginTeacherLockAcquisition(() => {
+                        const startup = document.getElementById('startup-overlay');
+                        startup.classList.add('hidden');
+                        startup.style.display = 'none';
+                        const dashboard = document.getElementById('teacher-dashboard');
+                        dashboard.classList.remove('hidden');
+                        dashboard.style.display = 'flex';
+
+                        if (!teacherRoomInitialized) {
+                            loadTeacherLocal();
+                            teacherRoomInitialized = true;
+                        }
+                        renderTeacherLeaderboard();
+                        updateTeacherStateButtons();
+                        saveTeacherLocal();
+                        broadcastGameState();
+                        publishLeaderboard();
+                    });
+                });
+            } else if (mode === 'student') {
+                const startup = document.getElementById('startup-overlay');
+                startup.classList.add('hidden');
+                startup.style.display = 'none';
+
+                localClient.subscribe([topics.state, topics.leaderboard], { qos: 1 }, error => {
+                    if (error) {
+                        console.error('학생용 토픽 구독 실패:', error);
+                        alert('실시간 통신 구독에 실패했습니다. 페이지를 새로고침해 주세요.');
+                        return;
+                    }
+                    startStudentSyncLoop();
+                    // 재연결 직후 현재 점수를 바로 다시 보내 교사 순위표를 복구합니다.
+                    if (studentSessionReady) publishMyScore();
+                });
+            }
+        });
+
+        localClient.on('message', (topic, message) => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            try {
+                const data = JSON.parse(message.toString());
+                const topics = getTopics();
+
+                if (topic === topics.teacherLock && myRole === 'teacher') {
+                    handleTeacherLockMessage(data);
+                    return;
+                }
+
+                if (topic === topics.state && myRole === 'student') {
+                    const incomingStatus = ['waiting', 'playing', 'ended'].includes(data.status)
+                        ? data.status : 'waiting';
+                    const incomingTimestamp = Math.max(0, Number(data.timestamp) || 0);
+                    if (incomingTimestamp && incomingTimestamp < lastAcceptedStateTimestamp) return;
+
+                    const incomingSessionId = String(data.sessionId || '').slice(0, 80);
+                    const incomingResultsCycleId = String(
+                        data.resultsCycleId || (incomingStatus === 'ended' && incomingSessionId ? `legacy_${incomingSessionId}` : '')
+                    ).slice(0, 80);
+                    const savedSessionMatches = Boolean(
+                        incomingSessionId && (
+                            (pendingStudentSave && pendingStudentSave.sessionId === incomingSessionId) ||
+                            (studentSessionReady && state.sessionId === incomingSessionId)
+                        )
+                    );
+                    const endedBeforeStudentJoined = Boolean(
+                        incomingStatus === 'ended' && incomingTimestamp && studentJoinedAt && incomingTimestamp < studentJoinedAt
+                    );
+
+                    // 새로 들어온 학생에게 과거 판 종료 창이 뜨는 것은 막되,
+                    // 같은 세션을 복구하는 학생은 종료 화면과 점수를 정상 복원합니다.
+                    if (
+                        incomingStatus === 'ended' &&
+                        endedBeforeStudentJoined &&
+                        !studentCanReceiveEndedState &&
+                        !savedSessionMatches
+                    ) {
+                        hideTop3Results();
+                        handleGameStateChange('waiting');
+                        return;
+                    }
+
+                    const sessionChanged = applyStudentSession(incomingSessionId);
+                    const incomingTeacherId = String(data.teacherId || '').slice(0, 80);
+                    const teacherChanged = Boolean(incomingTeacherId && incomingTeacherId !== lastTeacherIdSeen);
+                    if (incomingTeacherId) lastTeacherIdSeen = incomingTeacherId;
+                    if (incomingTimestamp) lastAcceptedStateTimestamp = incomingTimestamp;
+                    if (incomingStatus === 'waiting' || incomingStatus === 'playing') {
+                        studentCanReceiveEndedState = true;
+                    }
+
+                    handleGameStateChange(
+                        incomingStatus,
+                        Array.isArray(data.top3) ? data.top3 : null,
+                        incomingResultsCycleId
+                    );
+                    if (!initialScorePublished || sessionChanged || teacherChanged) {
+                        publishMyScore();
+                        initialScorePublished = true;
+                    }
+                } else if (topic === topics.leaderboard && myRole === 'student') {
+                    renderStudentLeaderboard(Array.isArray(data) ? data : []);
+                } else if (topic === topics.score && myRole === 'teacher' && teacherLockOwned) {
+                    const normalized = normalizeLeaderboardEntry(data);
+                    if (!normalized) return;
+                    if (normalized.sessionId !== gameSessionId) {
+                        broadcastGameState();
+                        return;
+                    }
+
+                    const existing = teacherLeaderboard[normalized.id];
+                    if (existing && existing.sessionId === normalized.sessionId) {
+                        // 같은 게임에서는 점수가 증가만 합니다.
+                        // 낮은 점수는 지연 메시지이므로, 같은 점수는 중복 동기화이므로 모두 무시합니다.
+                        if (normalized.score <= existing.score) return;
+                    }
+
+                    teacherLeaderboard[normalized.id] = normalized;
+                    saveTeacherLocal();
+                    renderTeacherLeaderboard();
+                    if (currentGameStatus === 'ended') queueFinalResultsRefresh();
+                    else queueLeaderboardPublish();
+                } else if (topic === topics.action && myRole === 'teacher' && teacherLockOwned) {
+                    if (data && data.type === 'requestSync') {
+                        const now = Date.now();
+                        // 다수 학생의 동기화 요청에도 상태 방송은 2초에 한 번만 합니다.
+                        if (now - lastBroadcastTime > 2000) {
+                            broadcastGameState();
+                            lastBroadcastTime = now;
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('실시간 데이터 처리 오류:', error);
+            }
+        });
+
+        localClient.on('reconnect', () => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            setInitMessage('통신망 재연결 중...');
+            console.warn('실시간 통신 재연결 시도 중...');
+        });
+
+        localClient.on('error', error => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            console.warn('MQTT 연결 오류:', error && error.message ? error.message : error);
+            if (!localClient.connected) {
+                setInitMessage('실시간 통신 연결 오류입니다. 학교 와이파이를 확인해주세요.', true);
+            }
+        });
+
+        localClient.on('close', () => {
+            if (attemptToken !== connectionAttemptToken || client !== localClient) return;
+            if (!isConnectingRealtime && myRole) {
+                console.warn('연결이 닫혀 자동 재연결을 시도합니다.');
+            }
+        });
+    }
+
+    window.teacherSetState = newStatus => {
+        if (!teacherLockOwned) {
+            alert('현재 기기가 이 방의 교사 제어권을 가지고 있지 않습니다.');
+            return;
+        }
+        if (!client || !client.connected) {
+            alert('실시간 통신 연결이 아직 완료되지 않았습니다. 잠시 후 다시 눌러주세요.');
+            return;
+        }
+        if (!['waiting', 'playing', 'ended'].includes(newStatus)) return;
+
+        clearFinalResultTimers();
+        const previousStatus = currentGameStatus;
+        const beginsNewGameAfterEnd = previousStatus === 'ended' &&
+            (newStatus === 'waiting' || newStatus === 'playing');
+
+        // 종료된 판에서 대기 또는 게임 시작으로 이동하면 새 게임입니다.
+        // 게임 도중의 대기 → 재시작은 기존 세션을 그대로 사용하여 점수를 유지합니다.
+        if (beginsNewGameAfterEnd) {
+            gameSessionId = createSessionId();
+            teacherLeaderboard = {};
+            renderTeacherLeaderboard();
+            publishLeaderboard();
+        }
+
+        currentGameStatus = newStatus;
+        if (newStatus === 'ended') {
+            // 종료 버튼을 누른 1회를 하나의 집계 회차로 고정합니다.
+            // 이후 재집계 방송은 같은 회차 ID를 사용하므로 확인한 팝업이 다시 열리지 않습니다.
+            finalResultsCycleId = createFinalResultsCycleId();
+            dismissedFinalResultsCycleId = '';
+        } else {
+            finalResultsCycleId = '';
+            dismissedFinalResultsCycleId = '';
+        }
+        saveTeacherLocal();
+        updateTeacherStateButtons();
+
+        if (newStatus === 'ended') {
+            // 먼저 종료 상태를 알려 학생 기기가 마지막 점수를 즉시 전송하게 합니다.
+            publishLeaderboard();
+            showTop3Results(getTopRankedEntries(), finalResultsCycleId);
+            broadcastGameState();
+            // 30명 환경에서 늦게 도착하는 점수를 3.5초 동안 반복 재집계합니다.
+            scheduleFinalResultsSettling();
+        } else {
+            hideTop3Results();
+            broadcastGameState();
+        }
+    };
+
+    function handleGameStateChange(newStatus, receivedTop3 = null, receivedResultsCycleId = '') {
+        currentGameStatus = newStatus;
+        if (newStatus === 'ended') {
+            const nextCycleId = getFinalResultsCycleKey(receivedResultsCycleId);
+            if (nextCycleId && nextCycleId !== finalResultsCycleId) {
+                finalResultsCycleId = nextCycleId;
+                dismissedFinalResultsCycleId = '';
+            } else if (!finalResultsCycleId) {
+                finalResultsCycleId = nextCycleId;
+            }
+        } else {
+            finalResultsCycleId = '';
+            dismissedFinalResultsCycleId = '';
+        }
+        const waitingScreen = document.getElementById('waiting-screen');
+        const endScreen = document.getElementById('end-screen');
+        const container = document.getElementById('game-container');
+
+        if (newStatus === 'waiting') {
+            hideTop3Results();
+            if (myRole === 'student' && studentSessionReady) {
+                saveStudentLocal();
+                publishMyScore();
+            }
+            container.classList.add('blur-md', 'pointer-events-none');
+            endScreen.classList.add('hidden');
+            endScreen.style.display = 'none';
+            waitingScreen.style.display = 'flex';
+            waitingScreen.classList.remove('hidden');
+            state.isPlaying = false;
+            state.motionToken += 1;
+            state.isResolvingHits = false;
+            setAnswerControlsEnabled(false);
+            hideFlySwatter();
+            fly.classList.add('fly-hidden');
+        } else if (newStatus === 'playing') {
+            hideTop3Results();
+            endScreen.classList.add('hidden');
+            endScreen.style.display = 'none';
+            waitingScreen.classList.add('hidden');
+            waitingScreen.style.display = 'none';
+            startGameInternal();
+        } else if (newStatus === 'ended') {
+            waitingScreen.classList.add('hidden');
+            waitingScreen.style.display = 'none';
+            state.isPlaying = false;
+            state.motionToken += 1;
+            state.isResolvingHits = false;
+            setAnswerControlsEnabled(false);
+            hideFlySwatter();
+            fly.classList.add('fly-hidden');
+            document.getElementById('final-score').innerText = state.score;
+            endScreen.style.display = 'flex';
+            endScreen.classList.remove('hidden');
+            container.classList.add('blur-md', 'pointer-events-none');
+            if (myRole === 'student') {
+                saveStudentLocal();
+                publishMyScore();
+            }
+            const resultSource = Array.isArray(receivedTop3) ? receivedTop3 : latestStudentLeaderboard;
+            showTop3Results(resultSource, finalResultsCycleId);
+        }
+    }
+
+    function startGameInternal() {
+        if (state.isPlaying) return;
+        const targetSessionId = gameSessionId || state.sessionId || createSessionId();
+        if (state.sessionId !== targetSessionId) resetGameProgressForSession(targetSessionId);
+
+        state.isPlaying = true;
+        state.motionToken += 1;
+        state.isResolvingHits = false;
+        scoreDisplay.innerText = state.score;
+        caughtDisplay.innerText = state.caught;
+        xInput.value = '0';
+        yInput.value = '0';
+        document.getElementById('game-container').classList.remove('blur-md', 'pointer-events-none');
+        splatLayer.innerHTML = '';
+        hideFlySwatter();
+        resizeCanvases();
+
+        if (state.fly.active && state.fly.previousKey && isFlyInsideSafeBounds()) {
+            setFlyVisualCoordinate(state.fly.x, state.fly.y);
+            fly.style.opacity = '1';
+            fly.classList.remove('fly-hidden', 'fly-under-swatter');
+            showSwatterAtOrigin();
+            resetCoordinateInputs();
+            setAnswerControlsEnabled(true);
+        } else {
+            spawnFly();
+        }
+        if (myRole === 'student') saveStudentLocal();
+    }
+
+    window.returnToStart = async () => {
+        const previousRole = myRole;
+        if (previousRole === 'teacher') saveTeacherLocal();
+        if (previousRole === 'student') saveStudentLocal();
+        hideTop3Results();
+
+        const dashboard = document.getElementById('teacher-dashboard');
+        dashboard.classList.add('hidden');
+        dashboard.style.display = 'none';
+        const waiting = document.getElementById('waiting-screen');
+        waiting.classList.add('hidden');
+        waiting.style.display = 'none';
+        const ending = document.getElementById('end-screen');
+        ending.classList.add('hidden');
+        ending.style.display = 'none';
+        document.getElementById('game-container').classList.add('blur-md', 'pointer-events-none');
+        const startup = document.getElementById('startup-overlay');
+        startup.classList.remove('hidden');
+        startup.style.display = 'flex';
+        document.getElementById('room-code-input').value = currentRoomCode;
+        if (previousRole === 'student') document.getElementById('player-name').value = state.playerName;
+
+        state.isPlaying = false;
+        state.motionToken += 1;
+        state.isResolvingHits = false;
+        setAnswerControlsEnabled(false);
+        hideFlySwatter();
+        fly.classList.add('fly-hidden');
+        studentCanReceiveEndedState = false;
+        studentJoinedAt = 0;
+        lastAcceptedStateTimestamp = 0;
+        updateStudentNameDisplay();
+        await disconnectRealtime();
+        myRole = '';
+        teacherRoomInitialized = false;
+        teacherLockOwned = false;
+        teacherLockRecord = null;
+        observedTeacherLock = null;
+        finalResultsCycleId = '';
+        dismissedFinalResultsCycleId = '';
+        const msgEl = document.getElementById('init-msg');
+        msgEl.classList.add('hidden');
+        msgEl.innerText = '';
+    };
+
+    function showTop3Results(entries, resultsCycleId = finalResultsCycleId) {
+        if (!top3ResultModal || !top3PodiumList) return;
+
+        const cycleKey = getFinalResultsCycleKey(resultsCycleId);
+        const wasDismissed = Boolean(cycleKey && dismissedFinalResultsCycleId === cycleKey);
+        const topEntries = getTopRankedEntries(Array.isArray(entries) ? entries : []);
+        top3PodiumList.innerHTML = '';
+
+        if (topEntries.length === 0) {
+            top3PodiumList.innerHTML = '<div class="py-10 text-center text-lg font-bold text-slate-500">아직 집계된 점수가 없습니다.</div>';
+        } else {
+            const groupedByRank = new Map();
+            topEntries.forEach(entry => {
+                if (!groupedByRank.has(entry.rank)) groupedByRank.set(entry.rank, []);
+                groupedByRank.get(entry.rank).push(entry);
+            });
+
+            const styleByRank = {
+                1: { medal: '🥇', row: 'border-amber-300 bg-amber-50', title: 'text-amber-900', score: 'bg-amber-100 text-amber-800 border-amber-300' },
+                2: { medal: '🥈', row: 'border-slate-300 bg-slate-50', title: 'text-slate-800', score: 'bg-slate-200 text-slate-700 border-slate-300' },
+                3: { medal: '🥉', row: 'border-orange-300 bg-orange-50', title: 'text-orange-900', score: 'bg-orange-100 text-orange-800 border-orange-300' }
+            };
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex flex-col gap-2 md:gap-3';
+
+            [...groupedByRank.entries()].sort((a, b) => a[0] - b[0]).forEach(([rankNumber, members]) => {
+                const style = styleByRank[rankNumber] || styleByRank[3];
+                const isTie = members.length > 1;
+                const scoreValue = Number(members[0]?.score || 0);
+
+                const row = document.createElement('section');
+                row.className = `grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-3 rounded-2xl border-2 px-3 py-3 shadow-sm md:gap-4 md:px-4 ${style.row}`;
+
+                const medal = document.createElement('div');
+                medal.className = 'text-3xl md:text-4xl';
+                medal.textContent = style.medal;
+
+                const middle = document.createElement('div');
+                middle.className = 'min-w-0';
+
+                const rankTitle = document.createElement('div');
+                rankTitle.className = `text-lg font-extrabold md:text-xl ${style.title}`;
+                rankTitle.textContent = isTie ? `공동 ${rankNumber}등` : `${rankNumber}등`;
+
+                const names = document.createElement('div');
+                const nameText = members.map(member => member.name || '이름 없음').join(' · ');
+                names.className = 'mt-0.5 break-words text-sm font-bold leading-snug text-slate-700 md:text-base';
+                names.textContent = nameText;
+                names.title = nameText;
+
+                middle.append(rankTitle, names);
+
+                const scoreBadge = document.createElement('div');
+                scoreBadge.className = `shrink-0 rounded-full border px-3 py-1.5 text-base font-black md:text-lg ${style.score}`;
+                scoreBadge.textContent = `${scoreValue}점`;
+
+                row.append(medal, middle, scoreBadge);
+                wrapper.appendChild(row);
+            });
+
+            top3PodiumList.appendChild(wrapper);
+        }
+
+        // 내용은 계속 최신 점수로 갱신하되, 사용자가 같은 종료 회차를 확인했다면 다시 표시하지 않습니다.
+        if (wasDismissed) return;
+        top3ResultModal.classList.remove('hidden');
+        top3ResultModal.style.display = 'flex';
+    }
+
+    window.hideTop3Results = () => {
+        if (!top3ResultModal) return;
+        top3ResultModal.classList.add('hidden');
+        top3ResultModal.style.display = 'none';
+    };
+
+    window.dismissTop3Results = () => {
+        const cycleKey = getFinalResultsCycleKey();
+        if (currentGameStatus === 'ended' && cycleKey) {
+            dismissedFinalResultsCycleId = cycleKey;
+        }
+        hideTop3Results();
+    };
+
+    function queueLeaderboardPublish() {
+        if (leaderboardPublishTimer) return;
+        leaderboardPublishTimer = setTimeout(() => {
+            leaderboardPublishTimer = null;
+            publishLeaderboard();
+        }, 300);
+    }
+
+    function publishLeaderboard() {
+        if (myRole !== 'teacher' || !teacherLockOwned || !client || !client.connected) return;
+        saveTeacherLocal();
+        const ranked = getRankedLeaderboard();
+        publishJson(getTopics().leaderboard, ranked, { qos: 1, retain: true });
+    }
+
+    function publishMyScore() {
+        if (myRole !== 'student' || !client || !client.connected || !studentSessionReady) return;
+        saveStudentLocal();
+        publishJson(getTopics().score, {
+            id: myId,
+            name: sanitizePlayerName(state.playerName),
+            score: Math.max(0, Math.min(MAX_ACCEPTED_SCORE, Math.trunc(Number(state.score) || 0))),
+            caught: Math.max(0, Math.trunc(Number(state.caught) || 0)),
+            sessionId: gameSessionId,
+            timestamp: Date.now()
+        }, { qos: 1 });
+    }
+
+    window.clearLeaderboard = () => {
+        if (!teacherLockOwned) {
+            alert('현재 기기가 이 방의 교사 제어권을 가지고 있지 않습니다.');
+            return;
+        }
+        if (!client || !client.connected) {
+            alert('실시간 통신 연결이 아직 완료되지 않았습니다.');
+            return;
+        }
+        if (!confirm('순위표와 학생 저장 점수를 새 게임으로 초기화하시겠습니까?')) return;
+        clearFinalResultTimers();
+        teacherLeaderboard = {};
+        gameSessionId = createSessionId();
+        currentGameStatus = 'waiting';
+        finalResultsCycleId = '';
+        dismissedFinalResultsCycleId = '';
+        hideTop3Results();
+        saveTeacherLocal();
+        renderTeacherLeaderboard();
+        updateTeacherStateButtons();
+        publishLeaderboard();
+        broadcastGameState();
+        alert('새 게임으로 초기화되었습니다. 학생 기기는 자동으로 0점부터 시작합니다.');
+    };
+
+    function createLeaderboardRow(entry, isMe = false) {
+        const li = document.createElement('li');
+        li.className = `flex justify-between items-center p-3 rounded-lg border shadow-sm ${
+            isMe ? 'bg-blue-50 border-blue-500' : 'bg-white border-slate-200'
+        }`;
+
+        const left = document.createElement('div');
+        left.className = 'flex items-center gap-3 min-w-0';
+        const rank = document.createElement('span');
+        rank.className = 'font-bold w-9 shrink-0 text-center text-slate-500';
+        rank.textContent = entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : entry.rank === 3 ? '🥉' : `${entry.rank}등`;
+
+        const name = document.createElement('span');
+        name.className = `font-bold truncate ${isMe ? 'text-blue-800' : 'text-slate-800'}`;
+        name.textContent = entry.name;
+        name.title = entry.name;
+        left.append(rank, name);
+
+        if (isMe) {
+            const me = document.createElement('span');
+            me.className = 'shrink-0 text-[10px] bg-blue-500 text-white px-2 py-0.5 rounded-full';
+            me.textContent = '나';
+            left.appendChild(me);
+        }
+
+        const score = document.createElement('span');
+        score.className = 'shrink-0 font-bold text-red-600';
+        score.textContent = `${entry.score}점`;
+        li.append(left, score);
+        return li;
+    }
+
+    function renderTeacherLeaderboard() {
+        const list = document.getElementById('teacher-leaderboard-list');
+        const sorted = getRankedLeaderboard();
+        list.replaceChildren();
+
+        if (sorted.length === 0) {
+            const empty = document.createElement('li');
+            empty.className = 'text-center text-slate-500 py-8';
+            empty.textContent = '아직 기록이 없습니다. 학생들이 점수를 얻으면 이곳에 표시됩니다.';
+            list.appendChild(empty);
+            return;
+        }
+        sorted.forEach(entry => list.appendChild(createLeaderboardRow(entry, false)));
+    }
+
+    function renderStudentLeaderboard(data) {
+        const normalized = getRankedLeaderboard(Array.isArray(data) ? data : []);
+        latestStudentLeaderboard = studentSessionReady
+            ? normalized.filter(entry => !entry.sessionId || entry.sessionId === gameSessionId)
+            : normalized;
+
+        const list = document.getElementById('student-leaderboard-list');
+        list.replaceChildren();
+        if (latestStudentLeaderboard.length === 0) {
+            const empty = document.createElement('li');
+            empty.className = 'text-center text-slate-500 py-4';
+            empty.textContent = '기록이 없습니다.';
+            list.appendChild(empty);
+            return;
+        }
+        latestStudentLeaderboard.forEach(entry => {
+            list.appendChild(createLeaderboardRow(entry, entry.id === myId));
+        });
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if (myRole === 'teacher') {
+            saveTeacherLocal();
+            releaseTeacherLock(client);
+        }
+        if (myRole === 'student') saveStudentLocal();
+    });
+</script>
+</body>
+</html>
