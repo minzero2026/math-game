@@ -17,13 +17,26 @@
 *{box-sizing:border-box}
 html,body{
   margin:0;
-  min-height:100%;
+  width:100%;
+  height:100%;
+  min-height:0;
+  overflow:hidden;
   font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
   color:var(--ink);
   background:#eef5ff;
 }
 button{font:inherit;touch-action:manipulation}
-.page{min-height:100vh;padding:9px}
+/* GitHub Pages에서도 전체 게임을 한 화면에 맞춰 자동 축소합니다. */
+.page{
+  position:absolute;
+  left:0;
+  top:0;
+  width:1400px;
+  min-height:0;
+  padding:9px;
+  transform-origin:top left;
+  will-change:transform;
+}
 
 .topbar{
   width:min(1400px,100%);
@@ -548,16 +561,16 @@ button{font:inherit;touch-action:manipulation}
   transform:translate(-50%,0);
 }
 
-@media(max-width:1040px){
+@media(max-width:1px){
   .layout{grid-template-columns:1fr}
 }
-@media(max-width:720px){
+@media(max-width:1px){
   .topbar{flex-wrap:wrap}
   .game-title{width:100%;text-align:center}
   .spacer{display:none}
   .stage-nav{margin-right:auto}
 }
-@media(max-width:600px){
+@media(max-width:1px){
   .page{padding:5px}
   .topbar{padding:7px}
   .stat{padding:7px 6px;font-size:13px}
@@ -590,7 +603,7 @@ button{font:inherit;touch-action:manipulation}
 .stage4-problem-card.stage6-negative .stage4-inline-editor{font-size:15px;gap:1px;letter-spacing:-.05em}
 .stage4-problem-card.stage6-negative .stage4-inline-editor .stepper{grid-template-columns:43px 15px}
 .stage4-problem-card.stage6-negative .stage4-inline-editor .stepper-value{min-width:43px;font-size:15px}
-@media(max-width:600px){
+@media(max-width:1px){
   .stage4-problem-card.stage6-negative .stage4-inline-editor{font-size:11px}
   .stage4-problem-card.stage6-negative .stage4-inline-editor .stepper{grid-template-columns:36px 12px}
   .stage4-problem-card.stage6-negative .stage4-inline-editor .stepper-value{min-width:36px;font-size:11px}
@@ -704,7 +717,7 @@ button{font:inherit;touch-action:manipulation}
 }
 .formula-ultra-tight .stepper button{font-size:5.5px!important}
 
-@media(max-width:420px){
+@media(max-width:1px){
   .control-panel{padding:9px}
   .stage3-problem-card,.stage4-problem-card{padding:9px}
   .stage3-target-equation,.stage4-editor-row{padding-left:0;padding-right:0}
@@ -3561,6 +3574,7 @@ function updateUI(){
 
   drawScene();
   fitEquationEditors();
+  if(typeof fitAppToViewport==="function")fitAppToViewport();
 }
 
 function initialDog(){
@@ -4990,13 +5004,47 @@ el.sound.addEventListener("click",()=>{
   el.sound.textContent=state.muted?"🔇":"🔊";
   if(!state.muted)playSound("click");
 });
+const appPage=document.querySelector(".page");
+let appFitFrame=0;
+
+function fitAppToViewport(){
+  cancelAnimationFrame(appFitFrame);
+  appFitFrame=requestAnimationFrame(()=>{
+    if(!appPage)return;
+
+    appPage.style.transform="none";
+    appPage.style.left="0px";
+    appPage.style.top="0px";
+
+    const naturalWidth=appPage.offsetWidth;
+    const naturalHeight=appPage.scrollHeight;
+    const viewportWidth=Math.max(1,document.documentElement.clientWidth-2);
+    const viewportHeight=Math.max(1,document.documentElement.clientHeight-2);
+    const scale=Math.min(1,viewportWidth/naturalWidth,viewportHeight/naturalHeight);
+    const renderedWidth=naturalWidth*scale;
+    const renderedHeight=naturalHeight*scale;
+
+    appPage.style.left=`${Math.max(0,(viewportWidth-renderedWidth)/2)}px`;
+    appPage.style.top=`${Math.max(0,(viewportHeight-renderedHeight)/2)}px`;
+    appPage.style.transform=`scale(${scale})`;
+  });
+}
+
+if(window.ResizeObserver&&appPage){
+  const appResizeObserver=new ResizeObserver(()=>fitAppToViewport());
+  appResizeObserver.observe(appPage);
+}
+
 window.addEventListener("resize",()=>{
   drawScene();
   fitEquationEditors();
+  fitAppToViewport();
 });
 
 restoreProblemProgress();
 loadCurrent();
+fitAppToViewport();
+setTimeout(fitAppToViewport,60);
 })();
 </script>
 </body>
