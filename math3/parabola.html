@@ -1,1 +1,5003 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>이차함수 포물선 게임</title>
+<style>
+:root{
+  --ink:#26354e;
+  --muted:#6c7890;
+  --blue:#5c8ff0;
+  --blue-dark:#365fbe;
+  --pink:#b20b72;
+  --green:#38aa75;
+  --line:#d5deeb;
+}
+*{box-sizing:border-box}
+html,body{
+  margin:0;
+  min-height:100%;
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  color:var(--ink);
+  background:#eef5ff;
+}
+button{font:inherit;touch-action:manipulation}
+.page{min-height:100vh;padding:9px}
 
+.topbar{
+  width:min(1400px,100%);
+  min-height:62px;
+  margin:0 auto 10px;
+  padding:8px 12px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:17px;
+  box-shadow:0 7px 22px rgba(38,53,78,.09);
+}
+.game-title{
+  font-size:clamp(18px,2.3vw,26px);
+  font-weight:1000;
+  letter-spacing:-.04em;
+}
+.spacer{flex:1}
+.stat{
+  padding:8px 10px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  font-weight:900;
+  white-space:nowrap;
+}
+.icon-btn{
+  width:40px;
+  height:40px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:#fff;
+  cursor:pointer;
+  font-size:19px;
+}
+.stage-nav{
+  display:flex;
+  align-items:stretch;
+  overflow:hidden;
+  border:1px solid #bfc9d8;
+  border-radius:11px;
+  background:#fff;
+}
+.stage-nav button{
+  min-width:50px;
+  border:0;
+  background:#fff;
+  color:#315078;
+  font-size:19px;
+  font-weight:900;
+  cursor:pointer;
+}
+.stage-nav button:disabled{
+  color:#c0c7d1;
+  cursor:not-allowed;
+}
+.stage-nav-center{
+  min-width:105px;
+  padding:5px 10px;
+  display:grid;
+  place-items:center;
+  border-left:1px solid #d4dce8;
+  border-right:1px solid #d4dce8;
+  line-height:1.2;
+}
+.stage-nav-center strong{font-size:16px}
+.stage-nav-center small{font-size:11px;color:var(--muted)}
+.stage-nav-center small.done{color:var(--green);font-weight:900}
+
+.layout{
+  width:min(1400px,100%);
+  margin:auto;
+  display:grid;
+  grid-template-columns:minmax(0,1.67fr) minmax(345px,.8fr);
+  gap:12px;
+  align-items:start;
+}
+.canvas-panel,.control-panel{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:19px;
+  overflow:hidden;
+  box-shadow:0 10px 28px rgba(38,53,78,.09);
+}
+.canvas-head{
+  min-height:54px;
+  padding:11px 15px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  border-bottom:1px solid var(--line);
+}
+.badge{
+  padding:7px 11px;
+  border-radius:999px;
+  background:#eaf2ff;
+  color:var(--blue-dark);
+  font-weight:900;
+}
+.canvas-wrap{background:#5f91ef}
+#gameCanvas{
+  display:block;
+  width:100%;
+  height:auto;
+  aspect-ratio:14/10;
+}
+
+.control-panel{padding:15px}
+.equation-card{
+  overflow:hidden;
+  border:1px solid #bfc6d0;
+  background:#fff;
+}
+.equation-head{
+  padding:11px;
+  text-align:center;
+  background:#ededed;
+  border-bottom:1px solid #333;
+  font-size:18px;
+  font-weight:900;
+}
+.equation-editor{
+  min-height:92px;
+  padding:11px 3px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  flex-wrap:nowrap;
+  overflow:hidden;
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  font-size:21px;
+  font-style:normal;
+  white-space:nowrap;
+}
+.math-text{flex:0 0 auto}
+.math-var{
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  font-style:normal;
+  font-weight:800;
+  font-size:1.08em;
+}
+.paren-group{
+  flex:0 0 auto;
+  min-width:0;
+  padding:3px 5px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  border:1px solid transparent;
+  border-radius:10px;
+  white-space:nowrap;
+}
+.paren-one{
+  background:#eaf4ff;
+  border-color:#c5ddf7;
+}
+.paren-two{
+  background:#fff0f6;
+  border-color:#f2cada;
+}
+.paren-group .math-text,
+.paren-group .math-var{
+  flex:0 0 auto;
+}
+/* 이후 단계에서도 함수식은 모두 기울이지 않은 동일한 글꼴을 사용합니다. */
+.equation-editor,
+.math-text,
+.math-var,
+.stepper-value,
+.stage3-inline-editor{
+  font-style:normal;
+}
+.stepper{
+  flex:0 0 auto;
+  display:grid;
+  grid-template-columns:43px 19px;
+  grid-template-rows:25px 25px;
+  overflow:hidden;
+  border:2px solid #9caecc;
+  border-radius:10px;
+  background:#fff;
+  font-style:normal;
+}
+.stepper-value{
+  grid-row:1/3;
+  min-width:43px;
+  display:grid;
+  place-items:center;
+  border-right:1px solid #c4cede;
+  color:#111b2e;
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  font-size:19px;
+  font-weight:900;
+}
+.stepper button{
+  border:0;
+  padding:0;
+  background:#f5f7fa;
+  color:#61718d;
+  cursor:pointer;
+  font-size:10px;
+  line-height:1;
+}
+.stepper button:first-of-type{border-bottom:1px solid #c4cede}
+.stepper button:active{background:#dfe8f8}
+.stepper button:disabled{
+  color:#b0b6c0;
+  background:#eef0f3;
+  cursor:not-allowed;
+}
+
+
+.hidden{display:none!important}
+.double-equation-wrap{
+  padding:9px;
+  display:grid;
+  gap:9px;
+  background:#f8faff;
+}
+.double-equation-box{
+  overflow:hidden;
+  border:1px solid #c9d3e2;
+  border-radius:11px;
+  background:#fff;
+}
+.double-equation-label{
+  padding:7px 10px;
+  background:#edf3ff;
+  color:#35568e;
+  text-align:center;
+  font-size:14px;
+  font-weight:900;
+}
+.double-equation-box .equation-editor{
+  min-height:72px;
+  padding:7px 2px;
+  font-size:18px;
+}
+.double-equation-box .stepper{
+  grid-template-columns:39px 17px;
+  grid-template-rows:23px 23px;
+}
+.double-equation-box .stepper-value{
+  min-width:39px;
+  font-size:17px;
+}
+
+.stage3-problem-card,
+.stage4-problem-card{
+  margin-bottom:12px;
+  padding:12px;
+  border:1px solid #c7d0dc;
+  border-radius:14px;
+  background:#fff;
+  text-align:center;
+}
+.stage3-instruction,
+.stage4-instruction{
+  color:#354052;
+  font-size:16px;
+  font-weight:800;
+  line-height:1.55;
+}
+.stage3-hint,
+.stage4-hint{
+  margin:3px 0 11px;
+  color:#58657a;
+  font-size:14px;
+}
+.stage3-target-table,
+.stage4-target-table{
+  display:grid;
+  grid-template-columns:minmax(0,1fr);
+  overflow:hidden;
+  border:1px solid #aeb7c4;
+  background:#fff;
+}
+.stage3-target-equation,
+.stage4-target-equation{
+  min-width:0;
+  min-height:70px;
+  padding:8px 6px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  color:#253047;
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  font-size:21px;
+  font-style:normal;
+  white-space:nowrap;
+}
+.stage3-target-equation + .stage3-target-equation,
+.stage4-target-equation + .stage4-target-equation{
+  border-top:1px solid #333;
+}
+.stage3-inline-editor,
+.stage4-target-math{
+  width:100%;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:3px;
+  overflow:visible;
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  font-size:21px;
+  font-style:normal;
+  font-weight:700;
+  white-space:nowrap;
+}
+.stage4-inline-editor{
+  width:100%;
+  min-width:0;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:2px;
+  overflow:visible;
+  font-family:"Pretendard","Noto Sans KR","Malgun Gothic",sans-serif;
+  font-size:18px;
+  font-style:normal;
+  font-weight:700;
+  letter-spacing:-.035em;
+  white-space:nowrap;
+}
+.stage3-inline-editor .math-text,
+.stage3-inline-editor .math-var,
+.stage4-inline-editor .math-text,
+.stage4-inline-editor .math-var,
+.stage4-target-math .math-text,
+.stage4-target-math .math-var{
+  flex:0 0 auto;
+  font-family:inherit;
+  font-size:1em;
+  font-style:normal;
+  font-weight:800;
+}
+.stage3-inline-editor .stepper{
+  grid-template-columns:43px 19px;
+  grid-template-rows:25px 25px;
+  border-width:2px;
+  border-radius:10px;
+}
+.stage3-inline-editor .stepper-value{
+  min-width:43px;
+  font-family:inherit;
+  font-size:19px;
+  font-style:normal;
+}
+.stage3-inline-editor .stepper button{font-size:10px}
+.stage4-inline-editor .stepper{
+  grid-template-columns:36px 15px;
+  grid-template-rows:23px 23px;
+  border-width:2px;
+  border-radius:9px;
+}
+.stage4-inline-editor .stepper-value{
+  min-width:36px;
+  font-family:inherit;
+  font-size:16px;
+  font-style:normal;
+}
+.stage4-inline-editor .stepper button{font-size:8px}
+.stage4-inline-editor .paren-group{
+  padding:2px 3px;
+  gap:1px;
+  border-radius:8px;
+}
+.stage4-mode-tabs{
+  margin:0 0 11px;
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:8px;
+}
+.mode-tab{
+  min-height:42px;
+  padding:8px 10px;
+  border:1px solid #c8d2e3;
+  border-radius:10px;
+  background:#f4f7fc;
+  color:#53647d;
+  font-weight:900;
+  cursor:pointer;
+}
+.mode-tab.active{
+  border-color:#5c8ff0;
+  background:#eaf2ff;
+  color:#264b96;
+}
+.stage4-editor-wrap{
+  margin-top:0;
+  overflow:hidden;
+  border:1px solid #bfc6d0;
+  background:#fff;
+}
+.stage4-editor-row{
+  width:100%;
+  min-height:66px;
+  padding:7px 2px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+}
+.stage4-editor-row + .stage4-editor-row{
+  border-top:1px solid #333;
+}
+
+.parameter-help{
+  margin:10px 0 13px;
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+}
+.help-chip{
+  padding:7px 5px;
+  border-radius:10px;
+  background:#edf4ff;
+  color:#4165ad;
+  text-align:center;
+  font-size:13px;
+  font-weight:800;
+}
+.run-btn{
+  width:100%;
+  min-height:58px;
+  padding:12px 18px;
+  border:0;
+  border-radius:14px;
+  color:#fff;
+  background:linear-gradient(#c51882,#9e075f);
+  box-shadow:0 9px 20px rgba(158,7,95,.22);
+  font-size:20px;
+  font-weight:900;
+  cursor:pointer;
+}
+.run-btn:disabled{
+  opacity:.47;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+.problem-nav{
+  margin-top:8px;
+  display:grid;
+  grid-template-columns:1fr 1.15fr 1fr;
+  gap:8px;
+}
+.problem-nav-btn{
+  min-height:38px;
+  padding:7px 10px;
+  border:1px solid #d3dce9;
+  border-radius:10px;
+  background:#edf2f8;
+  color:#52627a;
+  font-weight:900;
+  cursor:pointer;
+}
+.problem-nav-btn:active{transform:translateY(1px)}
+.problem-nav-btn:disabled{
+  opacity:.4;
+  cursor:not-allowed;
+  transform:none;
+}
+.reset-problem-btn{
+  border-color:#e1c9d7;
+  background:#fff3f8;
+  color:#9b296b;
+  line-height:1.35;
+  white-space:normal;
+}
+
+.progress{
+  margin-top:13px;
+  padding-top:12px;
+  border-top:1px solid var(--line);
+}
+.progress-head{
+  margin-bottom:8px;
+  display:flex;
+  justify-content:space-between;
+  color:var(--muted);
+  font-size:14px;
+}
+.progress-dots{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:7px;
+}
+.dot{
+  height:11px;
+  border-radius:99px;
+  background:#e2e7ee;
+}
+.dot.current{background:#5c8ff0}
+.dot.done{background:#38aa75}
+
+.toast{
+  position:fixed;
+  left:50%;
+  bottom:22px;
+  z-index:30;
+  max-width:90%;
+  padding:11px 16px;
+  border-radius:12px;
+  background:#26354e;
+  color:#fff;
+  font-weight:800;
+  text-align:center;
+  pointer-events:none;
+  opacity:0;
+  transform:translate(-50%,20px);
+  transition:.18s ease;
+}
+.toast.show{
+  opacity:1;
+  transform:translate(-50%,0);
+}
+
+@media(max-width:1040px){
+  .layout{grid-template-columns:1fr}
+}
+@media(max-width:720px){
+  .topbar{flex-wrap:wrap}
+  .game-title{width:100%;text-align:center}
+  .spacer{display:none}
+  .stage-nav{margin-right:auto}
+}
+@media(max-width:600px){
+  .page{padding:5px}
+  .topbar{padding:7px}
+  .stat{padding:7px 6px;font-size:13px}
+  .icon-btn{width:37px;height:37px}
+  .stage-nav button{min-width:42px}
+  .stage-nav-center{min-width:88px;padding:5px 6px}
+  .control-panel{padding:11px}
+  .equation-editor{font-size:17px;gap:2px;padding-left:1px;padding-right:1px}
+  .paren-group{padding:2px 3px;gap:1px;border-radius:8px}
+  .stepper{grid-template-columns:37px 16px;grid-template-rows:23px 23px}
+  .stepper-value{min-width:37px;font-size:16px}
+  .stepper button{font-size:9px}
+  .stage3-instruction,.stage4-instruction{font-size:14px}
+  .stage3-hint,.stage4-hint{font-size:12px}
+  .stage3-target-equation,.stage4-target-equation{min-height:62px;padding:6px 2px;font-size:15px}
+  .stage3-inline-editor,.stage4-target-math{font-size:14px;gap:1px}
+  .stage3-inline-editor .paren-group{padding:2px 2px;gap:1px}
+  .stage3-inline-editor .stepper{grid-template-columns:28px 12px;grid-template-rows:21px 21px}
+  .stage3-inline-editor .stepper-value{min-width:28px;font-size:13px}
+  .stage4-inline-editor{font-size:13px;gap:1px;letter-spacing:-.05em}
+  .stage4-inline-editor .stepper{grid-template-columns:27px 11px;grid-template-rows:20px 20px}
+  .stage4-inline-editor .stepper-value{min-width:27px;font-size:12px}
+  .stage4-inline-editor .stepper button{font-size:7px}
+  .stage4-editor-row{min-height:58px;padding:5px 1px}
+  .problem-nav{grid-template-columns:1fr 1.2fr 1fr;gap:5px}
+  .problem-nav-btn{padding:7px 4px;font-size:12px}
+}
+
+
+.stage4-problem-card.stage6-negative .stage4-inline-editor{font-size:15px;gap:1px;letter-spacing:-.05em}
+.stage4-problem-card.stage6-negative .stage4-inline-editor .stepper{grid-template-columns:43px 15px}
+.stage4-problem-card.stage6-negative .stage4-inline-editor .stepper-value{min-width:43px;font-size:15px}
+@media(max-width:600px){
+  .stage4-problem-card.stage6-negative .stage4-inline-editor{font-size:11px}
+  .stage4-problem-card.stage6-negative .stage4-inline-editor .stepper{grid-template-columns:36px 12px}
+  .stage4-problem-card.stage6-negative .stage4-inline-editor .stepper-value{min-width:36px;font-size:11px}
+}
+
+
+
+/* 모든 단계 함수식이 제어판 너비 안에서 잘리지 않도록 기본 크기를 정리합니다. */
+.equation-editor{
+  min-width:0;
+  max-width:100%;
+  padding-left:2px;
+  padding-right:2px;
+  gap:2px;
+  font-size:18px;
+}
+.equation-editor .stepper{
+  grid-template-columns:36px 15px;
+  grid-template-rows:23px 23px;
+}
+.equation-editor .stepper-value{
+  min-width:36px;
+  font-size:16px;
+}
+.equation-editor .paren-group{
+  padding:2px 3px;
+  gap:1px;
+}
+
+.stage3-target-equation,
+.stage4-editor-row{
+  min-width:0;
+  padding-left:2px;
+  padding-right:2px;
+}
+.stage3-inline-editor{
+  max-width:100%;
+  gap:1px;
+  font-size:15px;
+  letter-spacing:-.04em;
+}
+.stage3-inline-editor .stepper{
+  grid-template-columns:31px 12px;
+  grid-template-rows:22px 22px;
+}
+.stage3-inline-editor .stepper-value{
+  min-width:31px;
+  font-size:14px;
+}
+.stage3-inline-editor .stepper button{font-size:8px}
+.stage3-inline-editor .paren-group{
+  padding:2px 2px;
+  gap:0;
+}
+
+.stage4-inline-editor{
+  max-width:100%;
+  gap:1px;
+  font-size:14px;
+  letter-spacing:-.045em;
+}
+.stage4-inline-editor .stepper{
+  grid-template-columns:30px 11px;
+  grid-template-rows:21px 21px;
+}
+.stage4-inline-editor .stepper-value{
+  min-width:30px;
+  font-size:13px;
+}
+.stage4-inline-editor .stepper button{font-size:7px}
+.stage4-inline-editor .paren-group{
+  padding:1px 2px;
+  gap:0;
+}
+
+/* 화면 폭이 특히 좁을 때 자바스크립트가 아래 단계를 순서대로 적용합니다. */
+.formula-tight{
+  gap:0!important;
+  font-size:12.5px!important;
+  letter-spacing:-.06em!important;
+}
+.formula-tight .stepper{
+  grid-template-columns:27px 10px!important;
+  grid-template-rows:20px 20px!important;
+  border-width:1.5px!important;
+  border-radius:7px!important;
+}
+.formula-tight .stepper-value{
+  min-width:27px!important;
+  font-size:11.5px!important;
+}
+.formula-tight .stepper button{font-size:6px!important}
+.formula-tight .paren-group{
+  padding:1px!important;
+  gap:0!important;
+  border-radius:6px!important;
+}
+
+.formula-ultra-tight{
+  gap:0!important;
+  font-size:11px!important;
+  letter-spacing:-.075em!important;
+}
+.formula-ultra-tight .stepper{
+  grid-template-columns:25px 9px!important;
+  grid-template-rows:19px 19px!important;
+}
+.formula-ultra-tight .stepper-value{
+  min-width:25px!important;
+  font-size:10.5px!important;
+}
+.formula-ultra-tight .stepper button{font-size:5.5px!important}
+
+@media(max-width:420px){
+  .control-panel{padding:9px}
+  .stage3-problem-card,.stage4-problem-card{padding:9px}
+  .stage3-target-equation,.stage4-editor-row{padding-left:0;padding-right:0}
+}
+
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="topbar">
+    <div class="game-title">이차함수 포물선 게임</div>
+    <div class="spacer"></div>
+
+    <div class="stage-nav" aria-label="단계 선택">
+      <button id="prevStageBtn" type="button" title="이전 단계">‹</button>
+      <div class="stage-nav-center">
+        <strong id="stageNavText">1단계 / 3</strong>
+        <small id="stageDoneText">미완료</small>
+      </div>
+      <button id="nextStageBtn" type="button" title="다음 단계">›</button>
+    </div>
+
+    <div class="stat">도전 <span id="challengeStat">1 / 3</span></div>
+    <button id="soundBtn" class="icon-btn" type="button" title="소리 켜기/끄기">🔊</button>
+  </header>
+
+  <main class="layout">
+    <section class="canvas-panel">
+      <div class="canvas-head">
+        <span id="stageBadge" class="badge">표준형 연습</span>
+      </div>
+      <div class="canvas-wrap">
+        <canvas id="gameCanvas" width="920" height="650" aria-label="이차함수 게임 좌표평면"></canvas>
+      </div>
+    </section>
+
+    <aside class="control-panel">
+      <section id="stage3ProblemCard" class="stage3-problem-card hidden" aria-label="3단계 문제">
+        <div class="stage3-instruction">
+          이차함수 두 개의 식을 조절하여<br>동전과 별을 모아봅시다!
+        </div>
+        <div class="stage3-hint">(힌트: x축과의 교점을 생각해보세요~)</div>
+        <div class="stage3-target-table">
+          <div class="stage3-target-equation">
+            <div class="stage3-inline-editor" aria-label="첫 번째 이차함수 조절">
+              <span class="math-text"><span class="math-var">y</span>=</span>
+              <span class="stepper" aria-label="첫 번째 함수 a값">
+                <span id="a1Value" class="stepper-value">1</span>
+                <button type="button" data-param="a1" data-dir="1" aria-label="첫 번째 함수 a 증가">▲</button>
+                <button type="button" data-param="a1" data-dir="-1" aria-label="첫 번째 함수 a 감소">▼</button>
+              </span>
+              <span class="paren-group paren-one">
+                <span class="math-text">(<span class="math-var">x</span>−</span>
+                <span class="stepper" aria-label="첫 번째 함수 첫 번째 x절편">
+                  <span id="r1Value" class="stepper-value">3</span>
+                  <button type="button" data-param="r1" data-dir="1" aria-label="첫 번째 x절편 증가">▲</button>
+                  <button type="button" data-param="r1" data-dir="-1" aria-label="첫 번째 x절편 감소">▼</button>
+                </span>
+                <span class="math-text">)</span>
+              </span>
+              <span class="paren-group paren-two">
+                <span class="math-text">(<span class="math-var">x</span>−</span>
+                <span class="stepper" aria-label="첫 번째 함수 두 번째 x절편">
+                  <span id="s1Value" class="stepper-value">8</span>
+                  <button type="button" data-param="s1" data-dir="1" aria-label="두 번째 x절편 증가">▲</button>
+                  <button type="button" data-param="s1" data-dir="-1" aria-label="두 번째 x절편 감소">▼</button>
+                </span>
+                <span class="math-text">)</span>
+              </span>
+            </div>
+          </div>
+          <div class="stage3-target-equation">
+            <div class="stage3-inline-editor" aria-label="두 번째 이차함수 조절">
+              <span class="math-text"><span class="math-var">y</span>=</span>
+              <span class="stepper" aria-label="두 번째 함수 a값">
+                <span id="a2Value" class="stepper-value">1</span>
+                <button type="button" data-param="a2" data-dir="1" aria-label="두 번째 함수 a 증가">▲</button>
+                <button type="button" data-param="a2" data-dir="-1" aria-label="두 번째 함수 a 감소">▼</button>
+              </span>
+              <span class="paren-group paren-one">
+                <span class="math-text">(<span class="math-var">x</span>−</span>
+                <span class="stepper" aria-label="두 번째 함수 첫 번째 x절편">
+                  <span id="r2Value" class="stepper-value">8</span>
+                  <button type="button" data-param="r2" data-dir="1" aria-label="세 번째 x절편 증가">▲</button>
+                  <button type="button" data-param="r2" data-dir="-1" aria-label="세 번째 x절편 감소">▼</button>
+                </span>
+                <span class="math-text">)</span>
+              </span>
+              <span class="paren-group paren-two">
+                <span class="math-text">(<span class="math-var">x</span>−</span>
+                <span class="stepper" aria-label="두 번째 함수 두 번째 x절편">
+                  <span id="s2Value" class="stepper-value">13</span>
+                  <button type="button" data-param="s2" data-dir="1" aria-label="네 번째 x절편 증가">▲</button>
+                  <button type="button" data-param="s2" data-dir="-1" aria-label="네 번째 x절편 감소">▼</button>
+                </span>
+                <span class="math-text">)</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="stage4ProblemCard" class="stage4-problem-card hidden" aria-label="4단계 문제">
+        <div class="stage4-instruction">
+          동전과 별을 모으기 위해<br>두 개의 이차함수를 잘 만들어봅시다!
+        </div>
+        <div id="stage4Hint" class="stage4-hint">먼저 식의 형태를 고른 뒤 버튼으로 값을 직접 조절하세요.</div>
+        <div class="stage4-mode-tabs">
+          <button id="modeFactorBtn" class="mode-tab active" type="button">인수분해형</button>
+          <button id="modeVertexBtn" class="mode-tab" type="button">표준형</button>
+        </div>
+        <div class="stage4-editor-wrap">
+          <div id="stage4EditorWrap"></div>
+        </div>
+      </section>
+
+      <section id="equationCard" class="equation-card" aria-label="이차함수 입력">
+        <div id="equationHead" class="equation-head">함수식 입력</div>
+
+        <div id="singleEquationEditor" class="equation-editor">
+          <span class="math-text"><span class="math-var">y</span> =</span>
+
+          <span class="stepper" aria-label="a값">
+            <span id="aValue" class="stepper-value">−1</span>
+            <button type="button" data-param="a" data-dir="1" aria-label="a 증가">▲</button>
+            <button type="button" data-param="a" data-dir="-1" aria-label="a 감소">▼</button>
+          </span>
+
+          <span class="paren-group paren-one">
+            <span class="math-text">(<span class="math-var">x</span> −</span>
+
+            <span class="stepper" aria-label="p값">
+              <span id="pValue" class="stepper-value">6</span>
+              <button type="button" data-param="p" data-dir="1" aria-label="p 증가">▲</button>
+              <button type="button" data-param="p" data-dir="-1" aria-label="p 감소">▼</button>
+            </span>
+
+            <span class="math-text">)</span>
+          </span>
+          <span class="math-text">² +</span>
+
+          <span class="stepper" aria-label="q값">
+            <span id="qValue" class="stepper-value">4</span>
+            <button type="button" data-param="q" data-dir="1" aria-label="q 증가">▲</button>
+            <button type="button" data-param="q" data-dir="-1" aria-label="q 감소">▼</button>
+          </span>
+        </div>
+
+      </section>
+
+      <div id="parameterHelp" class="parameter-help">
+        <div id="helpA" class="help-chip">a: 0.5씩 조절</div>
+        <div id="helpP" class="help-chip">p: 1씩 조절</div>
+        <div id="helpQ" class="help-chip">q: 1씩 조절</div>
+      </div>
+
+      <button id="runBtn" class="run-btn" type="button">달리기</button>
+
+      <div class="problem-nav">
+        <button id="prevProblemBtn" class="problem-nav-btn" type="button">‹ 이전 문제</button>
+        <button id="resetProblemBtn" class="problem-nav-btn reset-problem-btn" type="button"><span>현재 문제<br>초기화</span></button>
+        <button id="nextProblemBtn" class="problem-nav-btn" type="button">다음 문제 ›</button>
+      </div>
+
+      <div class="progress">
+        <div class="progress-head">
+          <span id="progressLabel">1단계 진행</span>
+          <strong id="progressText">1 / 3</strong>
+        </div>
+        <div id="progressDots" class="progress-dots"></div>
+      </div>
+    </aside>
+  </main>
+</div>
+
+<div id="toast" class="toast" aria-live="polite"></div>
+
+<script>
+(() => {
+"use strict";
+
+const STAGES = [
+  {
+    name:"1단계",
+    badge:"표준형 연습",
+    type:"coins",
+    plot:{xMax:14,yMax:12},
+    challenges:[
+      {
+        title:"꼭짓점의 위치를 맞춰 보세요.",
+        initial:{a:1,p:6,q:4},
+        target:{a:-1,p:8,q:6},
+        bounds:{a:[-3,1],p:[1,13],q:[1,12]},
+        coinX:[6,8,10]
+      },
+      {
+        title:"꼭짓점은 그대로 두고 폭만 바꿔 보세요.",
+        initial:{a:1,p:8,q:6},
+        target:{a:-2,p:8,q:6},
+        bounds:{a:[-3,1],p:[1,13],q:[1,12]},
+        coinX:[6.5,7.5,8.5,9.5]
+      },
+      {
+        title:"폭은 그대로 두고 꼭짓점만 옮겨 보세요.",
+        initial:{a:1,p:8,q:6},
+        target:{a:-2,p:10,q:8},
+        bounds:{a:[-3,1],p:[1,13],q:[1,12]},
+        coinX:[8.5,9.25,10,10.75,11.5]
+      }
+    ]
+  },
+  {
+    name:"2단계",
+    badge:"용암 뛰어넘기",
+    type:"lava",
+    plot:{xMax:20,yMax:20},
+    challenges:[
+      {
+        title:"위로 볼록한 포물선을 만들어 넓은 용암을 뛰어넘으세요.",
+        initial:{a:0.5,p:3,q:3},
+        target:{a:-0.5,p:10,q:11},
+        bounds:{a:[-2,2],p:[1,19],q:[1,12]},
+        startX:6,
+        endX:14,
+        landingY:3,
+        lava:[6.5,13.5],
+        dogStartX:1.2,
+        dogEndX:18.8
+      },
+      {
+        title:"꼭짓점을 왼쪽으로 옮기고 더 좁은 포물선으로 뛰어넘으세요.",
+        initial:{a:0.5,p:10,q:11},
+        target:{a:-1,p:8,q:11},
+        bounds:{a:[-2,2],p:[1,19],q:[1,12]},
+        startX:5,
+        endX:11,
+        landingY:2,
+        lava:[5.4,10.6],
+        dogStartX:1,
+        dogEndX:18.5
+      },
+      {
+        title:"폭은 유지하고 꼭짓점을 오른쪽으로 옮겨 뛰어넘으세요.",
+        initial:{a:1,p:8,q:11},
+        target:{a:-1,p:13,q:11},
+        bounds:{a:[-2,2],p:[1,19],q:[1,12]},
+        startX:10,
+        endX:16,
+        landingY:2,
+        lava:[10.4,15.6],
+        dogStartX:1.2,
+        dogEndX:18.8
+      }
+    ]
+  },
+  {
+    name:"3단계",
+    badge:"인수분해형 연습",
+    type:"double",
+    plot:{xMax:18,yMax:12},
+    challenges:[
+      {
+        title:"두 식의 x절편을 맞춰 포물선을 이어 보세요.",
+        initial:{a1:1,r1:3,s1:8,a2:1,r2:10,s2:15},
+        target:{a1:-1,r1:4,s1:9,a2:-1,r2:9,s2:15},
+        bounds:{a1:[-2,2],r1:[1,15],s1:[2,17],a2:[-2,2],r2:[1,16],s2:[2,17]},
+        items:[
+          {type:"coin",curve:1,x:4.2},
+          {type:"star",curve:1,x:6.5},
+          {type:"coin",curve:1,x:9},
+          {type:"star",curve:2,x:11.5},
+          {type:"coin",curve:2,x:13.8}
+        ]
+      },
+      {
+        title:"첫 번째 포물선은 넓게, 두 번째 포물선은 좁게 이어 보세요.",
+        initial:{a1:1,r1:3,s1:9,a2:1,r2:9,s2:14},
+        target:{a1:-1,r1:2,s1:8,a2:-1,r2:8,s2:12},
+        bounds:{a1:[-2,2],r1:[1,15],s1:[2,17],a2:[-2,2],r2:[1,16],s2:[2,17]},
+        items:[
+          {type:"coin",curve:1,x:2.3},
+          {type:"star",curve:1,x:5},
+          {type:"coin",curve:1,x:8},
+          {type:"star",curve:2,x:10},
+          {type:"coin",curve:2,x:11.7}
+        ]
+      },
+      {
+        title:"첫 번째 포물선은 좁게, 두 번째 포물선은 넓게 이어 보세요.",
+        initial:{a1:1,r1:4,s1:10,a2:1,r2:10,s2:14},
+        target:{a1:-1,r1:5,s1:9,a2:-1,r2:9,s2:15},
+        bounds:{a1:[-2,2],r1:[1,15],s1:[2,17],a2:[-2,2],r2:[1,16],s2:[2,17]},
+        items:[
+          {type:"coin",curve:1,x:5.3},
+          {type:"star",curve:1,x:7},
+          {type:"coin",curve:1,x:9},
+          {type:"star",curve:2,x:12},
+          {type:"coin",curve:2,x:14.7}
+        ]
+      }
+    ]
+  },
+  {
+    name:"4단계",
+    badge:"표준형과 인수분해형",
+    type:"doubleDirect",
+    theme:"pipeJump",
+    plot:{xMax:14,yMax:12},
+    challenges:[
+      {
+        title:"표준형과 인수분해형 중 편한 방법으로 도전해 보세요.",
+        initialFactor:{a1:0.5,r1:0,s1:8,a2:0.5,r2:4,s2:12},
+        initialVertex:{a1:0.5,p1:4,q1:4,a2:0.5,p2:8,q2:4},
+        target:{
+          factor:{a1:-0.5,r1:1,s1:9,a2:-0.5,r2:5,s2:13},
+          vertex:{a1:-0.5,p1:5,q1:8,a2:-0.5,p2:9,q2:8}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[0,14],s1:[0,15],a2:[-2,2],r2:[0,14],s2:[0,15]},
+          vertex:{a1:[-2,2],p1:[0,14],q1:[1,12],a2:[-2,2],p2:[0,14],q2:[1,12]}
+        },
+        jumpStartX:1,
+        landing1:{x:7,y:6},
+        landing2:{x:11,y:6},
+        dogStartX:.45,
+        items:[
+          {type:"coin",curve:1,x:2.5},
+          {type:"star",curve:1,x:5},
+          {type:"coin",curve:1,x:6.4},
+          {type:"coin",curve:2,x:7.7},
+          {type:"star",curve:2,x:9},
+          {type:"coin",curve:2,x:10.4}
+        ]
+      },
+      {
+        title:"표준형과 인수분해형 중 편한 방법으로 도전해 보세요.",
+        initialFactor:{a1:1,r1:1,s1:7,a2:1,r2:5,s2:11},
+        initialVertex:{a1:1,p1:4,q1:4,a2:1,p2:8,q2:4},
+        target:{
+          factor:{a1:-1,r1:2,s1:8,a2:-1,r2:6,s2:12},
+          vertex:{a1:-1,p1:5,q1:9,a2:-1,p2:9,q2:9}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[0,14],s1:[0,15],a2:[-2,2],r2:[0,14],s2:[0,15]},
+          vertex:{a1:[-2,2],p1:[0,14],q1:[1,12],a2:[-2,2],p2:[0,14],q2:[1,12]}
+        },
+        jumpStartX:2,
+        landing1:{x:7,y:5},
+        landing2:{x:11,y:5},
+        dogStartX:.65,
+        items:[
+          {type:"coin",curve:1,x:2.8},
+          {type:"star",curve:1,x:5},
+          {type:"coin",curve:1,x:6.5},
+          {type:"coin",curve:2,x:7.5},
+          {type:"star",curve:2,x:9},
+          {type:"coin",curve:2,x:10.5}
+        ]
+      },
+      {
+        title:"표준형과 인수분해형 중 편한 방법으로 도전해 보세요.",
+        initialFactor:{a1:0.5,r1:1,s1:9,a2:0.5,r2:5,s2:13},
+        initialVertex:{a1:0.5,p1:5,q1:4,a2:0.5,p2:9,q2:4},
+        target:{
+          factor:{a1:-0.5,r1:2,s1:10,a2:-0.5,r2:6,s2:14},
+          vertex:{a1:-0.5,p1:6,q1:8,a2:-0.5,p2:10,q2:8}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[0,14],s1:[0,15],a2:[-2,2],r2:[0,14],s2:[0,15]},
+          vertex:{a1:[-2,2],p1:[0,14],q1:[1,12],a2:[-2,2],p2:[0,14],q2:[1,12]}
+        },
+        jumpStartX:2,
+        landing1:{x:8,y:6},
+        landing2:{x:12,y:6},
+        dogStartX:.65,
+        items:[
+          {type:"coin",curve:1,x:3.2},
+          {type:"star",curve:1,x:6},
+          {type:"coin",curve:1,x:7.4},
+          {type:"coin",curve:2,x:8.6},
+          {type:"star",curve:2,x:10},
+          {type:"coin",curve:2,x:11.4}
+        ]
+      }
+    ]
+  }  ,
+  {
+    name:"5단계",
+    badge:"표준형과 인수분해형",
+    type:"doubleDirect",
+    theme:"undergroundQuadrant",
+    directOpen:"up",
+    plot:{xMin:-1,xMax:7,yMin:-8,yMax:1,labelStepX:1,labelStepY:1},
+    challenges:[
+      {
+        title:"사사분면에서 두 식을 직접 입력해 보세요.",
+        initialFactor:{a1:-0.5,r1:0,s1:4,a2:-1,r2:4,s2:6},
+        initialVertex:{a1:-0.5,p1:2,q1:-2,a2:-1,p2:5,q2:-1},
+        target:{
+          factor:{a1:1,r1:1,s1:5,a2:1,r2:5,s2:7},
+          vertex:{a1:1,p1:3,q1:-4,a2:1,p2:6,q2:-1}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[-1,6],s1:[0,7],a2:[-2,2],r2:[-1,6],s2:[0,7]},
+          vertex:{a1:[-2,2],p1:[-1,7],q1:[-8,1],a2:[-2,2],p2:[-1,7],q2:[-8,1]}
+        },
+        items:[
+          {type:"coin",curve:1,x:2},
+          {type:"coin",curve:1,x:3},
+          {type:"coin",curve:1,x:4},
+          {type:"star",curve:2,x:5.5},
+          {type:"coin",curve:2,x:6}
+        ],
+        dogStartX:-0.62,
+        dogStartY:-5.05,
+        dogEndX:6.75,
+        dogEndY:-5.05
+      },
+      {
+        title:"음의 y값을 지나는 두 포물선을 완성해 보세요.",
+        initialFactor:{a1:-1,r1:-1,s1:3,a2:-1,r2:3,s2:5},
+        initialVertex:{a1:-1,p1:1,q1:-4,a2:-1,p2:4,q2:-1},
+        target:{
+          factor:{a1:0.5,r1:0,s1:4,a2:1,r2:4,s2:6},
+          vertex:{a1:0.5,p1:2,q1:-2,a2:1,p2:5,q2:-1}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[-1,6],s1:[0,7],a2:[-2,2],r2:[-1,6],s2:[0,7]},
+          vertex:{a1:[-2,2],p1:[-1,7],q1:[-8,1],a2:[-2,2],p2:[-1,7],q2:[-8,1]}
+        },
+        items:[
+          {type:"coin",curve:1,x:1},
+          {type:"coin",curve:1,x:2},
+          {type:"coin",curve:1,x:3},
+          {type:"star",curve:2,x:5},
+          {type:"coin",curve:2,x:5.5}
+        ],
+        dogStartX:-0.62,
+        dogStartY:-5.05,
+        dogEndX:6.75,
+        dogEndY:-5.05
+      },
+      {
+        title:"표준형과 인수분해형 중 편한 방법으로 해결해 보세요.",
+        initialFactor:{a1:-1,r1:0,s1:4,a2:-1,r2:4,s2:6},
+        initialVertex:{a1:-1,p1:2,q1:-4,a2:-1,p2:5,q2:-1},
+        target:{
+          factor:{a1:0.5,r1:1,s1:5,a2:1,r2:5,s2:7},
+          vertex:{a1:0.5,p1:3,q1:-2,a2:1,p2:6,q2:-1}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[-1,6],s1:[0,7],a2:[-2,2],r2:[-1,6],s2:[0,7]},
+          vertex:{a1:[-2,2],p1:[-1,7],q1:[-8,1],a2:[-2,2],p2:[-1,7],q2:[-8,1]}
+        },
+        items:[
+          {type:"coin",curve:1,x:2},
+          {type:"coin",curve:1,x:3},
+          {type:"coin",curve:1,x:4},
+          {type:"star",curve:2,x:5.5},
+          {type:"coin",curve:2,x:6}
+        ],
+        dogStartX:-0.62,
+        dogStartY:-5.05,
+        dogEndX:6.75,
+        dogEndY:-5.05
+      }
+    ]
+  },
+  {
+    name:"6단계",
+    badge:"표준형과 인수분해형",
+    type:"doubleDirect",
+    theme:"castleNegativeQuadrants",
+    directOpen:"up",
+    plot:{xMin:-80,xMax:-40,yMin:-10,yMax:20,labelStepX:10,labelStepY:10},
+    challenges:[
+      {
+        title:"빈 통로 안에서 두 포물선으로 벽돌 장애물을 건너 보세요.",
+        initialFactor:{a1:0.5,r1:-78,s1:-70,a2:0.5,r2:-60,s2:-52},
+        initialVertex:{a1:0.5,p1:-75,q1:2,a2:0.5,p2:-56,q2:3},
+        target:{
+          factor:{a1:-0.5,r1:-74,s1:-66,a2:-0.5,r2:-56,s2:-48},
+          vertex:{a1:-0.5,p1:-70,q1:8,a2:-0.5,p2:-52,q2:8}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[-80,-40],s1:[-80,-40],a2:[-2,2],r2:[-80,-40],s2:[-80,-40]},
+          vertex:{a1:[-2,2],p1:[-80,-40],q1:[-10,10],a2:[-2,2],p2:[-80,-40],q2:[-10,10]}
+        },
+        jumpStartX:-75.6569,
+        landing1:{x:-65.5279,y:-2},
+        jump2StartX:-56.4721,
+        landing2:{x:-46.7085,y:-6},
+        dogStartX:-79.6,
+        dogStartY:-8,
+        dogEndX:-46.7085,
+        dogEndY:-6,
+        items:[
+          {type:"coin",curve:1,x:-74},
+          {type:"star",curve:1,x:-70},
+          {type:"coin",curve:1,x:-67},
+          {type:"coin",curve:2,x:-55},
+          {type:"star",curve:2,x:-52},
+          {type:"coin",curve:2,x:-48}
+        ]
+      },
+      {
+        title:"가운데 벽돌 발판에 착지한 뒤 두 번째 점프를 이어 보세요.",
+        initialFactor:{a1:0.5,r1:-76,s1:-68,a2:0.5,r2:-58,s2:-50},
+        initialVertex:{a1:0.5,p1:-73,q1:3,a2:0.5,p2:-55,q2:2},
+        target:{
+          factor:{a1:-1,r1:-72,s1:-66,a2:-1,r2:-55,s2:-49},
+          vertex:{a1:-1,p1:-69,q1:9,a2:-1,p2:-52,q2:9}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[-80,-40],s1:[-80,-40],a2:[-2,2],r2:[-80,-40],s2:[-80,-40]},
+          vertex:{a1:[-2,2],p1:[-80,-40],q1:[-10,10],a2:[-2,2],p2:[-80,-40],q2:[-10,10]}
+        },
+        jumpStartX:-73.1231,
+        landing1:{x:-65.8377,y:-1},
+        jump2StartX:-55.1623,
+        landing2:{x:-48.1270,y:-6},
+        dogStartX:-79.3,
+        dogStartY:-8,
+        dogEndX:-48.1270,
+        dogEndY:-6,
+        items:[
+          {type:"coin",curve:1,x:-72},
+          {type:"star",curve:1,x:-69},
+          {type:"coin",curve:1,x:-66},
+          {type:"coin",curve:2,x:-55},
+          {type:"star",curve:2,x:-52},
+          {type:"coin",curve:2,x:-49}
+        ]
+      },
+      {
+        title:"벽돌 계단 위를 지나 오른쪽 발판까지 두 번 점프해 보세요.",
+        initialFactor:{a1:1,r1:-75,s1:-67,a2:1,r2:-57,s2:-49},
+        initialVertex:{a1:1,p1:-72,q1:1,a2:1,p2:-55,q2:4},
+        target:{
+          factor:{a1:-0.5,r1:-72,s1:-64,a2:-1,r2:-53,s2:-47},
+          vertex:{a1:-0.5,p1:-68,q1:8,a2:-1,p2:-50,q2:9}
+        },
+        bounds:{
+          factor:{a1:[-2,2],r1:[-80,-40],s1:[-80,-40],a2:[-2,2],r2:[-80,-40],s2:[-80,-40]},
+          vertex:{a1:[-2,2],p1:[-80,-40],q1:[-10,10],a2:[-2,2],p2:[-80,-40],q2:[-10,10]}
+        },
+        jumpStartX:-73.6569,
+        landing1:{x:-63.5279,y:-2},
+        jump2StartX:-53.3166,
+        landing2:{x:-46.1270,y:-6},
+        dogStartX:-79.0,
+        dogStartY:-8,
+        dogEndX:-46.1270,
+        dogEndY:-6,
+        items:[
+          {type:"coin",curve:1,x:-72},
+          {type:"star",curve:1,x:-68},
+          {type:"coin",curve:1,x:-64},
+          {type:"coin",curve:2,x:-53},
+          {type:"star",curve:2,x:-50},
+          {type:"coin",curve:2,x:-47}
+        ]
+      }
+    ]
+  },
+  {
+    name:"7단계",
+    badge:"괴물 밟기",
+    type:"boss",
+    theme:"castleBoss",
+    plot:{xMin:0,xMax:16,yMin:-6,yMax:10,labelStepX:2,labelStepY:2},
+    challenges:[
+      {
+        title:"포물선을 조절하여 괴물 1마리를 밟아 보세요.",
+        initial:{a:0.5,p:5,q:1},
+        target:{a:-0.5,p:8,q:8},
+        bounds:{a:[-2,2],p:[1,15],q:[-4,10]},
+        dogStartX:0.8,
+        dogStartY:-5.2,
+        dogEndX:15.2,
+        dogEndY:-5.2,
+        monsters:[
+          {x:12.7,groundY:-5.2}
+        ]
+      },
+      {
+        title:"포물선 하나로 괴물 2마리를 모두 밟아 보세요.",
+        initial:{a:0.5,p:7,q:2},
+        target:{a:-0.5,p:9,q:7},
+        bounds:{a:[-2,2],p:[1,15],q:[-4,10]},
+        dogStartX:0.8,
+        dogStartY:-5.2,
+        dogEndX:15.3,
+        dogEndY:-5.2,
+        monsters:[
+          {x:7.5,groundY:4.15},
+          {x:13.3,groundY:-3.95}
+        ]
+      },
+      {
+        title:"포물선 하나로 괴물 3마리를 모두 밟아 보세요.",
+        initial:{a:0.5,p:4,q:3},
+        target:{a:-0.5,p:9,q:7},
+        bounds:{a:[-2,2],p:[1,15],q:[-4,10]},
+        dogStartX:0.8,
+        dogStartY:-5.2,
+        dogEndX:15.1,
+        dogEndY:-5.2,
+        monsters:[
+          {x:6.8,groundY:2.9},
+          {x:10.0,groundY:4.8},
+          {x:13.2,groundY:-3.55}
+        ]
+      }
+    ]
+  }
+];
+
+const state = {
+  stage:0,
+  challengeByStage:STAGES.map(()=>0),
+  params:{},
+  animating:false,
+  muted:false,
+  status:"ready",
+  completedChallenges:STAGES.map(stage=>stage.challenges.map(()=>false)),
+  savedAnswers:STAGES.map(stage=>stage.challenges.map(()=>null)),
+  trail:[],
+  collected:[],
+  dog:{x:1,y:0,rotation:0,phase:0},
+  monsters:[],
+  runToken:0,
+  transitionTimer:null,
+  stage4Mode:"factor",
+  // 문제를 처음 열었을 때는 포물선을 숨기고, 값 조절 후에만 표시합니다.
+  hasEquationInput:false
+};
+
+// 문제별 입력값은 다음/이전 문제 이동과 새로고침 뒤에도 유지합니다.
+const PROGRESS_STORAGE_KEY="quadratic_parabola_game_v7_problem_answers_20260728";
+
+function persistProblemProgress(){
+  try{
+    sessionStorage.setItem(PROGRESS_STORAGE_KEY,JSON.stringify({
+      challengeByStage:state.challengeByStage,
+      completedChallenges:state.completedChallenges,
+      savedAnswers:state.savedAnswers
+    }));
+  }catch(error){}
+}
+
+function restoreProblemProgress(){
+  try{
+    const raw=sessionStorage.getItem(PROGRESS_STORAGE_KEY);
+    if(!raw)return;
+    const saved=JSON.parse(raw);
+    if(Array.isArray(saved.challengeByStage)&&saved.challengeByStage.length===STAGES.length){
+      state.challengeByStage=saved.challengeByStage.map((value,stageIndex)=>{
+        const max=STAGES[stageIndex].challenges.length-1;
+        return Math.max(0,Math.min(max,Number(value)||0));
+      });
+    }
+    if(Array.isArray(saved.completedChallenges)&&saved.completedChallenges.length===STAGES.length){
+      state.completedChallenges=STAGES.map((stage,stageIndex)=>
+        stage.challenges.map((_,challengeIndex)=>
+          Boolean(saved.completedChallenges?.[stageIndex]?.[challengeIndex])
+        )
+      );
+    }
+    if(Array.isArray(saved.savedAnswers)&&saved.savedAnswers.length===STAGES.length){
+      state.savedAnswers=STAGES.map((stage,stageIndex)=>
+        stage.challenges.map((_,challengeIndex)=>{
+          const answer=saved.savedAnswers?.[stageIndex]?.[challengeIndex];
+          if(!answer||typeof answer!=="object"||!answer.params)return null;
+          return{
+            params:{...answer.params},
+            hasEquationInput:Boolean(answer.hasEquationInput),
+            ...(answer.mode?{mode:answer.mode}:{})
+          };
+        })
+      );
+    }
+  }catch(error){}
+}
+
+const $=id=>document.getElementById(id);
+const el={
+  prevStage:$("prevStageBtn"),
+  nextStage:$("nextStageBtn"),
+  stageNavText:$("stageNavText"),
+  stageDoneText:$("stageDoneText"),
+  challengeStat:$("challengeStat"),
+  sound:$("soundBtn"),
+  stageBadge:$("stageBadge"),
+  stage3ProblemCard:$("stage3ProblemCard"),
+  stage4ProblemCard:$("stage4ProblemCard"),
+  stage4EditorWrap:$("stage4EditorWrap"),
+  stage4Hint:$("stage4Hint"),
+  modeFactorBtn:$("modeFactorBtn"),
+  modeVertexBtn:$("modeVertexBtn"),
+  equationCard:$("equationCard"),
+  parameterHelp:$("parameterHelp"),
+  equationHead:$("equationHead"),
+  singleEquation:$("singleEquationEditor"),
+  aValue:$("aValue"),
+  pValue:$("pValue"),
+  qValue:$("qValue"),
+  a1Value:$("a1Value"),
+  a2Value:$("a2Value"),
+  r1Value:$("r1Value"),
+  s1Value:$("s1Value"),
+  r2Value:$("r2Value"),
+  s2Value:$("s2Value"),
+  helpA:$("helpA"),
+  helpP:$("helpP"),
+  helpQ:$("helpQ"),
+  run:$("runBtn"),
+  prevProblem:$("prevProblemBtn"),
+  resetProblem:$("resetProblemBtn"),
+  nextProblem:$("nextProblemBtn"),
+  progressLabel:$("progressLabel"),
+  progressText:$("progressText"),
+  dots:$("progressDots"),
+  canvas:$("gameCanvas"),
+  toast:$("toast")
+};
+
+// 단계별로 사용하지 않는 입력 영역은 단순히 감추지 않고 DOM에서 제거합니다.
+// 1·2단계로 돌아오면 원래 위치에 다시 삽입됩니다.
+const controlPanel=el.run.parentElement;
+const stage3Slot=document.createComment("3단계 문제 카드 위치");
+const stage4Slot=document.createComment("4단계 문제 카드 위치");
+const equationSlot=document.createComment("1·2단계 함수식 입력 위치");
+const helpSlot=document.createComment("1·2단계 도움말 위치");
+controlPanel.insertBefore(stage3Slot,el.stage3ProblemCard);
+controlPanel.insertBefore(stage4Slot,el.stage4ProblemCard);
+controlPanel.insertBefore(equationSlot,el.equationCard);
+controlPanel.insertBefore(helpSlot,el.parameterHelp);
+
+function mountAfter(slot,node){
+  if(!node.isConnected){
+    slot.parentNode.insertBefore(node,slot.nextSibling);
+  }
+  node.classList.remove("hidden");
+}
+
+function removeFromLayout(node){
+  if(node.isConnected)node.remove();
+}
+
+function updateStageControls(stageType){
+  removeFromLayout(el.stage3ProblemCard);
+  removeFromLayout(el.stage4ProblemCard);
+  removeFromLayout(el.equationCard);
+  removeFromLayout(el.parameterHelp);
+
+  if(stageType==="double"){
+    mountAfter(stage3Slot,el.stage3ProblemCard);
+  }else if(stageType==="doubleDirect"){
+    mountAfter(stage4Slot,el.stage4ProblemCard);
+  }else{
+    mountAfter(equationSlot,el.equationCard);
+    mountAfter(helpSlot,el.parameterHelp);
+  }
+}
+
+const ctx=el.canvas.getContext("2d");
+let audioCtx=null;
+let toastTimer=null;
+
+function currentStage(){return STAGES[state.stage]}
+function currentChallengeIndex(){return state.challengeByStage[state.stage]}
+function current(){return currentStage().challenges[currentChallengeIndex()]}
+
+function isStage4PipeJump(){return currentStage().theme==="pipeJump"}
+function isStage5(){return currentStage().theme==="undergroundQuadrant"}
+function isStage6(){return currentStage().theme==="castleNegativeQuadrants"}
+function isStage7(){return currentStage().theme==="castleBoss"}
+function usesSignedPlot(){return isStage5()||isStage6()||isStage7()}
+
+function f(x,params=state.params){
+  return params.a*Math.pow(x-params.p,2)+params.q;
+}
+
+function doubleF(curve,x,params=state.params){
+  if(curve===1){
+    return params.a1*(x-params.r1)*(x-params.s1);
+  }
+  return params.a2*(x-params.r2)*(x-params.s2);
+}
+
+function targetDoubleY(item){
+  return doubleF(item.curve,item.x,current().target);
+}
+
+function stage4CurrentMode(){
+  return state.stage4Mode;
+}
+
+function stage4ValueKey(curve,key){
+  return `${key}${curve}`;
+}
+
+function stage4F(curve,x,params=state.params,mode=stage4CurrentMode()){
+  const a=params[stage4ValueKey(curve,"a")];
+  if(mode==="factor"){
+    const r=params[stage4ValueKey(curve,"r")];
+    const s=params[stage4ValueKey(curve,"s")];
+    return a*(x-r)*(x-s);
+  }
+  const p=params[stage4ValueKey(curve,"p")];
+  const q=params[stage4ValueKey(curve,"q")];
+  return a*Math.pow(x-p,2)+q;
+}
+
+function stage4TargetF(curve,x){
+  const target=current().target.vertex;
+  const a=target[stage4ValueKey(curve,"a")];
+  const p=target[stage4ValueKey(curve,"p")];
+  const q=target[stage4ValueKey(curve,"q")];
+  return a*Math.pow(x-p,2)+q;
+}
+
+function stage4Roots(curve,params=state.params,mode=stage4CurrentMode()){
+  if(mode==="factor"){
+    const r=params[stage4ValueKey(curve,"r")];
+    const s=params[stage4ValueKey(curve,"s")];
+    return [Math.min(r,s),Math.max(r,s)];
+  }
+  const a=params[stage4ValueKey(curve,"a")];
+  const p=params[stage4ValueKey(curve,"p")];
+  const q=params[stage4ValueKey(curve,"q")];
+  if(Math.abs(a)<1e-9)return null;
+  const rad=(-q)/a;
+  if(rad<0)return null;
+  const d=Math.sqrt(rad);
+  return [p-d,p+d];
+}
+
+function stage4EquivalentParamsFromCurrent(mode){
+  if(mode===stage4CurrentMode())return {...state.params};
+
+  if(mode==="vertex"){
+    const next={};
+    for(let curve=1;curve<=2;curve++){
+      const a=state.params[stage4ValueKey(curve,"a")];
+      const r=state.params[stage4ValueKey(curve,"r")];
+      const s=state.params[stage4ValueKey(curve,"s")];
+      const p=(r+s)/2;
+      const q=a*(p-r)*(p-s);
+      next[stage4ValueKey(curve,"a")]=Math.round(a*10)/10;
+      next[stage4ValueKey(curve,"p")]=Math.round(p*10)/10;
+      next[stage4ValueKey(curve,"q")]=Math.round(q*10)/10;
+    }
+    return next;
+  }
+
+  const next={};
+  for(let curve=1;curve<=2;curve++){
+    const roots=stage4Roots(curve,state.params,"vertex");
+    if(!roots)return null;
+    next[stage4ValueKey(curve,"a")]=Math.round(state.params[stage4ValueKey(curve,"a")]*10)/10;
+    next[stage4ValueKey(curve,"r")]=Math.round(roots[0]*10)/10;
+    next[stage4ValueKey(curve,"s")]=Math.round(roots[1]*10)/10;
+  }
+  return next;
+}
+
+function stage4Step(param){
+  return /^a\d*$/.test(param)?.5:1;
+}
+
+function stage4StepperHTML(param,value,label){
+  return `<span class="stepper" aria-label="${label}"><span class="stepper-value">${displayNumber(value)}</span><button type="button" data-param="${param}" data-dir="1" aria-label="${label} 증가">▲</button><button type="button" data-param="${param}" data-dir="-1" aria-label="${label} 감소">▼</button></span>`;
+}
+
+function stage4EditorRowHTML(curve){
+  if(isStage6()){
+    if(stage4CurrentMode()==="factor"){
+      return `<div class="stage4-editor-row"><div class="stage4-inline-editor"><span class="math-text"><span class="math-var">y</span>=</span>${stage4StepperHTML(stage4ValueKey(curve,"a"),state.params[stage4ValueKey(curve,"a")],`${curve}번 식 a값`)}<span class="paren-group paren-one"><span class="math-text">(<span class="math-var">x</span>−(</span>${stage4StepperHTML(stage4ValueKey(curve,"r"),state.params[stage4ValueKey(curve,"r")],`${curve}번 식 첫 번째 근`)}<span class="math-text">))</span></span><span class="paren-group paren-two"><span class="math-text">(<span class="math-var">x</span>−(</span>${stage4StepperHTML(stage4ValueKey(curve,"s"),state.params[stage4ValueKey(curve,"s")],`${curve}번 식 두 번째 근`)}<span class="math-text">))</span></span></div></div>`;
+    }
+    const parenClass=curve===1?"paren-one":"paren-two";
+    return `<div class="stage4-editor-row"><div class="stage4-inline-editor"><span class="math-text"><span class="math-var">y</span>=</span>${stage4StepperHTML(stage4ValueKey(curve,"a"),state.params[stage4ValueKey(curve,"a")],`${curve}번 식 a값`)}<span class="paren-group ${parenClass}"><span class="math-text">(<span class="math-var">x</span>−(</span>${stage4StepperHTML(stage4ValueKey(curve,"p"),state.params[stage4ValueKey(curve,"p")],`${curve}번 식 p값`)}<span class="math-text">))</span></span><span class="math-text">²+(</span>${stage4StepperHTML(stage4ValueKey(curve,"q"),state.params[stage4ValueKey(curve,"q")],`${curve}번 식 q값`)}<span class="math-text">)</span></div></div>`;
+  }
+  if(stage4CurrentMode()==="factor"){
+    return `<div class="stage4-editor-row"><div class="stage4-inline-editor"><span class="math-text"><span class="math-var">y</span>=</span>${stage4StepperHTML(stage4ValueKey(curve,"a"),state.params[stage4ValueKey(curve,"a")],`${curve}번 식 a값`)}<span class="paren-group paren-one"><span class="math-text">(<span class="math-var">x</span>−</span>${stage4StepperHTML(stage4ValueKey(curve,"r"),state.params[stage4ValueKey(curve,"r")],`${curve}번 식 첫 번째 근`)}<span class="math-text">)</span></span><span class="paren-group paren-two"><span class="math-text">(<span class="math-var">x</span>−</span>${stage4StepperHTML(stage4ValueKey(curve,"s"),state.params[stage4ValueKey(curve,"s")],`${curve}번 식 두 번째 근`)}<span class="math-text">)</span></span></div></div>`;
+  }
+  const parenClass=curve===1?"paren-one":"paren-two";
+  return `<div class="stage4-editor-row"><div class="stage4-inline-editor"><span class="math-text"><span class="math-var">y</span>=</span>${stage4StepperHTML(stage4ValueKey(curve,"a"),state.params[stage4ValueKey(curve,"a")],`${curve}번 식 a값`)}<span class="paren-group ${parenClass}"><span class="math-text">(<span class="math-var">x</span>−</span>${stage4StepperHTML(stage4ValueKey(curve,"p"),state.params[stage4ValueKey(curve,"p")],`${curve}번 식 p값`)}<span class="math-text">)</span></span><span class="math-text">² +</span>${stage4StepperHTML(stage4ValueKey(curve,"q"),state.params[stage4ValueKey(curve,"q")],`${curve}번 식 q값`)}</div></div>`;
+}
+
+function renderStage4Card(){
+  el.stage4ProblemCard.classList.toggle("stage6-negative",isStage6());
+  el.modeFactorBtn.classList.toggle("active",stage4CurrentMode()==="factor");
+  el.modeVertexBtn.classList.toggle("active",stage4CurrentMode()==="vertex");
+  el.stage4EditorWrap.innerHTML = stage4EditorRowHTML(1)+stage4EditorRowHTML(2);
+}
+
+function switchStage4Mode(mode){
+  if(mode===stage4CurrentMode()||currentStage().type!=="doubleDirect"||state.animating)return;
+  state.stage4Mode=mode;
+  // 식의 형태를 바꿀 때 소수점 값으로 변환하지 않고,
+  // 각 형태의 시작값으로 다시 불러와 모든 수가 정해진 간격을 유지합니다.
+  state.params={...current()[mode==="factor"?"initialFactor":"initialVertex"]};
+  state.collected=current().items.map(()=>false);
+  state.trail=[];
+  state.dog=initialDog();
+  state.monsters=initialMonsters();
+  saveCurrentAnswer();
+  playSound("click");
+  updateUI();
+}
+
+function runButtonLabel(){
+  return isStage7()?"괴물 공격":"달리기";
+}
+
+function displayNumber(value){
+  const rounded=Math.round(value*10)/10;
+  return String(rounded).replace("-","−");
+}
+
+function exactAnswer(){
+  const target=current().target;
+  return Math.abs(state.params.a-target.a)<1e-9 &&
+         state.params.p===target.p &&
+         state.params.q===target.q;
+}
+
+function stageCompleted(stageIndex){
+  return state.completedChallenges[stageIndex].every(Boolean);
+}
+
+function allStagesCompleted(){
+  return state.completedChallenges.every(stage=>stage.every(Boolean));
+}
+
+function plot(){
+  const spec=currentStage().plot;
+  if(usesSignedPlot()){
+    return {
+      left:58,right:22,top:28,bottom:54,
+      xMin:spec.xMin,xMax:spec.xMax,yMin:spec.yMin,yMax:spec.yMax,
+      labelStepX:spec.labelStepX,labelStepY:spec.labelStepY
+    };
+  }
+  return {
+    left:58,right:22,top:28,bottom:54,
+    xMin:0,xMax:spec.xMax,yMin:0,yMax:spec.yMax
+  };
+}
+
+function mapPoint(x,y){
+  const p=plot();
+  const w=el.canvas.width-p.left-p.right;
+  const h=el.canvas.height-p.top-p.bottom;
+  return {
+    x:p.left+(x-p.xMin)/(p.xMax-p.xMin)*w,
+    y:p.top+(p.yMax-y)/(p.yMax-p.yMin)*h
+  };
+}
+
+function roundedRect(c,x,y,w,h,r){
+  r=Math.min(r,w/2,h/2);
+  c.beginPath();
+  c.moveTo(x+r,y);
+  c.arcTo(x+w,y,x+w,y+h,r);
+  c.arcTo(x+w,y+h,x,y+h,r);
+  c.arcTo(x,y+h,x,y,r);
+  c.arcTo(x,y,x+w,y,r);
+  c.closePath();
+}
+
+function drawDog(x,y,scale,rotation,phase){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(rotation);
+  ctx.scale(scale,scale);
+  ctx.lineCap="round";
+  ctx.lineJoin="round";
+
+  const leg=Math.sin(phase)*9;
+  const ear=Math.sin(phase+.6)*4;
+  const tail=Math.sin(phase*1.4)*.35;
+
+  ctx.strokeStyle="#51361f";
+  ctx.lineWidth=7;
+  ctx.save();
+  ctx.translate(-26,-2);
+  ctx.rotate(-.55+tail);
+  ctx.beginPath();
+  ctx.moveTo(0,0);
+  ctx.quadraticCurveTo(-19,-11,-26,-28);
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle="#d99655";
+  ctx.strokeStyle="#51361f";
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.ellipse(0,-7,31,22,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.fillStyle="#fff4df";
+  ctx.beginPath();
+  ctx.ellipse(7,-2,16,13,0,0,Math.PI*2);
+  ctx.fill();
+
+  [[-14,10,leg],[13,10,-leg]].forEach(([lx,ly,swing])=>{
+    ctx.save();
+    ctx.translate(lx,ly);
+    ctx.rotate(swing*Math.PI/180);
+    ctx.strokeStyle="#8c572f";
+    ctx.lineWidth=8;
+    ctx.beginPath();
+    ctx.moveTo(0,0);
+    ctx.lineTo(swing*.45,19);
+    ctx.stroke();
+    ctx.fillStyle="#fff";
+    ctx.strokeStyle="#51361f";
+    ctx.lineWidth=2;
+    ctx.beginPath();
+    ctx.ellipse(swing*.45+3,22,8,5,0,0,Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  });
+
+  ctx.save();
+  ctx.translate(24,-24);
+  ctx.fillStyle="#d99655";
+  ctx.strokeStyle="#51361f";
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.ellipse(0,0,22,21,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.save();
+  ctx.translate(-13,-10);
+  ctx.rotate(-.45+ear*Math.PI/180);
+  ctx.fillStyle="#8c572f";
+  ctx.beginPath();
+  ctx.ellipse(0,5,8,18,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle="#fff4df";
+  ctx.beginPath();
+  ctx.ellipse(7,5,14,11,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="#26354e";
+  ctx.beginPath();
+  ctx.arc(6,-5,2.8,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.fillStyle="#49301e";
+  ctx.beginPath();
+  ctx.ellipse(21,2,5,4,0,0,Math.PI*2);
+  ctx.fill();
+
+  ctx.strokeStyle="#51361f";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(11,7,7,.1*Math.PI,.75*Math.PI);
+  ctx.stroke();
+
+  ctx.fillStyle="#ff5d72";
+  ctx.beginPath();
+  ctx.ellipse(15,13,5,3,0,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.fillStyle="#55a6e8";
+  ctx.strokeStyle="#315c91";
+  ctx.lineWidth=2;
+  roundedRect(ctx,-8,-27,22,8,4);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawCloud(x,y,scale){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.scale(scale,scale);
+  ctx.fillStyle="#fff";
+  ctx.strokeStyle="#334d7b";
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.moveTo(-52,12);
+  ctx.lineTo(-42,-3);
+  ctx.lineTo(-28,-3);
+  ctx.lineTo(-22,-17);
+  ctx.lineTo(-8,-17);
+  ctx.lineTo(0,-27);
+  ctx.lineTo(16,-27);
+  ctx.lineTo(25,-16);
+  ctx.lineTo(40,-16);
+  ctx.lineTo(47,-4);
+  ctx.lineTo(58,-4);
+  ctx.lineTo(63,12);
+  ctx.lineTo(52,23);
+  ctx.lineTo(-42,23);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.strokeStyle="#6fa0ef";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(-40,24);
+  for(let i=0;i<5;i++){
+    const x1=-40+i*18;
+    ctx.quadraticCurveTo(x1+9,32,x1+18,24);
+  }
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStage1Background(){
+  const W=el.canvas.width,H=el.canvas.height;
+  const gradient=ctx.createLinearGradient(0,0,0,H);
+  gradient.addColorStop(0,"#5c8ff0");
+  gradient.addColorStop(1,"#75a4f2");
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,W,H);
+
+  drawCloud(125,82,.82);
+  drawCloud(520,112,.72);
+  drawCloud(815,65,.5);
+  drawCloud(760,278,.68);
+  drawCloud(168,390,.5);
+
+  const ground=mapPoint(0,0).y;
+  ctx.fillStyle="#a74e28";
+  ctx.fillRect(0,ground,W,H-ground);
+  ctx.fillStyle="#f0873d";
+  ctx.fillRect(0,ground,W,14);
+  ctx.strokeStyle="#5c2e1e";
+  ctx.lineWidth=2.5;
+  for(let x=-18;x<W+36;x+=38)ctx.strokeRect(x,ground,38,20);
+  for(let x=1;x<W+36;x+=38)ctx.strokeRect(x,ground+20,38,20);
+}
+
+function drawStage3Tree(x){
+  const ground=mapPoint(x,0);
+  const crown=mapPoint(x,1.25);
+
+  ctx.save();
+  ctx.fillStyle="#e5b79d";
+  ctx.strokeStyle="#593927";
+  ctx.lineWidth=2.2;
+  ctx.fillRect(ground.x-7,crown.y+12,14,ground.y-crown.y-12);
+  ctx.strokeRect(ground.x-7,crown.y+12,14,ground.y-crown.y-12);
+
+  ctx.fillStyle="#65bf2f";
+  ctx.strokeStyle="#263b1e";
+  ctx.lineWidth=2.5;
+  ctx.beginPath();
+  ctx.arc(crown.x,crown.y,19,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStage3BrickPillar(rootX){
+  const W=el.canvas.width,H=el.canvas.height;
+  const center=mapPoint(rootX,0).x;
+  const axisY=mapPoint(rootX,0).y;
+  const unitWidth=(mapPoint(1,0).x-mapPoint(0,0).x);
+  const width=Math.max(28,unitWidth*.68);
+  const left=center-width/2;
+  const top=axisY-5;
+  const height=H-top+4;
+
+  ctx.save();
+  ctx.fillStyle="#a94b28";
+  ctx.strokeStyle="#47281e";
+  ctx.lineWidth=2.2;
+  ctx.fillRect(left,top,width,height);
+  ctx.strokeRect(left,top,width,height);
+
+  ctx.fillStyle="#ef8138";
+  ctx.fillRect(left,top,width,9);
+
+  const brickH=18;
+  const brickW=width/2;
+  for(let row=0,y=top+9;y<H;y+=brickH,row++){
+    ctx.strokeStyle="#5d2d21";
+    ctx.lineWidth=1.5;
+    ctx.beginPath();
+    ctx.moveTo(left,y);
+    ctx.lineTo(left+width,y);
+    const offset=row%2===0?0:brickW/2;
+    for(let x=left+offset;x<left+width;x+=brickW){
+      ctx.moveTo(x,y);
+      ctx.lineTo(x,Math.min(H,y+brickH));
+    }
+    ctx.stroke();
+
+    ctx.fillStyle="rgba(40,18,13,.68)";
+    ctx.beginPath();
+    ctx.arc(center,y+brickH*.55,3.2,0,Math.PI*2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawStage3Background(){
+  const W=el.canvas.width,H=el.canvas.height;
+  const gradient=ctx.createLinearGradient(0,0,0,H);
+  gradient.addColorStop(0,"#5c8ff0");
+  gradient.addColorStop(1,"#75a4f2");
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,W,H);
+
+  drawCloud(345,145,.58);
+  drawCloud(585,200,.76);
+
+  // 참고 화면처럼 바닥 전체를 연결하지 않고, 목표 x절편 위치에만
+  // 짧은 벽돌 발판을 둡니다.
+  const target=current().target;
+  const roots=[target.r1,target.s1,target.r2,target.s2]
+    .filter((value,index,array)=>array.indexOf(value)===index)
+    .sort((a,b)=>a-b);
+
+  // 첫 번째 기둥과 마지막 기둥 사이에는 땅 대신 물을 표시합니다.
+  // 기둥은 뒤에서 다시 그려 물 위의 발판처럼 보이게 합니다.
+  if(roots.length>=2){
+    const axisY=mapPoint(0,0).y;
+    const unitWidth=mapPoint(1,0).x-mapPoint(0,0).x;
+    const pillarWidth=Math.max(28,unitWidth*.68);
+    const waterLeft=mapPoint(roots[0],0).x+pillarWidth/2;
+    const waterRight=mapPoint(roots[roots.length-1],0).x-pillarWidth/2;
+    const waterTop=axisY+4;
+
+    const waterGradient=ctx.createLinearGradient(0,waterTop,0,H);
+    waterGradient.addColorStop(0,"#27aee4");
+    waterGradient.addColorStop(.42,"#087fc1");
+    waterGradient.addColorStop(1,"#035b9d");
+    ctx.fillStyle=waterGradient;
+    ctx.fillRect(waterLeft,waterTop,waterRight-waterLeft,H-waterTop);
+
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(waterLeft,waterTop,waterRight-waterLeft,H-waterTop);
+    ctx.clip();
+
+    // 수면의 잔물결
+    ctx.strokeStyle="rgba(225,248,255,.92)";
+    ctx.lineWidth=2.2;
+    for(let row=0;row<3;row++){
+      const y=waterTop+4+row*9;
+      ctx.beginPath();
+      for(let x=waterLeft-18;x<=waterRight+18;x+=22){
+        ctx.moveTo(x,y);
+        ctx.quadraticCurveTo(x+5.5,y-3,x+11,y);
+        ctx.quadraticCurveTo(x+16.5,y+3,x+22,y);
+      }
+      ctx.stroke();
+    }
+
+    // 물속의 옅은 움직임
+    ctx.strokeStyle="rgba(159,226,255,.22)";
+    ctx.lineWidth=1.6;
+    for(let y=waterTop+42;y<H;y+=28){
+      ctx.beginPath();
+      for(let x=waterLeft-30;x<=waterRight+30;x+=48){
+        ctx.moveTo(x,y);
+        ctx.quadraticCurveTo(x+12,y-5,x+24,y);
+        ctx.quadraticCurveTo(x+36,y+5,x+48,y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  drawStage3Tree(.75);
+  drawStage3Tree(1.65);
+  roots.forEach(drawStage3BrickPillar);
+}
+
+function drawStage4Pipe(x,heightUnits){
+  const base=mapPoint(x,0);
+  const top=mapPoint(x,heightUnits);
+  const unitWidth=(mapPoint(1,0).x-mapPoint(0,0).x);
+  const bodyW=Math.max(42,unitWidth*1.05);
+  const lipW=bodyW*1.22;
+  const bodyLeft=base.x-bodyW/2;
+  const lipLeft=base.x-lipW/2;
+  // heightUnits는 파이프 입구의 실제 맨 윗면 높이입니다.
+  // 강아지가 목표 포물선의 꼭짓점에서 발판에 정확히 닿도록 맞춥니다.
+  const platformTop=top.y;
+  const pipeTop=platformTop+18;
+
+  const grad=ctx.createLinearGradient(bodyLeft,0,bodyLeft+bodyW,0);
+  grad.addColorStop(0,"#1d7f12");
+  grad.addColorStop(.28,"#59db42");
+  grad.addColorStop(.54,"#96ff75");
+  grad.addColorStop(.78,"#35b724");
+  grad.addColorStop(1,"#166b10");
+
+  ctx.save();
+  ctx.fillStyle=grad;
+  ctx.strokeStyle="#0f4710";
+  ctx.lineWidth=2.5;
+  ctx.fillRect(bodyLeft,pipeTop,bodyW,base.y-pipeTop);
+  ctx.strokeRect(bodyLeft,pipeTop,bodyW,base.y-pipeTop);
+
+  ctx.fillRect(lipLeft,pipeTop-18,lipW,18);
+  ctx.strokeRect(lipLeft,pipeTop-18,lipW,18);
+
+  ctx.strokeStyle="rgba(255,255,255,.45)";
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(bodyLeft+bodyW*.33,pipeTop+4);
+  ctx.lineTo(bodyLeft+bodyW*.33,base.y-4);
+  ctx.stroke();
+  ctx.restore();
+}
+
+
+
+function drawStage7Background(){
+  const W=el.canvas.width,H=el.canvas.height;
+  const p=plot();
+
+  const gradient=ctx.createLinearGradient(0,0,0,H);
+  gradient.addColorStop(0,"#10251d");
+  gradient.addColorStop(.55,"#17382b");
+  gradient.addColorStop(1,"#09150f");
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,W,H);
+
+  // 어두운 성벽 벽돌
+  const brickW=38,brickH=22;
+  for(let row=0,y=0;y<H;y+=brickH,row++){
+    const offset=row%2?brickW/2:0;
+    for(let x=-brickW+offset;x<W+brickW;x+=brickW){
+      ctx.fillStyle=row%3===0?"rgba(30,70,49,.62)":"rgba(20,54,38,.66)";
+      ctx.fillRect(x+1,y+1,brickW-2,brickH-2);
+      ctx.strokeStyle="rgba(2,12,8,.72)";
+      ctx.lineWidth=1.2;
+      ctx.strokeRect(x+1,y+1,brickW-2,brickH-2);
+      ctx.fillStyle="rgba(90,130,90,.08)";
+      ctx.fillRect(x+5,y+4,brickW-10,3);
+    }
+  }
+
+  // 세로 돌기둥
+  [2.1,7.4,11.6,15.4].forEach(x=>{
+    const left=mapPoint(x-.24,p.yMin).x;
+    const right=mapPoint(x+.24,p.yMin).x;
+    ctx.fillStyle="rgba(42,86,55,.56)";
+    ctx.fillRect(left,0,right-left,H);
+    ctx.strokeStyle="rgba(5,20,12,.74)";
+    ctx.lineWidth=2;
+    ctx.strokeRect(left,0,right-left,H);
+  });
+
+  // 왼쪽 주황색 벽
+  const wallRight=mapPoint(1.25,0).x;
+  ctx.fillStyle="#a83e0d";
+  ctx.fillRect(0,0,wallRight,H);
+  for(let row=0,y=0;y<H;y+=23,row++){
+    const bw=44,offset=row%2?22:0;
+    for(let x=-44+offset;x<wallRight+44;x+=bw){
+      ctx.fillStyle=row%3===0?"#c85013":"#a83d0d";
+      ctx.fillRect(x+1,y+1,bw-2,21);
+      ctx.strokeStyle="#4b1606";
+      ctx.lineWidth=1.4;
+      ctx.strokeRect(x+1,y+1,bw-2,21);
+      ctx.fillStyle="rgba(255,174,89,.18)";
+      ctx.fillRect(x+5,y+4,bw-10,3);
+    }
+  }
+
+  // 성 안의 어두운 아치
+  [4.1,9.2,13.4].forEach(x=>{
+    const top=mapPoint(x,-1.5);
+    const bottom=mapPoint(x,-5.3);
+    const rx=mapPoint(x+.9,0).x-top.x;
+    ctx.fillStyle="#020705";
+    ctx.beginPath();
+    ctx.ellipse(top.x,top.y,rx,72,0,Math.PI,0);
+    ctx.lineTo(top.x+rx,bottom.y);
+    ctx.lineTo(top.x-rx,bottom.y);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  // 붉은 커튼 장식
+  const curtainY=mapPoint(0,-1.0).y;
+  ctx.fillStyle="#7d0713";
+  ctx.strokeStyle="#310208";
+  ctx.lineWidth=4;
+  for(let x=wallRight;x<W+80;x+=155){
+    ctx.beginPath();
+    ctx.moveTo(x,curtainY-15);
+    ctx.bezierCurveTo(x+35,curtainY+65,x+85,curtainY+65,x+120,curtainY-15);
+    ctx.lineTo(x+145,curtainY-15);
+    ctx.bezierCurveTo(x+100,curtainY+92,x+35,curtainY+92,x-10,curtainY-15);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  function drawTileRect(x,y,w,h,kind="ice"){
+    const a=mapPoint(x,y+h);
+    const b=mapPoint(x+w,y);
+    const px=a.x,py=a.y,pw=b.x-a.x,ph=b.y-a.y;
+    ctx.fillStyle=kind==="ice"?"#c9e5ee":"#a94717";
+    ctx.fillRect(px,py,pw,ph);
+    ctx.strokeStyle=kind==="ice"?"#334e5b":"#4f1708";
+    ctx.lineWidth=2;
+    ctx.strokeRect(px,py,pw,ph);
+    const unitX=Math.max(14,pw/Math.max(1,Math.round(w)));
+    const unitY=Math.max(14,ph/Math.max(1,Math.round(h)));
+    for(let yy=py;yy<py+ph;yy+=unitY){
+      for(let xx=px;xx<px+pw;xx+=unitX){
+        ctx.strokeStyle=kind==="ice"?"rgba(63,91,104,.72)":"rgba(75,22,8,.72)";
+        ctx.strokeRect(xx,yy,Math.min(unitX,px+pw-xx),Math.min(unitY,py+ph-yy));
+        if(kind==="ice"){
+          ctx.beginPath();
+          ctx.moveTo(xx,yy);
+          ctx.lineTo(Math.min(xx+unitX,px+pw),Math.min(yy+unitY,py+ph));
+          ctx.moveTo(Math.min(xx+unitX,px+pw),yy);
+          ctx.lineTo(xx,Math.min(yy+unitY,py+ph));
+          ctx.stroke();
+        }
+      }
+    }
+  }
+
+  // 출발·도착 발판과 중앙 벽돌 바닥
+  drawTileRect(0,-6,8.8,.8,"ice");
+  drawTileRect(8.8,-6,5.2,.8,"brick");
+  drawTileRect(14,-6,2,.8,"ice");
+  drawTileRect(15.4,-5.2,.6,1.2,"ice");
+
+  // 7단계 2·3번의 괴물은 포물선 위 서로 다른 높이에 배치합니다.
+  // 공중에 떠 보이지 않도록 각 괴물 아래에 작은 벽돌 발판을 둡니다.
+  stage7ChallengeMonsters().forEach(monster=>{
+    if(monster.groundY>-5.05){
+      drawTileRect(monster.x-1.05,monster.groundY-.38,2.1,.38,"brick");
+    }
+  });
+
+  // 벽에 걸린 괴물 초상화
+  [[8.8,6.2],[8.8,2.2]].forEach(([x,y])=>{
+    const c=mapPoint(x,y);
+    ctx.fillStyle="#3b1d13";
+    ctx.fillRect(c.x-50,c.y-45,100,90);
+    ctx.strokeStyle="#8f5c31";
+    ctx.lineWidth=7;
+    ctx.strokeRect(c.x-50,c.y-45,100,90);
+    ctx.fillStyle="#234b2c";
+    ctx.beginPath();
+    ctx.arc(c.x,c.y,25,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle="#e69b27";
+    ctx.beginPath();
+    ctx.arc(c.x,c.y+5,14,0,Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle="#d53722";
+    for(let i=-2;i<=2;i++){
+      ctx.beginPath();
+      ctx.moveTo(c.x+i*12,c.y-19);
+      ctx.lineTo(c.x+i*12-7,c.y-38);
+      ctx.lineTo(c.x+i*12+7,c.y-27);
+      ctx.closePath();
+      ctx.fill();
+    }
+  });
+}
+
+function drawStage6Background(){
+  const W=el.canvas.width,H=el.canvas.height;
+  const p=plot();
+  // y=10 아래만 실제 이동 가능한 빈 통로입니다.
+  const hallTop=mapPoint(p.xMin,10).y;
+  const floorTop=mapPoint(p.xMin,-9).y;
+
+  ctx.fillStyle="#101416";
+  ctx.fillRect(0,0,W,H);
+
+  function brick(x,y,w,h,base="#a93f0d"){
+    ctx.fillStyle=base;
+    ctx.fillRect(x,y,w,h);
+    ctx.strokeStyle="#2a1008";
+    ctx.lineWidth=2;
+    ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle="rgba(255,138,55,.24)";
+    ctx.fillRect(x+3,y+3,Math.max(2,w-7),3);
+    ctx.fillStyle="rgba(61,15,4,.30)";
+    for(let i=0;i<3;i++){
+      const px=x+6+(i*13)%Math.max(10,w-8);
+      const py=y+8+(i*7)%Math.max(8,h-8);
+      ctx.fillRect(px,py,3,2);
+    }
+  }
+
+  // 위쪽 붉은 벽돌 천장
+  const bw=38,bh=18;
+  for(let row=0,y=0;y<hallTop+28;row++,y+=bh){
+    const offset=row%2?-bw/2:0;
+    for(let x=offset;x<W;x+=bw)brick(x,y,bw,bh,row%3===0?"#b74b12":"#9e370b");
+  }
+
+  // 아래쪽 어두운 초록색 성벽
+  const lowerGradient=ctx.createLinearGradient(0,hallTop,0,floorTop);
+  lowerGradient.addColorStop(0,"#14231d");
+  lowerGradient.addColorStop(1,"#0b281d");
+  ctx.fillStyle=lowerGradient;
+  ctx.fillRect(0,hallTop,W,floorTop-hallTop);
+  for(let row=0,y=hallTop;y<floorTop;row++,y+=22){
+    const offset=row%2?-24:0;
+    for(let x=offset;x<W;x+=48){
+      ctx.fillStyle=row%3===0?"rgba(37,82,53,.48)":"rgba(22,55,39,.55)";
+      ctx.fillRect(x,y,48,22);
+      ctx.strokeStyle="rgba(3,12,9,.62)";
+      ctx.lineWidth=1.5;
+      ctx.strokeRect(x,y,48,22);
+    }
+  }
+
+  // 붉은 커튼
+  function curtain(cx,width,depth){
+    const top=hallTop-6;
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(cx-width/2,top);
+    ctx.bezierCurveTo(cx-width*.38,top+depth*.78,cx-width*.1,top+depth,cx,top+depth*.72);
+    ctx.bezierCurveTo(cx+width*.12,top+depth,cx+width*.38,top+depth*.75,cx+width/2,top);
+    ctx.lineTo(cx+width/2,top-18);
+    ctx.lineTo(cx-width/2,top-18);
+    ctx.closePath();
+    const g=ctx.createLinearGradient(cx-width/2,0,cx+width/2,0);
+    g.addColorStop(0,"#520006");
+    g.addColorStop(.25,"#b0000c");
+    g.addColorStop(.5,"#5d0007");
+    g.addColorStop(.75,"#b0000c");
+    g.addColorStop(1,"#4b0005");
+    ctx.fillStyle=g;
+    ctx.fill();
+    ctx.strokeStyle="#2b0003";
+    ctx.lineWidth=4;
+    ctx.stroke();
+    ctx.restore();
+  }
+  curtain(W*.42,W*.23,88);
+  curtain(W*.67,W*.19,66);
+  curtain(W*.88,W*.18,86);
+
+  // 검은 아치형 통로
+  function arch(cx,baseY,width,height){
+    ctx.fillStyle="#020304";
+    ctx.beginPath();
+    ctx.moveTo(cx-width/2,baseY);
+    ctx.lineTo(cx-width/2,baseY-height*.58);
+    ctx.arc(cx,baseY-height*.58,width/2,Math.PI,0);
+    ctx.lineTo(cx+width/2,baseY);
+    ctx.closePath();
+    ctx.fill();
+  }
+  arch(W*.25,floorTop,78,205);
+  arch(W*.57,floorTop,76,212);
+  arch(W*.91,floorTop,70,190);
+
+  // 좌표 단위의 발판과 장애물을 벽돌 블록으로 그립니다.
+  function platformRect(rect){
+    const topLeft=mapPoint(rect.left,rect.top);
+    const bottomRight=mapPoint(rect.right,rect.bottom);
+    const width=Math.max(2,bottomRight.x-topLeft.x);
+    const height=Math.max(2,bottomRight.y-topLeft.y);
+    const cols=Math.max(1,Math.ceil(width/38));
+    const rows=Math.max(1,Math.ceil(height/22));
+    const cellW=width/cols;
+    const cellH=height/rows;
+    for(let r=0;r<rows;r++){
+      const offset=r%2?-cellW/2:0;
+      for(let c=0;c<=cols;c++){
+        const x=topLeft.x+c*cellW+offset;
+        if(x+cellW<topLeft.x||x>topLeft.x+width)continue;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(topLeft.x,topLeft.y,width,height);
+        ctx.clip();
+        brick(x,topLeft.y+r*cellH,cellW+1,cellH+1,
+          rect.kind==="obstacle"?"#b54812":"#a33c0e");
+        ctx.restore();
+      }
+    }
+  }
+  stage6ObstacleRects().forEach(platformRect);
+
+  // 발판 위의 성 석상 장식
+  function statueAt(x,y,scale=.72){
+    const pos=mapPoint(x,y);
+    ctx.save();
+    ctx.translate(pos.x,pos.y);
+    ctx.scale(scale,scale);
+    ctx.fillStyle="#c4c7cc";
+    ctx.strokeStyle="#35383c";
+    ctx.lineWidth=3;
+    ctx.fillRect(-13,-8,26,38);
+    ctx.strokeRect(-13,-8,26,38);
+    ctx.beginPath();
+    ctx.arc(0,-22,14,0,Math.PI*2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(-8,-27);ctx.lineTo(-18,-38);ctx.lineTo(-3,-31);
+    ctx.moveTo(8,-27);ctx.lineTo(18,-38);ctx.lineTo(3,-31);
+    ctx.stroke();
+    ctx.fillStyle="#6f757b";
+    ctx.fillRect(-20,30,40,8);
+    ctx.restore();
+  }
+  // 두 번째 참고 사진처럼 통로 안쪽의 세 지점에 석상을 배치합니다.
+  // 점프 경로의 꼭짓점과 동전·별 위치는 가리지 않도록 발판 가장자리로 옮깁니다.
+  const challenge=current();
+  statueAt(challenge.jumpStartX+2.1,challenge.dogStartY+.15,.62);
+  statueAt((challenge.landing1.x+challenge.jump2StartX)/2,challenge.landing1.y+.15,.62);
+  statueAt(Math.min(plot().xMax-.7,challenge.landing2.x+3.1),challenge.landing2.y+.15,.62);
+
+  // 체커보드 바닥
+  const cell=42;
+  for(let y=floorTop;y<H;y+=cell){
+    for(let x=0;x<W;x+=cell){
+      const dark=(Math.floor(x/cell)+Math.floor((y-floorTop)/cell))%2===0;
+      ctx.fillStyle=dark?"#090909":"#f4f4f4";
+      ctx.fillRect(x,y,cell,cell);
+      ctx.strokeStyle="#777";
+      ctx.lineWidth=1;
+      ctx.strokeRect(x,y,cell,cell);
+    }
+  }
+}
+
+function stage6ObstacleRects(){
+  const challenge=current();
+  const floor=-9;
+
+  // 두 번째 참고 사진처럼 가운데에 하나의 큰 벽돌 구조물을 두고,
+  // 왼쪽 바닥 → 가운데 발판 → 오른쪽 발판 순서로 이동합니다.
+  const middleLeft=challenge.landing1.x-.45;
+  const middleRight=challenge.jump2StartX+.45;
+
+  const platforms=[
+    {kind:"start",left:plot().xMin,right:challenge.jumpStartX+.35,top:challenge.dogStartY-.12,bottom:floor},
+    {kind:"middle",left:middleLeft,right:middleRight,top:challenge.landing1.y-.12,bottom:floor},
+    {kind:"end",left:challenge.landing2.x-.35,right:plot().xMax,top:challenge.landing2.y-.12,bottom:floor}
+  ];
+
+  // 가운데 발판 아래의 계단형 벽돌. 포물선은 이 벽돌 위의 빈 공간으로 지나갑니다.
+  const approach1=[
+    {kind:"obstacle",left:middleLeft-3.4,right:middleLeft-2.05,top:challenge.dogStartY+1.25,bottom:floor},
+    {kind:"obstacle",left:middleLeft-2.05,right:middleLeft-.45,top:challenge.dogStartY+2.65,bottom:floor}
+  ];
+  const approach2=[
+    {kind:"obstacle",left:middleRight+.45,right:middleRight+1.85,top:challenge.landing2.y+2.55,bottom:floor},
+    {kind:"obstacle",left:middleRight+1.85,right:middleRight+3.25,top:challenge.landing2.y+1.15,bottom:floor}
+  ];
+
+  return[...platforms,...approach1,...approach2];
+}
+
+function stage6ObstacleSurfaceY(x){
+  // 충돌 판정에서는 출발·착지 발판을 제외하고 실제 장애물만 검사합니다.
+  // 발판까지 장애물로 계산하면 정상적인 착지 순간도 충돌로 처리됩니다.
+  let surface=plot().yMin;
+  stage6ObstacleRects().forEach(rect=>{
+    if(rect.kind!=="obstacle")return;
+    if(x>=rect.left&&x<=rect.right)surface=Math.max(surface,rect.top);
+  });
+  return surface;
+}
+
+function stage6PathBlocked(x,y){
+  const surface=stage6ObstacleSurfaceY(x);
+  if(surface<=plot().yMin+.01)return false;
+
+  // 강아지 몸 전체가 벽돌 위를 지나도록 약 1좌표 단위의 여유를 둡니다.
+  return y<surface+1.05;
+}
+
+function drawStage5Background(){
+  const W=el.canvas.width,H=el.canvas.height;
+  const gradient=ctx.createLinearGradient(0,0,0,H);
+  gradient.addColorStop(0,"#08142c");
+  gradient.addColorStop(.42,"#0f2a58");
+  gradient.addColorStop(1,"#0d3d7c");
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,W,H);
+
+  const topBand=mapPoint(plot().xMin,0.88).y;
+  ctx.fillStyle="#0d7c9e";
+  ctx.fillRect(0,0,W,topBand);
+  for(let x=-40;x<W+40;x+=34){
+    for(let y=0;y<topBand;y+=18){
+      const offset=(Math.floor(y/18)%2===0)?0:17;
+      ctx.fillStyle=Math.floor(y/18)%2===0?"#35bfe4":"#1683aa";
+      ctx.fillRect(x+offset,y,34,18);
+      ctx.strokeStyle="#07314b";
+      ctx.strokeRect(x+offset,y,34,18);
+    }
+  }
+
+  const tileW=42,tileH=46;
+  for(let x=0;x<W;x+=tileW){
+    for(let y=topBand;y<H;y+=tileH){
+      ctx.fillStyle=((Math.floor(x/tileW)+Math.floor(y/tileH))%2===0)
+        ?"rgba(20,38,98,.42)":"rgba(8,20,56,.44)";
+      ctx.fillRect(x,y,tileW,tileH);
+      ctx.strokeStyle="rgba(0,0,0,.28)";
+      ctx.strokeRect(x,y,tileW,tileH);
+    }
+  }
+
+  const pillarLeft=mapPoint(0.08,plot().yMin).x;
+  const pillarRight=mapPoint(0.67,plot().yMin).x;
+  ctx.fillStyle="rgba(140,170,195,.28)";
+  ctx.fillRect(pillarLeft,0,pillarRight-pillarLeft,H);
+  ctx.strokeStyle="rgba(0,0,0,.4)";
+  ctx.lineWidth=3;
+  ctx.strokeRect(pillarLeft,0,pillarRight-pillarLeft,H);
+
+  const waterTop=mapPoint(plot().xMin,-7.15).y;
+  ctx.fillStyle="#1f5da7";
+  ctx.fillRect(0,waterTop,W,H-waterTop);
+  for(let x=0;x<W;x+=14){
+    for(let y=waterTop;y<H;y+=14){
+      ctx.fillStyle=((Math.floor((x+y)/14))%2===0)
+        ?"rgba(255,255,255,.10)":"rgba(0,0,0,.07)";
+      ctx.fillRect(x,y,14,14);
+    }
+  }
+
+  function drawIceRect(rect){
+    const a=mapPoint(rect.x,rect.y+rect.h);
+    const b=mapPoint(rect.x+rect.w,rect.y);
+    const w=b.x-a.x,h=b.y-a.y;
+    ctx.fillStyle="#8fddfa";
+    ctx.fillRect(a.x,a.y,w,h);
+    ctx.strokeStyle="#dbf8ff";
+    ctx.lineWidth=1.6;
+    ctx.strokeRect(a.x,a.y,w,h);
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y+h/2);
+    ctx.lineTo(a.x+w/2,a.y);
+    ctx.lineTo(a.x+w,a.y+h/2);
+    ctx.lineTo(a.x+w/2,a.y+h);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // 시작 지점 아래에 바닥을 두어 강아지가 공중에 뜨지 않게 합니다.
+  [
+    {x:-1.0,y:-6,w:.7,h:.7},{x:-.3,y:-6,w:.7,h:.7}
+  ].forEach(drawIceRect);
+
+  // 오른쪽 도착 계단 발판
+  [
+    {x:4.15,y:-6,w:.7,h:.7},{x:4.85,y:-6,w:.7,h:.7},
+    {x:5.55,y:-6,w:.7,h:.7},{x:6.25,y:-6,w:.7,h:.7},
+    {x:5.55,y:-5.3,w:.7,h:.7},{x:6.25,y:-5.3,w:.7,h:.7},
+    {x:6.25,y:-4.6,w:.7,h:.7}
+  ].forEach(drawIceRect);
+
+  [[1.15,-0.25],[2.45,-1.0],[1.7,-2.25],[4.45,-3.7]].forEach(([mx,my])=>{
+    const p=mapPoint(mx,my);
+    ctx.fillStyle="#4c8f2a";
+    for(let i=0;i<4;i++){
+      ctx.beginPath();
+      ctx.ellipse(p.x+i*6,p.y+(i%2)*4,6,10,0,0,Math.PI*2);
+      ctx.fill();
+    }
+  });
+}
+
+function drawStage4HorizontalPipe(x,y,length){
+  const left=mapPoint(x,y);
+  const right=mapPoint(x+length,y-1.35);
+  const bodyH=Math.abs(right.y-left.y);
+  const bodyW=right.x-left.x;
+  const grad=ctx.createLinearGradient(left.x,0,right.x,0);
+  grad.addColorStop(0,"#187b12");
+  grad.addColorStop(.24,"#59db42");
+  grad.addColorStop(.5,"#9bff78");
+  grad.addColorStop(.78,"#35b724");
+  grad.addColorStop(1,"#12670d");
+
+  ctx.save();
+  ctx.fillStyle=grad;
+  ctx.strokeStyle="#0b4810";
+  ctx.lineWidth=2.5;
+  ctx.fillRect(left.x,left.y,bodyW,bodyH);
+  ctx.strokeRect(left.x,left.y,bodyW,bodyH);
+
+  ctx.beginPath();
+  ctx.ellipse(right.x,left.y+bodyH/2,18,bodyH/2,0,-Math.PI/2,Math.PI/2);
+  ctx.lineTo(right.x-18,left.y+bodyH);
+  ctx.lineTo(right.x-18,left.y);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  ctx.strokeStyle="rgba(255,255,255,.48)";
+  ctx.lineWidth=4;
+  ctx.beginPath();
+  ctx.moveTo(left.x+bodyW*.35,left.y+5);
+  ctx.lineTo(left.x+bodyW*.35,left.y+bodyH-5);
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStage4Background(){
+  const W=el.canvas.width,H=el.canvas.height;
+  const gradient=ctx.createLinearGradient(0,0,0,H);
+  gradient.addColorStop(0,"#06729f");
+  gradient.addColorStop(.43,"#26a2dc");
+  gradient.addColorStop(1,"#b9eaff");
+  ctx.fillStyle=gradient;
+  ctx.fillRect(0,0,W,H);
+
+  // 올려 준 사진처럼 밝은 하늘과 흰 구름을 배치합니다.
+  drawCloud(275,205,.82);
+  drawCloud(820,78,.86);
+
+  const ground=mapPoint(0,0).y;
+  ctx.fillStyle="#46bb22";
+  ctx.fillRect(0,ground-16,W,16);
+  ctx.fillStyle="#198710";
+  ctx.fillRect(0,ground,W,13);
+  ctx.fillStyle="#a95720";
+  ctx.fillRect(0,ground+13,W,H-ground-13);
+
+  // 땅속 흙무늬
+  ctx.fillStyle="#763718";
+  [[45,92],[260,118],[570,86],[790,124]].forEach(([x,y])=>{
+    ctx.beginPath();
+    ctx.ellipse(x,ground+y,26,11,-.12,0,Math.PI*2);
+    ctx.ellipse(x+22,ground+y-5,15,8,.2,0,Math.PI*2);
+    ctx.fill();
+  });
+
+  // 왼쪽의 낮은 파이프와 눕혀진 파이프는 배경 장식입니다.
+  drawStage4Pipe(-.45,2);
+  drawStage4HorizontalPipe(4.65,2.05,1.8);
+
+  // 실제 착지 지점 두 곳. 마지막에는 오른쪽 기둥 위에서 멈춥니다.
+  drawStage4Pipe(current().landing1.x,current().landing1.y);
+  drawStage4Pipe(current().landing2.x,current().landing2.y);
+}
+
+function drawTileRect(rect,fill="#7893d6"){
+  const topLeft=mapPoint(rect.x,rect.y+rect.h);
+  const bottomRight=mapPoint(rect.x+rect.w,rect.y);
+  const width=bottomRight.x-topLeft.x;
+  const height=bottomRight.y-topLeft.y;
+
+  ctx.fillStyle=fill;
+  ctx.fillRect(topLeft.x,topLeft.y,width,height);
+  ctx.strokeStyle="#0a1220";
+  ctx.lineWidth=2.2;
+  ctx.strokeRect(topLeft.x,topLeft.y,width,height);
+
+  const tile=35;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(topLeft.x,topLeft.y,width,height);
+  ctx.clip();
+
+  for(let x=topLeft.x;x<topLeft.x+width;x+=tile){
+    for(let y=topLeft.y;y<topLeft.y+height;y+=tile){
+      ctx.strokeStyle="rgba(5,11,20,.88)";
+      ctx.lineWidth=1.7;
+      ctx.strokeRect(x,y,tile,tile);
+
+      ctx.strokeStyle="rgba(255,255,255,.28)";
+      ctx.lineWidth=1;
+      ctx.beginPath();
+      ctx.moveTo(x+3,y+tile-3);
+      ctx.lineTo(x+tile-3,y+3);
+      ctx.moveTo(x+3,y+3);
+      ctx.lineTo(x+tile-3,y+tile-3);
+      ctx.stroke();
+    }
+  }
+  ctx.restore();
+}
+
+function drawCastleLowerBackground(){
+  const bottom=mapPoint(0,0).y;
+  const top=mapPoint(0,12).y;
+  const left=mapPoint(0,0).x;
+  const right=mapPoint(20,0).x;
+
+  ctx.fillStyle="#1c2c23";
+  ctx.fillRect(left,top,right-left,bottom-top);
+
+  [5.2,11.2,17].forEach(centerX=>{
+    const center=mapPoint(centerX,9.2);
+    const radius=Math.abs(mapPoint(centerX+2,9.2).x-center.x);
+    ctx.fillStyle="#020403";
+    ctx.beginPath();
+    ctx.arc(center.x,center.y,radius,Math.PI,0);
+    ctx.lineTo(center.x+radius,bottom);
+    ctx.lineTo(center.x-radius,bottom);
+    ctx.closePath();
+    ctx.fill();
+  });
+
+  [8.1,14.2].forEach(x=>{
+    const a=mapPoint(x-.42,0);
+    const b=mapPoint(x+.42,11.3);
+    const width=b.x-a.x;
+    const height=a.y-b.y;
+
+    const grad=ctx.createLinearGradient(a.x,0,b.x,0);
+    grad.addColorStop(0,"#526658");
+    grad.addColorStop(.45,"#9aaa9c");
+    grad.addColorStop(1,"#405247");
+    ctx.fillStyle=grad;
+    ctx.fillRect(a.x,b.y,width,height);
+    ctx.strokeStyle="#26372d";
+    ctx.lineWidth=2;
+    ctx.strokeRect(a.x,b.y,width,height);
+
+    ctx.fillStyle="#87988a";
+    ctx.fillRect(a.x-8,b.y-8,width+16,14);
+  });
+}
+
+function drawLavaAndPlatforms(){
+  const challenge=current();
+  const [lavaStart,lavaEnd]=challenge.lava;
+  const platformHeight=challenge.landingY;
+
+  drawTileRect({x:0,y:0,w:lavaStart,h:platformHeight},"#748fd2");
+  drawTileRect({x:lavaEnd,y:0,w:20-lavaEnd,h:platformHeight},"#748fd2");
+
+  const lavaTop=mapPoint(lavaStart,1).y;
+  const lavaBottom=mapPoint(lavaEnd,0).y;
+  const lavaLeft=mapPoint(lavaStart,0).x;
+  const lavaRight=mapPoint(lavaEnd,0).x;
+
+  ctx.fillStyle="#cf2907";
+  ctx.fillRect(lavaLeft,lavaTop,lavaRight-lavaLeft,lavaBottom-lavaTop);
+  ctx.fillStyle="#ff7910";
+
+  for(let i=0;i<44;i++){
+    const width=Math.max(1,lavaRight-lavaLeft);
+    const height=Math.max(8,lavaBottom-lavaTop);
+    const x=lavaLeft+((i*47)%width);
+    const y=lavaTop+4+((i*23)%Math.max(5,height-6));
+    ctx.beginPath();
+    ctx.arc(x,y,2+(i%5),0,Math.PI*2);
+    ctx.fill();
+  }
+
+  ctx.strokeStyle="#ffb11a";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  for(let x=lavaLeft;x<=lavaRight;x+=14){
+    const y=lavaTop+Math.sin(x*.08)*3;
+    if(x===lavaLeft)ctx.moveTo(x,y);
+    else ctx.lineTo(x,y);
+  }
+  ctx.stroke();
+}
+
+function drawStage2Background(){
+  const W=el.canvas.width,H=el.canvas.height;
+  ctx.fillStyle="#070a0d";
+  ctx.fillRect(0,0,W,H);
+
+  drawCastleLowerBackground();
+  drawTileRect({x:0,y:12,w:20,h:8},"#7e98dc");
+  drawLavaAndPlatforms();
+}
+
+
+function drawStage5Grid(){
+  const p=plot();
+  ctx.save();
+
+  for(let x=Math.ceil(p.xMin);x<=Math.floor(p.xMax);x++){
+    const a=mapPoint(x,p.yMin);
+    const b=mapPoint(x,p.yMax);
+    const isAxis=x===0;
+    ctx.strokeStyle=isAxis?"rgba(10,18,31,.9)":"rgba(10,18,31,.38)";
+    ctx.lineWidth=isAxis?2.2:1.15;
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  }
+
+  for(let y=Math.ceil(p.yMin);y<=Math.floor(p.yMax);y++){
+    const a=mapPoint(p.xMin,y);
+    const b=mapPoint(p.xMax,y);
+    const isAxis=y===0;
+    ctx.strokeStyle=isAxis?"rgba(10,18,31,.9)":"rgba(10,18,31,.38)";
+    ctx.lineWidth=isAxis?2.2:1.15;
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  }
+
+  ctx.font="bold 17px sans-serif";
+  ctx.textAlign="center";
+  ctx.fillStyle="#fff";
+  ctx.strokeStyle="rgba(38,53,78,.58)";
+  ctx.lineWidth=3;
+
+  const xStart=Math.ceil(p.xMin/p.labelStepX)*p.labelStepX;
+  for(let x=xStart;x<=p.xMax+1e-9;x+=p.labelStepX){
+    const value=Math.round(x*10)/10;
+    const point=mapPoint(value,0);
+    ctx.strokeText(String(value),point.x,point.y+28);
+    ctx.fillText(String(value),point.x,point.y+28);
+  }
+
+  ctx.textAlign="right";
+  const yStart=Math.ceil(p.yMin/p.labelStepY)*p.labelStepY;
+  for(let y=yStart;y<=p.yMax+1e-9;y+=p.labelStepY){
+    const value=Math.round(y*10)/10;
+    if(value===0)continue;
+    const point=mapPoint(0,value);
+    ctx.strokeText(String(value),point.x-9,point.y+6);
+    ctx.fillText(String(value),point.x-9,point.y+6);
+  }
+  ctx.restore();
+}
+
+
+function drawStage6Grid(){
+  const p=plot();
+  ctx.save();
+
+  for(let x=Math.ceil(p.xMin/2)*2;x<=p.xMax+1e-9;x+=2){
+    const a=mapPoint(x,p.yMin);
+    const b=mapPoint(x,p.yMax);
+    const major=Math.abs(x%10)<1e-9;
+    ctx.strokeStyle=major?"rgba(255,255,255,.28)":"rgba(255,255,255,.10)";
+    ctx.lineWidth=major?1.45:.75;
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  }
+
+  for(let y=Math.ceil(p.yMin/2)*2;y<=p.yMax+1e-9;y+=2){
+    const a=mapPoint(p.xMin,y);
+    const b=mapPoint(p.xMax,y);
+    const isAxis=Math.abs(y)<1e-9;
+    const major=Math.abs(y%10)<1e-9;
+    ctx.strokeStyle=isAxis?"rgba(255,255,255,.92)":major?"rgba(255,255,255,.30)":"rgba(255,255,255,.11)";
+    ctx.lineWidth=isAxis?2.5:major?1.45:.75;
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  }
+
+  ctx.font="bold 18px sans-serif";
+  ctx.fillStyle="#fff";
+  ctx.strokeStyle="rgba(38,20,12,.82)";
+  ctx.lineWidth=4;
+  ctx.textAlign="center";
+  for(let x=p.xMin;x<=p.xMax+1e-9;x+=p.labelStepX){
+    const point=mapPoint(x,0);
+    ctx.strokeText(String(x),point.x,point.y+28);
+    ctx.fillText(String(x),point.x,point.y+28);
+  }
+
+  ctx.textAlign="right";
+  for(let y=p.yMin;y<=p.yMax+1e-9;y+=p.labelStepY){
+    if(Math.abs(y)<1e-9)continue;
+    const point=mapPoint(p.xMax,y);
+    ctx.strokeText(String(y),el.canvas.width-7,point.y+6);
+    ctx.fillText(String(y),el.canvas.width-7,point.y+6);
+  }
+  ctx.restore();
+}
+
+function drawStage7Grid(){
+  const p=plot();
+  ctx.save();
+
+  for(let x=Math.ceil(p.xMin);x<=Math.floor(p.xMax);x++){
+    const a=mapPoint(x,p.yMin),b=mapPoint(x,p.yMax);
+    ctx.strokeStyle=x===0?"rgba(255,255,255,.88)":"rgba(255,255,255,.20)";
+    ctx.lineWidth=x===0?2.3:1;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+  for(let y=Math.ceil(p.yMin);y<=Math.floor(p.yMax);y++){
+    const a=mapPoint(p.xMin,y),b=mapPoint(p.xMax,y);
+    ctx.strokeStyle=y===0?"rgba(255,255,255,.88)":"rgba(255,255,255,.20)";
+    ctx.lineWidth=y===0?2.3:1;
+    ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+  }
+
+  ctx.font="bold 18px sans-serif";
+  ctx.fillStyle="#fff";
+  ctx.strokeStyle="rgba(28,34,42,.86)";
+  ctx.lineWidth=4;
+  ctx.textAlign="center";
+  for(let x=2;x<=p.xMax;x+=p.labelStepX){
+    const pt=mapPoint(x,0);
+    ctx.strokeText(String(x),pt.x,pt.y+28);
+    ctx.fillText(String(x),pt.x,pt.y+28);
+  }
+  ctx.textAlign="right";
+  for(let y=p.yMin;y<=p.yMax;y+=p.labelStepY){
+    if(y===0)continue;
+    const pt=mapPoint(0,y);
+    ctx.strokeText(String(y),pt.x-9,pt.y+6);
+    ctx.fillText(String(y),pt.x-9,pt.y+6);
+  }
+  ctx.restore();
+}
+
+function drawGrid(){
+  if(isStage7()){
+    drawStage7Grid();
+    return;
+  }
+  if(isStage6()){
+    drawStage6Grid();
+    return;
+  }
+  if(isStage5()){
+    drawStage5Grid();
+    return;
+  }
+  const p=plot();
+  ctx.save();
+  for(let x=0;x<=p.xMax;x++){
+    const a=mapPoint(x,0);
+    const b=mapPoint(x,p.yMax);
+    ctx.strokeStyle=x===0?"rgba(10,18,31,.9)":"rgba(10,18,31,.38)";
+    ctx.lineWidth=x===0?2.2:1.15;
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  }
+  for(let y=0;y<=p.yMax;y++){
+    const a=mapPoint(0,y);
+    const b=mapPoint(p.xMax,y);
+    ctx.strokeStyle=y===0?"rgba(10,18,31,.9)":"rgba(10,18,31,.38)";
+    ctx.lineWidth=y===0?2.2:1.15;
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y);
+    ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  }
+
+  const labelStep=p.xMax===20?5:2;
+  ctx.font="bold 17px sans-serif";
+  ctx.textAlign="center";
+  ctx.fillStyle="#fff";
+  ctx.strokeStyle="rgba(38,53,78,.58)";
+  ctx.lineWidth=3;
+
+  for(let x=labelStep;x<=p.xMax;x+=labelStep){
+    const point=mapPoint(x,0);
+    ctx.strokeText(String(x),point.x,point.y+28);
+    ctx.fillText(String(x),point.x,point.y+28);
+  }
+
+  ctx.textAlign="right";
+  for(let y=labelStep;y<=p.yMax;y+=labelStep){
+    const point=mapPoint(0,y);
+    ctx.strokeText(String(y),point.x-9,point.y+6);
+    ctx.fillText(String(y),point.x-9,point.y+6);
+  }
+  ctx.restore();
+}
+
+function stage1Range(){
+  const {a,p,q}=state.params;
+  if(a>=0||q<=0)return[0,currentStage().plot.xMax];
+  const distance=Math.sqrt(q/Math.abs(a));
+  return[
+    Math.max(0,p-distance),
+    Math.min(currentStage().plot.xMax,p+distance)
+  ];
+}
+
+function stage2Range(){
+  return[0,20];
+}
+
+
+function curveCurrentA(curve){
+  if(currentStage().type==="double"){
+    return state.params[`a${curve}`];
+  }
+  return state.params[stage4ValueKey(curve,"a")];
+}
+
+function curveTargetA(curve){
+  if(currentStage().type==="double"){
+    return current().target[`a${curve}`];
+  }
+  return current().target.vertex[stage4ValueKey(curve,"a")];
+}
+
+function curveDirectionMatchesTarget(curve){
+  const currentA=curveCurrentA(curve);
+  const targetA=curveTargetA(curve);
+  return Math.abs(currentA)>1e-9 && Math.sign(currentA)===Math.sign(targetA);
+}
+
+function curveRootsForDrawing(curve){
+  if(currentStage().type==="double"){
+    const r=state.params[`r${curve}`];
+    const s=state.params[`s${curve}`];
+    return [Math.min(r,s),Math.max(r,s)];
+  }
+  return stage4Roots(curve);
+}
+
+function curveDrawRange(curve){
+  const p=plot();
+
+  // 4단계는 실제 점프 구간만 표시합니다.
+  // 첫 포물선은 바닥에서 첫 기둥까지, 두 번째 포물선은 첫 기둥에서 오른쪽 기둥까지입니다.
+  if(isStage4PipeJump()){
+    return curve===1
+      ?[current().jumpStartX,current().landing1.x]
+      :[current().landing1.x,current().landing2.x];
+  }
+
+  // 6단계도 벽돌 장애물을 넘는 실제 두 점프 구간만 표시합니다.
+  if(isStage6()&&Number.isFinite(current().jumpStartX)){
+    return curve===1
+      ?[current().jumpStartX,current().landing1.x]
+      :[current().jump2StartX,current().landing2.x];
+  }
+
+  const roots=curveRootsForDrawing(curve);
+
+  if(!curveDirectionMatchesTarget(curve)||!roots){
+    return [p.xMin,p.xMax];
+  }
+
+  return [
+    Math.max(p.xMin,roots[0]),
+    Math.min(p.xMax,roots[1])
+  ];
+}
+
+function parabolaCurveColor(curve=1){
+  // 3단계는 요청대로 두 포물선을 모두 검정색 점으로 표시합니다.
+  if(currentStage().type==="double")return "#080808";
+
+  // 2단계는 용암 배경에서 또렷하게 보이는 밝은 노란색을 사용합니다.
+  if(currentStage().type==="lava")return "#fff06a";
+
+  // 5단계는 어두운 배경에서 두 포물선이 잘 구별되도록 밝은 색을 사용합니다.
+  if(isStage5())return curve===1?"#8ff7ff":"#ffe45c";
+
+  // 나머지 단계의 기존 색상은 그대로 유지합니다.
+  if(isStage6()||isStage7()){
+    if(currentStage().type==="doubleDirect"){
+      return curve===1?"#fffdf2":"#ffd83d";
+    }
+    return "#fffdf2";
+  }
+
+  return "#080808";
+}
+
+function drawHighContrastCurveDot(x,y,color,radius=3){
+  const point=mapPoint(x,y);
+  ctx.save();
+  ctx.fillStyle=color;
+
+  // 검정색 점은 참고 사진처럼 효과 없이 단순하고 또렷하게 표시합니다.
+  // 밝은 점은 어두운 배경에서만 아주 약한 그림자를 더합니다.
+  if(color!=="#080808"){
+    ctx.shadowColor="rgba(0,0,0,.38)";
+    ctx.shadowBlur=1.4;
+  }
+
+  ctx.beginPath();
+  ctx.arc(point.x,point.y,radius,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+// 포물선 위 점을 화면상의 일정한 간격으로만 표시합니다.
+// 꼭짓점처럼 기울기가 작은 부분에서도 동그라미가 다닥다닥 붙지 않습니다.
+function drawSpacedCurveDots(start,end,yValue,color,radius=3,minGap=10.5){
+  const p=plot();
+  const samples=520;
+  let previousPoint=null;
+  let lastVisible=null;
+
+  for(let i=0;i<=samples;i++){
+    const x=start+(end-start)*i/samples;
+    const y=yValue(x);
+    if(y<p.yMin||y>p.yMax)continue;
+
+    const mapped=mapPoint(x,y);
+    lastVisible={x,y,mapped};
+    const farEnough=!previousPoint||Math.hypot(
+      mapped.x-previousPoint.x,
+      mapped.y-previousPoint.y
+    )>=minGap;
+
+    if(farEnough){
+      drawHighContrastCurveDot(x,y,color,radius);
+      previousPoint=mapped;
+    }
+  }
+
+  // 곡선의 마지막 보이는 끝점이 빠지지 않도록 필요할 때 한 점을 추가합니다.
+  if(lastVisible&&previousPoint&&Math.hypot(
+    lastVisible.mapped.x-previousPoint.x,
+    lastVisible.mapped.y-previousPoint.y
+  )>=minGap*.55){
+    drawHighContrastCurveDot(lastVisible.x,lastVisible.y,color,radius);
+  }
+}
+
+function drawDoubleParabolas(){
+  [1,2].forEach(curve=>{
+    const [start,end]=curveDrawRange(curve);
+    if(!Number.isFinite(start)||!Number.isFinite(end)||end<=start)return;
+
+    const yValue=currentStage().type==="double"
+      ?x=>doubleF(curve,x)
+      :x=>stage4F(curve,x);
+    const color=parabolaCurveColor(curve);
+
+    drawSpacedCurveDots(start,end,yValue,color,3,10.5);
+  });
+}
+
+function drawParabola(){
+  // 문제를 처음 열었을 때는 포물선을 그리지 않습니다.
+  // 학생이 함수식의 값을 한 번이라도 조절한 뒤부터 표시합니다.
+  if(!state.hasEquationInput)return;
+
+  if(currentStage().type==="double"||currentStage().type==="doubleDirect"){
+    drawDoubleParabolas();
+    return;
+  }
+
+  const p=plot();
+  const color=parabolaCurveColor(1);
+
+  if(isStage7()){
+    drawSpacedCurveDots(p.xMin,p.xMax,x=>f(x),color,3,10.5);
+    return;
+  }
+
+  const range=currentStage().type==="coins"?stage1Range():stage2Range();
+  const start=range[0],end=range[1];
+  drawSpacedCurveDots(
+    start,
+    end,
+    x=>f(x),
+    color,
+    3,
+    10.5
+  );
+}
+
+function drawTrail(){
+  if(state.trail.length<2)return;
+
+  // 서로 다른 포물선 구간은 각각 따로 그립니다.
+  // 따라서 6단계의 첫 점프와 두 번째 점프 사이에 가로 연결선이 생기지 않습니다.
+  const grouped=[];
+  let active=null;
+  let previousSegment=Symbol("none");
+
+  state.trail.forEach(point=>{
+    if(!point)return;
+    const segment=point.segment??0;
+    if(!active||segment!==previousSegment){
+      active={segment,points:[]};
+      grouped.push(active);
+      previousSegment=segment;
+    }
+    active.points.push(point);
+  });
+
+  grouped.forEach(group=>{
+    if(group.points.length<2)return;
+    ctx.save();
+    const curveNumber=group.segment===2?2:1;
+    ctx.strokeStyle=parabolaCurveColor(curveNumber);
+    ctx.globalAlpha=.58;
+    ctx.shadowBlur=0;
+    ctx.lineWidth=1.5;
+    ctx.lineCap="round";
+    ctx.lineJoin="round";
+    ctx.beginPath();
+    group.points.forEach((point,index)=>{
+      const mapped=mapPoint(point.x,point.y);
+      if(index===0)ctx.moveTo(mapped.x,mapped.y);
+      else ctx.lineTo(mapped.x,mapped.y);
+    });
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function targetY(x){
+  const target=current().target;
+  return target.a*Math.pow(x-target.p,2)+target.q;
+}
+
+function drawCoin(x,y,collected,index){
+  const point=mapPoint(x,y);
+  ctx.save();
+  ctx.translate(point.x,point.y);
+
+  if(collected){
+    ctx.globalAlpha=.18;
+    ctx.fillStyle="#fff";
+    ctx.beginPath();
+    ctx.arc(0,0,13,0,Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  const pulse=1+Math.sin(performance.now()/260+index)*.05;
+  ctx.scale(pulse,pulse);
+  ctx.shadowColor="rgba(255,211,31,.75)";
+  ctx.shadowBlur=13;
+  ctx.fillStyle="#ffd12f";
+  ctx.strokeStyle="#aa6800";
+  ctx.lineWidth=2.2;
+  ctx.beginPath();
+  ctx.arc(0,0,15,0,Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.shadowBlur=0;
+
+  ctx.strokeStyle="#fff0a1";
+  ctx.lineWidth=2;
+  ctx.beginPath();
+  ctx.arc(0,0,10,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.fillStyle="#bf7900";
+  ctx.font="bold 16px sans-serif";
+  ctx.textAlign="center";
+  ctx.textBaseline="middle";
+  ctx.fillText("★",0,1);
+  ctx.restore();
+}
+
+function drawStar(x,y,collected,index){
+  const point=mapPoint(x,y);
+  ctx.save();
+  ctx.translate(point.x,point.y);
+
+  if(collected){
+    ctx.globalAlpha=.18;
+  }
+
+  const pulse=1+Math.sin(performance.now()/250+index*.8)*.06;
+  ctx.scale(pulse,pulse);
+  ctx.shadowColor="rgba(255,224,45,.8)";
+  ctx.shadowBlur=14;
+  ctx.fillStyle="#ffe02f";
+  ctx.strokeStyle="#a56b00";
+  ctx.lineWidth=2.2;
+  ctx.beginPath();
+  for(let i=0;i<10;i++){
+    const angle=-Math.PI/2+i*Math.PI/5;
+    const radius=i%2===0?17:7.5;
+    const px=Math.cos(angle)*radius;
+    const py=Math.sin(angle)*radius;
+    if(i===0)ctx.moveTo(px,py);
+    else ctx.lineTo(px,py);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawStage3Items(){
+  current().items.forEach((item,index)=>{
+    const y=targetDoubleY(item);
+    if(item.type==="star")drawStar(item.x,y,state.collected[index],index);
+    else drawCoin(item.x,y,state.collected[index],index);
+  });
+}
+
+function stage3ItemMatches(index){
+  const item=current().items[index];
+  return Math.abs(doubleF(item.curve,item.x)-targetDoubleY(item))<.28;
+}
+
+function drawStage4Items(){
+  current().items.forEach((item,index)=>{
+    const y=stage4TargetF(item.curve,item.x);
+    if(item.type==="star")drawStar(item.x,y,state.collected[index],index);
+    else drawCoin(item.x,y,state.collected[index],index);
+  });
+}
+
+function stage4ItemMatches(index){
+  const item=current().items[index];
+  return Math.abs(stage4F(item.curve,item.x)-stage4TargetF(item.curve,item.x))<.28;
+}
+
+function stage7ChallengeMonsters(){
+  if(!isStage7())return[];
+  if(Array.isArray(current().monsters)&&current().monsters.length){
+    return current().monsters;
+  }
+  // 이전 형식의 문제 데이터도 안전하게 읽습니다.
+  if(Number.isFinite(current().monsterX)){
+    return[{x:current().monsterX,groundY:current().monsterGroundY}];
+  }
+  return[];
+}
+
+function initialMonsters(){
+  if(!isStage7())return[];
+  return stage7ChallengeMonsters().map((monster,index)=>({
+    index,
+    state:"normal",
+    x:monster.x,
+    y:monster.groundY,
+    originX:monster.x,
+    originY:monster.groundY,
+    rotation:0,
+    scale:1,
+    alpha:1,
+    hitAt:null
+  }));
+}
+
+function drawOneBossMonster(m){
+  if(!m||m.state==="none")return;
+  const point=mapPoint(m.x,m.y);
+  ctx.save();
+  ctx.globalAlpha=m.alpha??1;
+  ctx.translate(point.x,point.y);
+  ctx.rotate(m.rotation||0);
+  ctx.scale((m.scale||1)*.82,(m.scale||1)*.82);
+  ctx.lineJoin="round";
+  ctx.lineCap="round";
+
+  if(m.state==="ball"){
+    // 몸을 완전히 웅크린 가시 공 형태
+    const ballGradient=ctx.createRadialGradient(-10,-44,5,0,-30,42);
+    ballGradient.addColorStop(0,"#58c55b");
+    ballGradient.addColorStop(.52,"#18893a");
+    ballGradient.addColorStop(1,"#0c4c28");
+    ctx.fillStyle=ballGradient;
+    ctx.strokeStyle="#102d1b";
+    ctx.lineWidth=4;
+    ctx.beginPath();
+    ctx.arc(0,-30,36,0,Math.PI*2);
+    ctx.fill();ctx.stroke();
+
+    ctx.fillStyle="#eee2bd";
+    ctx.strokeStyle="#5c4528";
+    ctx.lineWidth=2.5;
+    for(let i=0;i<12;i++){
+      const a=i*Math.PI/6;
+      const sx=Math.cos(a)*35,sy=-30+Math.sin(a)*35;
+      ctx.save();ctx.translate(sx,sy);ctx.rotate(a+Math.PI/2);
+      ctx.beginPath();ctx.moveTo(-7,2);ctx.lineTo(0,-21);ctx.lineTo(7,2);ctx.closePath();
+      ctx.fill();ctx.stroke();ctx.restore();
+    }
+    // 웅크린 상태에서도 등껍질 무늬가 보이도록 합니다.
+    ctx.strokeStyle="rgba(239,215,84,.68)";
+    ctx.lineWidth=3;
+    ctx.beginPath();ctx.arc(0,-30,22,.2,2.9);ctx.stroke();
+    ctx.beginPath();ctx.arc(0,-30,22,3.35,6.05);ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
+  // 강아지가 있는 방향으로 몸 전체를 돌립니다.
+  // 기본 그림의 머리는 오른쪽이므로, 강아지가 왼쪽에 있으면 좌우 반전합니다.
+  const facing=state.dog.x<m.x?-1:1;
+  ctx.scale(facing,1);
+
+  const squash=m.state==="squash"?.58:1;
+  ctx.scale(1,squash);
+
+  // 바닥 그림자
+  ctx.fillStyle="rgba(0,0,0,.28)";
+  ctx.beginPath();ctx.ellipse(0,1,58,12,0,0,Math.PI*2);ctx.fill();
+
+  // 꼬리와 꼬리 가시
+  ctx.fillStyle="#ca6e1e";
+  ctx.strokeStyle="#4c250d";
+  ctx.lineWidth=3.2;
+  ctx.beginPath();
+  ctx.moveTo(-35,-45);
+  ctx.quadraticCurveTo(-66,-53,-73,-29);
+  ctx.quadraticCurveTo(-59,-37,-43,-25);
+  ctx.closePath();ctx.fill();ctx.stroke();
+  ctx.fillStyle="#eee2bd";
+  [-62,-50].forEach((x,index)=>{
+    ctx.save();ctx.translate(x,-38+index*5);ctx.rotate(-.45);
+    ctx.beginPath();ctx.moveTo(-6,3);ctx.lineTo(0,-16);ctx.lineTo(7,3);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+  });
+
+  // 굵은 다리와 발톱
+  ctx.fillStyle="#b85e18";
+  [-28,24].forEach((x,index)=>{
+    ctx.beginPath();ctx.ellipse(x,-10,18,14,index?-.12:.12,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle="#e99b2f";
+    ctx.beginPath();ctx.ellipse(x+(index?7:-7),-2,20,9,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+    ctx.fillStyle="#f4ead0";
+    for(let c=0;c<3;c++){
+      const cx=x+(index?8:-8)+(c-1)*8;
+      ctx.beginPath();ctx.moveTo(cx-4,1);ctx.lineTo(cx,11);ctx.lineTo(cx+5,1);ctx.closePath();ctx.fill();ctx.stroke();
+    }
+    ctx.fillStyle="#b85e18";
+  });
+
+  // 몸통
+  ctx.fillStyle="#d77a20";
+  ctx.beginPath();ctx.ellipse(4,-43,43,35,-.05,0,Math.PI*2);ctx.fill();ctx.stroke();
+
+  // 짙은 녹색 등껍질
+  const shellGradient=ctx.createRadialGradient(-13,-72,8,-5,-54,55);
+  shellGradient.addColorStop(0,"#49aa50");
+  shellGradient.addColorStop(.5,"#187d39");
+  shellGradient.addColorStop(1,"#0a4729");
+  ctx.fillStyle=shellGradient;
+  ctx.beginPath();ctx.ellipse(-11,-58,53,45,-.08,0,Math.PI*2);ctx.fill();ctx.stroke();
+
+  // 등껍질 판 무늬
+  ctx.strokeStyle="#d7b83e";
+  ctx.lineWidth=3;
+  ctx.beginPath();ctx.moveTo(-54,-57);ctx.quadraticCurveTo(-10,-35,34,-56);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(-44,-78);ctx.quadraticCurveTo(-10,-57,26,-79);ctx.stroke();
+  [-32,-8,16].forEach(x=>{
+    ctx.beginPath();ctx.moveTo(x,-94);ctx.quadraticCurveTo(x-7,-58,x,-22);ctx.stroke();
+  });
+
+  // 등껍질의 크고 날카로운 가시
+  ctx.fillStyle="#efe1b8";
+  ctx.strokeStyle="#5b4224";
+  ctx.lineWidth=2.7;
+  for(let i=0;i<8;i++){
+    const a=-Math.PI*.88+i*(Math.PI*1.76/7);
+    const sx=-11+Math.cos(a)*49,sy=-58+Math.sin(a)*41;
+    ctx.save();ctx.translate(sx,sy);ctx.rotate(a+Math.PI/2);
+    ctx.beginPath();ctx.moveTo(-9,3);ctx.lineTo(0,-24);ctx.lineTo(9,3);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+  }
+
+  // 앞팔과 손톱
+  ctx.fillStyle="#d77a20";
+  ctx.strokeStyle="#4c250d";
+  ctx.lineWidth=3.2;
+  ctx.save();ctx.translate(30,-38);ctx.rotate(-.35);
+  ctx.beginPath();ctx.ellipse(0,0,12,24,0,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#f4ead0";
+  [-6,0,6].forEach(cx=>{
+    ctx.beginPath();ctx.moveTo(cx-3,17);ctx.lineTo(cx,31);ctx.lineTo(cx+4,17);ctx.closePath();ctx.fill();ctx.stroke();
+  });
+  ctx.restore();
+
+  // 두꺼운 목과 괴물 머리
+  ctx.fillStyle="#ca6e1e";
+  ctx.beginPath();ctx.ellipse(31,-57,29,31,-.18,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#e08c28";
+  ctx.beginPath();ctx.ellipse(48,-69,28,27,-.06,0,Math.PI*2);ctx.fill();ctx.stroke();
+  // 주둥이
+  ctx.fillStyle="#c9641d";
+  ctx.beginPath();ctx.ellipse(59,-55,23,15,.04,0,Math.PI*2);ctx.fill();ctx.stroke();
+
+  // 큰 뿔 3개
+  ctx.fillStyle="#f1e5c4";
+  [[31,-90,-.43],[48,-98,0],[64,-89,.42]].forEach(([x,y,r])=>{
+    ctx.save();ctx.translate(x,y);ctx.rotate(r);
+    ctx.beginPath();ctx.moveTo(-7,6);ctx.lineTo(0,-25);ctx.lineTo(8,6);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+  });
+
+  // 사나운 눈, 붉은 눈썹, 세로 동공
+  ctx.fillStyle="#fff7b5";
+  ctx.beginPath();ctx.ellipse(43,-74,7,8,0,0,Math.PI*2);ctx.ellipse(59,-73,7,8,0,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle="#1a0b06";
+  ctx.fillRect(42,-80,2.8,13);ctx.fillRect(58,-79,2.8,13);
+  ctx.strokeStyle="#a51e17";
+  ctx.lineWidth=5;
+  ctx.beginPath();ctx.moveTo(35,-85);ctx.lineTo(48,-80);ctx.moveTo(55,-80);ctx.lineTo(68,-85);ctx.stroke();
+
+  // 콧구멍
+  ctx.fillStyle="#35130c";
+  ctx.beginPath();ctx.ellipse(61,-59,2.8,2,0,0,Math.PI*2);ctx.ellipse(70,-58,2.8,2,0,0,Math.PI*2);ctx.fill();
+
+  // 벌어진 입과 송곳니
+  ctx.fillStyle="#52120f";
+  ctx.beginPath();ctx.ellipse(58,-48,20,10,.05,0,Math.PI*2);ctx.fill();ctx.stroke();
+  ctx.fillStyle="#f7efd8";
+  [[47,-53],[57,-55],[67,-53]].forEach(([x,y])=>{
+    ctx.beginPath();ctx.moveTo(x-4,y);ctx.lineTo(x,y+10);ctx.lineTo(x+4,y);ctx.closePath();ctx.fill();ctx.stroke();
+  });
+  ctx.fillStyle="#e94d3f";
+  ctx.beginPath();ctx.ellipse(59,-44,10,3,0,0,Math.PI*2);ctx.fill();
+
+  // 머리 옆 작은 가시
+  ctx.fillStyle="#efe1b8";
+  [[25,-72,-1.2],[28,-53,-1.55]].forEach(([x,y,r])=>{
+    ctx.save();ctx.translate(x,y);ctx.rotate(r);
+    ctx.beginPath();ctx.moveTo(-5,2);ctx.lineTo(0,-15);ctx.lineTo(6,2);ctx.closePath();ctx.fill();ctx.stroke();ctx.restore();
+  });
+
+  ctx.restore();
+}
+function drawBossMonsters(){
+  if(!isStage7()||!Array.isArray(state.monsters))return;
+  state.monsters.forEach(drawOneBossMonster);
+}
+
+function drawScene(){
+  if(currentStage().type==="coins")drawStage1Background();
+  else if(currentStage().type==="lava")drawStage2Background();
+  else if(currentStage().type==="double")drawStage3Background();
+  else if(isStage7())drawStage7Background();
+  else if(isStage6())drawStage6Background();
+  else if(isStage5())drawStage5Background();
+  else drawStage4Background();
+
+  drawGrid();
+  drawParabola();
+  if(state.animating)drawTrail();
+
+  if(currentStage().type==="coins"){
+    current().coinX.forEach((x,index)=>{
+      drawCoin(x,targetY(x),state.collected[index],index);
+    });
+  }else if(currentStage().type==="double"){
+    drawStage3Items();
+  }else if(currentStage().type==="doubleDirect"){
+    drawStage4Items();
+  }
+
+  if(isStage7())drawBossMonsters();
+
+  const dogPoint=mapPoint(state.dog.x,state.dog.y);
+  const isLava=currentStage().type==="lava";
+  const isBoss=isStage7();
+  drawDog(
+    dogPoint.x,
+    dogPoint.y-(isLava?18:isBoss?19:23),
+    isLava?.58:isBoss?.64:.72,
+    state.dog.rotation,
+    state.dog.phase
+  );
+}
+
+function stageScore(){
+  if(state.stage===0){
+    const values=[3,4,5];
+    return state.completedChallenges[0].reduce(
+      (sum,done,index)=>sum+(done?values[index]:0),0
+    );
+  }
+  return state.completedChallenges[1].filter(Boolean).length;
+}
+
+function fitEquationEditors(){
+  requestAnimationFrame(()=>{
+    const editors=document.querySelectorAll(
+      ".equation-editor,.stage3-inline-editor,.stage4-inline-editor"
+    );
+
+    editors.forEach(editor=>{
+      editor.classList.remove("formula-tight","formula-ultra-tight");
+
+      if(editor.scrollWidth>editor.clientWidth+2){
+        editor.classList.add("formula-tight");
+      }
+      if(editor.scrollWidth>editor.clientWidth+2){
+        editor.classList.add("formula-ultra-tight");
+      }
+    });
+  });
+}
+
+function updateUI(){
+  const challengeIndex=currentChallengeIndex();
+  const stageType=currentStage().type;
+
+  updateStageControls(stageType);
+  el.equationHead.textContent="함수식 입력";
+  if(stageType==="doubleDirect"){
+    el.stage4Hint.textContent=state.stage===3
+      ?"표준형과 인수분해형 중 편한 방법으로 도전해 보세요."
+      :"먼저 식의 형태를 고른 뒤 버튼으로 값을 직접 조절하세요.";
+  }
+
+  if(stageType==="double"){
+    el.a1Value.textContent=displayNumber(state.params.a1);
+    el.a2Value.textContent=displayNumber(state.params.a2);
+    el.r1Value.textContent=displayNumber(state.params.r1);
+    el.s1Value.textContent=displayNumber(state.params.s1);
+    el.r2Value.textContent=displayNumber(state.params.r2);
+    el.s2Value.textContent=displayNumber(state.params.s2);
+  }else if(stageType==="doubleDirect"){
+    renderStage4Card();
+  }else{
+    el.aValue.textContent=displayNumber(state.params.a);
+    el.pValue.textContent=displayNumber(state.params.p);
+    el.qValue.textContent=displayNumber(state.params.q);
+    el.helpA.textContent="a: 0.5씩 조절";
+    el.helpP.textContent="p: 1씩 조절";
+    el.helpQ.textContent="q: 1씩 조절";
+  }
+
+  el.stageNavText.textContent=`${state.stage+1}단계 / ${STAGES.length}`;
+  el.stageDoneText.textContent=stageCompleted(state.stage)?"완료":"미완료";
+  el.stageDoneText.classList.toggle("done",stageCompleted(state.stage));
+
+  el.prevStage.disabled=state.stage===0;
+  el.nextStage.disabled=state.stage===STAGES.length-1;
+  el.prevProblem.disabled=currentChallengeIndex()===0;
+  el.resetProblem.disabled=state.animating;
+  el.nextProblem.disabled=currentChallengeIndex()===currentStage().challenges.length-1;
+
+  if(!state.animating)el.run.textContent=runButtonLabel();
+  el.stageBadge.textContent=currentStage().badge;
+  el.challengeStat.textContent=`${challengeIndex+1} / ${currentStage().challenges.length}`;
+  el.progressLabel.textContent=`${currentStage().name} 진행`;
+  el.progressText.textContent=`${challengeIndex+1} / ${currentStage().challenges.length}`;
+
+  el.dots.innerHTML="";
+  currentStage().challenges.forEach((_,index)=>{
+    const dot=document.createElement("span");
+    dot.className="dot";
+    if(state.completedChallenges[state.stage][index])dot.classList.add("done");
+    else if(index===challengeIndex)dot.classList.add("current");
+    el.dots.appendChild(dot);
+  });
+
+  drawScene();
+  fitEquationEditors();
+}
+
+function initialDog(){
+  if(isStage4PipeJump()){
+    return{x:current().dogStartX??.5,y:0,rotation:0,phase:0};
+  }
+  if(usesSignedPlot()){
+    return{
+      x:current().dogStartX,
+      y:current().dogStartY,
+      rotation:0,
+      phase:0
+    };
+  }
+  if(["coins","double","doubleDirect"].includes(currentStage().type)){
+    return{x:1,y:0,rotation:0,phase:0};
+  }
+  return{
+    x:current().dogStartX??1,
+    y:current().landingY,
+    rotation:0,
+    phase:0
+  };
+}
+
+function setParameterButtonsDisabled(disabled){
+  document.querySelectorAll("[data-param]").forEach(button=>{
+    button.disabled=disabled;
+  });
+
+}
+
+function saveCurrentAnswer(){
+  const saved={
+    params:{...state.params},
+    hasEquationInput:state.hasEquationInput
+  };
+  if(currentStage().type==="doubleDirect"){
+    saved.mode=state.stage4Mode;
+  }
+  state.savedAnswers[state.stage][currentChallengeIndex()]=saved;
+  persistProblemProgress();
+}
+
+function restoreOrInitializeCurrent(){
+  const saved=state.savedAnswers[state.stage][currentChallengeIndex()];
+
+  if(saved){
+    if(currentStage().type==="doubleDirect" && saved.mode){
+      state.stage4Mode=saved.mode;
+    }
+    state.params={...saved.params};
+    state.hasEquationInput=Boolean(saved.hasEquationInput);
+    return;
+  }
+
+  state.hasEquationInput=false;
+
+  if(currentStage().type==="doubleDirect"){
+    const initialKey=stage4CurrentMode()==="factor"?"initialFactor":"initialVertex";
+    state.params={...current()[initialKey]};
+  }else{
+    state.params={...current().initial};
+  }
+}
+
+function loadCurrent(){
+  clearTimeout(state.transitionTimer);
+  state.runToken++;
+  state.animating=false;
+  state.status="ready";
+
+  restoreOrInitializeCurrent();
+
+  state.collected=currentStage().type==="coins"
+    ?current().coinX.map(()=>false)
+    :["double","doubleDirect"].includes(currentStage().type)
+      ?current().items.map(()=>false)
+      :[];
+  state.trail=[];
+  state.dog=initialDog();
+  state.monsters=initialMonsters();
+
+  el.run.disabled=false;
+  el.run.textContent=runButtonLabel();
+  el.resetProblem.disabled=false;
+  setParameterButtonsDisabled(false);
+  updateUI();
+}
+
+function selectStage(index){
+  if(index<0||index>=STAGES.length||index===state.stage)return;
+  saveCurrentAnswer();
+  clearTimeout(state.transitionTimer);
+  state.runToken++;
+  state.animating=false;
+  state.stage=index;
+  loadCurrent();
+}
+
+function selectProblem(index){
+  const maxIndex=currentStage().challenges.length-1;
+  if(index<0||index>maxIndex||index===currentChallengeIndex())return;
+
+  saveCurrentAnswer();
+  clearTimeout(state.transitionTimer);
+  state.runToken++;
+  state.animating=false;
+  state.status="ready";
+  state.challengeByStage[state.stage]=index;
+  loadCurrent();
+}
+
+function resetCurrentProblem(){
+  if(state.animating)return;
+
+  clearTimeout(state.transitionTimer);
+  state.runToken++;
+  state.status="ready";
+  state.savedAnswers[state.stage][currentChallengeIndex()]=null;
+  state.hasEquationInput=false;
+  persistProblemProgress();
+
+  if(currentStage().type==="doubleDirect"){
+    const initialKey=stage4CurrentMode()==="factor"?"initialFactor":"initialVertex";
+    state.params={...current()[initialKey]};
+  }else{
+    state.params={...current().initial};
+  }
+
+  state.collected=currentStage().type==="coins"
+    ?current().coinX.map(()=>false)
+    :["double","doubleDirect"].includes(currentStage().type)
+      ?current().items.map(()=>false)
+      :[];
+  state.trail=[];
+  state.dog=initialDog();
+  state.monsters=initialMonsters();
+
+  el.run.disabled=false;
+  el.run.textContent=runButtonLabel();
+  el.resetProblem.disabled=false;
+  setParameterButtonsDisabled(false);
+  playSound("click");
+  showToast("현재 문제를 시작값으로 초기화했습니다.");
+  updateUI();
+}
+
+function adjustParameter(param,direction){
+  if(state.animating||state.status==="success")return;
+
+  let bounds;
+  if(currentStage().type==="doubleDirect"){
+    bounds=current().bounds[stage4CurrentMode()][param];
+  }else{
+    bounds=current().bounds[param];
+  }
+
+  // 모든 단계 공통:
+  // 이차항의 계수(a, a1, a2)는 0.5 간격,
+  // 나머지 값은 모두 1 간격으로만 움직입니다.
+  const isQuadraticCoefficient=/^a\d*$/.test(param);
+  const step=isQuadraticCoefficient?.5:1;
+  const currentValue=Number(state.params[param]);
+  const snappedCurrent=isQuadraticCoefficient
+    ?Math.round(currentValue*2)/2
+    :Math.round(currentValue);
+  const next=snappedCurrent+direction*step;
+  const clamped=Math.max(bounds[0],Math.min(bounds[1],next));
+
+  state.params[param]=isQuadraticCoefficient
+    ?Math.round(clamped*2)/2
+    :Math.round(clamped);
+  state.hasEquationInput=true;
+  state.collected=currentStage().type==="coins"
+    ?current().coinX.map(()=>false)
+    :["double","doubleDirect"].includes(currentStage().type)
+      ?current().items.map(()=>false)
+      :[];
+  state.trail=[];
+  state.dog=initialDog();
+  saveCurrentAnswer();
+  playSound("click");
+  updateUI();
+}
+
+function coinMatches(index){
+  const x=current().coinX[index];
+  return Math.abs(f(x)-targetY(x))<.25;
+}
+
+function runStage1(token){
+  state.collected=current().coinX.map(()=>false);
+  const [curveStart,curveEnd]=stage1Range();
+  const groundStart=1;
+  const groundEnd=13.2;
+  const duration=3900;
+  const begin=performance.now();
+  let previousX=curveStart;
+
+  function frame(now){
+    if(token!==state.runToken)return;
+
+    const t=Math.min(1,(now-begin)/duration);
+    let x,y,rotation=0;
+    const phase=t*34;
+
+    if(t<.2){
+      const u=t/.2;
+      x=groundStart+(curveStart-groundStart)*u;
+      y=0;
+    }else if(t<.86){
+      const u=(t-.2)/.66;
+      const eased=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+      x=curveStart+(curveEnd-curveStart)*eased;
+      y=Math.max(0,f(x));
+      rotation=Math.atan(-(2*state.params.a*(x-state.params.p)))*.13;
+
+      state.trail.push({x,y});
+      if(state.trail.length>170)state.trail.shift();
+
+      current().coinX.forEach((coinX,index)=>{
+        if(state.collected[index]||!coinMatches(index))return;
+        const crossed=previousX<=coinX&&x>=coinX;
+        if(crossed||Math.abs(x-coinX)<.14){
+          state.collected[index]=true;
+          playSound("coin");
+        }
+      });
+      previousX=x;
+    }else{
+      const u=(t-.86)/.14;
+      x=curveEnd+(groundEnd-curveEnd)*u;
+      y=0;
+    }
+
+    state.dog={x,y,rotation,phase};
+    drawScene();
+
+    if(t<1)requestAnimationFrame(frame);
+    else finishStage1();
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function stage2Collision(x,y){
+  const [lavaStart,lavaEnd]=current().lava;
+
+  if(y<0||y>=12)return true;
+  if(x>lavaStart&&x<lavaEnd&&y<=1.25)return true;
+  return false;
+}
+
+function evaluateStage2Path(){
+  const challenge=current();
+  const {a,p,q}=state.params;
+  const platformY=challenge.landingY;
+  const [lavaStart,lavaEnd]=challenge.lava;
+  const edgeTolerance=.12;
+
+  const result={
+    startOK:false,
+    endOK:false,
+    crashed:false,
+    success:false,
+    reason:"landing",
+    startX:challenge.startX,
+    endX:challenge.endX
+  };
+
+  if(a>=0){
+    result.reason="direction";
+    return result;
+  }
+
+  // 포물선과 발판 윗면 y=landingY의 실제 교점을 구한다.
+  // 고정된 startX/endX의 함수값을 비교하면, 그림상 발판에 정확히
+  // 닿아도 오답이 되는 문제가 생기므로 실제 두 교점으로 판정한다.
+  const radiusSquared=(platformY-q)/a;
+  if(radiusSquared<0){
+    result.reason="height";
+    return result;
+  }
+
+  const radius=Math.sqrt(radiusSquared);
+  const leftIntersection=p-radius;
+  const rightIntersection=p+radius;
+
+  result.startX=leftIntersection;
+  result.endX=rightIntersection;
+  result.startOK=
+    leftIntersection>=0-edgeTolerance &&
+    leftIntersection<=lavaStart+edgeTolerance;
+  result.endOK=
+    rightIntersection>=lavaEnd-edgeTolerance &&
+    rightIntersection<=currentStage().plot.xMax+edgeTolerance;
+
+  if(!result.startOK){
+    result.reason="start";
+    return result;
+  }
+
+  if(!result.endOK){
+    result.reason="end";
+    return result;
+  }
+
+  // 실제 출발 교점부터 도착 교점까지 전 구간을 검사한다.
+  for(let i=0;i<=300;i++){
+    const x=leftIntersection+
+      (rightIntersection-leftIntersection)*i/300;
+    const y=f(x);
+
+    if(stage2Collision(x,y)){
+      result.crashed=true;
+      result.reason="collision";
+      return result;
+    }
+  }
+
+  result.success=true;
+  result.reason="success";
+  return result;
+}
+
+function runStage2(token){
+  const challenge=current();
+  const result=evaluateStage2Path();
+  const startX=result.startX;
+  const endX=result.endX;
+  const landingY=challenge.landingY;
+  const dogStartX=challenge.dogStartX??1;
+  const dogEndX=challenge.dogEndX??19;
+  const duration=4300;
+  const begin=performance.now();
+
+  function frame(now){
+    if(token!==state.runToken)return;
+
+    const t=Math.min(1,(now-begin)/duration);
+    let x,y,rotation=0;
+    const phase=t*40;
+
+    if(t<.18){
+      const u=t/.18;
+      x=dogStartX+(startX-dogStartX)*u;
+      y=landingY;
+    }else if(!result.startOK){
+      x=startX;
+      y=landingY;
+    }else if(t<.82){
+      const u=(t-.18)/.64;
+      const eased=u<.5?2*u*u:1-Math.pow(-2*u+2,2)/2;
+      x=startX+(endX-startX)*eased;
+      y=f(x);
+      const slope=2*state.params.a*(x-state.params.p);
+      rotation=Math.atan(-slope)*.12;
+
+      state.trail.push({x,y});
+      if(state.trail.length>180)state.trail.shift();
+    }else if(result.success){
+      const u=(t-.82)/.18;
+      x=endX+(dogEndX-endX)*u;
+      y=landingY;
+    }else{
+      const u=(t-.82)/.18;
+      x=endX;
+      y=Math.max(0,f(endX)-8*u*u);
+      rotation=.18*u;
+    }
+
+    state.dog={x,y,rotation,phase};
+    drawScene();
+
+    if(!result.startOK&&t>=.34){
+      finishStage2(result);
+      return;
+    }
+
+    if(t<1){
+      requestAnimationFrame(frame);
+    }else{
+      finishStage2(result);
+    }
+  }
+
+  requestAnimationFrame(frame);
+}
+
+
+function evaluateStage3Path(){
+  const p=state.params;
+  const result={success:false,reason:"items"};
+
+  if(p.a1>=0||p.a2>=0){
+    result.reason="direction";
+    return result;
+  }
+  if(p.r1>=p.s1||p.r2>=p.s2){
+    result.reason="order";
+    return result;
+  }
+  if(Math.abs(p.s1-p.r2)>.12){
+    result.reason="connection";
+    return result;
+  }
+  if(p.r1<0||p.s2>currentStage().plot.xMax){
+    result.reason="range";
+    return result;
+  }
+
+  for(let curve=1;curve<=2;curve++){
+    const left=curve===1?p.r1:p.r2;
+    const right=curve===1?p.s1:p.s2;
+    for(let i=0;i<=180;i++){
+      const x=left+(right-left)*i/180;
+      const y=doubleF(curve,x);
+      if(y<-.05||y>currentStage().plot.yMax-.25){
+        result.reason="height";
+        return result;
+      }
+    }
+  }
+
+  if(!current().items.every((_,index)=>stage3ItemMatches(index))){
+    result.reason="items";
+    return result;
+  }
+
+  result.success=true;
+  result.reason="success";
+  return result;
+}
+
+function runStage3(token){
+  state.collected=current().items.map(()=>false);
+  const result=evaluateStage3Path();
+  const p=state.params;
+  const duration=5000;
+  const begin=performance.now();
+  let previousX=1;
+
+  function collectItems(x,curve){
+    current().items.forEach((item,index)=>{
+      if(state.collected[index]||!stage3ItemMatches(index))return;
+      const sharedRoot=Math.abs(item.x-p.s1)<.15&&Math.abs(p.s1-p.r2)<.15;
+      if(item.curve!==curve&&!sharedRoot)return;
+      if((previousX<=item.x&&x>=item.x)||Math.abs(x-item.x)<.13){
+        state.collected[index]=true;
+        playSound(item.type==="star"?"success":"coin");
+      }
+    });
+    previousX=x;
+  }
+
+  function frame(now){
+    if(token!==state.runToken)return;
+
+    const t=Math.min(1,(now-begin)/duration);
+    let x=1,y=0,rotation=0;
+    const phase=t*46;
+
+    if(t<.14){
+      const u=t/.14;
+      x=1+(p.r1-1)*u;
+      y=0;
+      previousX=x;
+    }else if(t<.48){
+      const u=(t-.14)/.34;
+      x=p.r1+(p.s1-p.r1)*u;
+      y=Math.max(0,doubleF(1,x));
+      const slope=p.a1*(2*x-p.r1-p.s1);
+      rotation=Math.atan(-slope)*.12;
+      collectItems(x,1);
+      state.trail.push({x,y,segment:1});
+    }else if(Math.abs(p.s1-p.r2)>.12){
+      x=p.s1;
+      y=0;
+    }else if(t<.82){
+      const u=(t-.48)/.34;
+      x=p.r2+(p.s2-p.r2)*u;
+      y=Math.max(0,doubleF(2,x));
+      const slope=p.a2*(2*x-p.r2-p.s2);
+      rotation=Math.atan(-slope)*.12;
+      collectItems(x,2);
+      state.trail.push({x,y,segment:2});
+    }else{
+      const u=(t-.82)/.18;
+      x=p.s2+(currentStage().plot.xMax-.7-p.s2)*u;
+      y=0;
+    }
+
+    if(state.trail.length>230)state.trail.shift();
+    state.dog={x,y,rotation,phase};
+    drawScene();
+
+    if(Math.abs(p.s1-p.r2)>.12&&t>=.58){
+      finishStage3(result);
+      return;
+    }
+
+    if(t<1)requestAnimationFrame(frame);
+    else finishStage3(result);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+
+function evaluateStage5Path(){
+  const result={success:false,reason:"items"};
+  const roots1=stage4Roots(1);
+  const roots2=stage4Roots(2);
+
+  // 5단계는 a>0인 아래로 볼록한 포물선입니다.
+  if(state.params.a1<=0||state.params.a2<=0){
+    result.reason="direction";
+    return result;
+  }
+  if(!roots1||!roots2){
+    result.reason="roots";
+    return result;
+  }
+  if(roots1[0]>=roots1[1]||roots2[0]>=roots2[1]){
+    result.reason="order";
+    return result;
+  }
+  if(Math.abs(roots1[1]-roots2[0])>.12){
+    result.reason="connection";
+    return result;
+  }
+  if(roots1[0]<plot().xMin||roots2[1]>plot().xMax){
+    result.reason="range";
+    return result;
+  }
+
+  for(let curve=1;curve<=2;curve++){
+    const roots=curve===1?roots1:roots2;
+    for(let i=0;i<=180;i++){
+      const x=roots[0]+(roots[1]-roots[0])*i/180;
+      const y=stage4F(curve,x);
+      if(y<plot().yMin-.05||y>plot().yMax+.05){
+        result.reason="height";
+        return result;
+      }
+    }
+  }
+
+  if(!current().items.every((_,index)=>stage4ItemMatches(index))){
+    result.reason="items";
+    return result;
+  }
+
+  result.success=true;
+  result.reason="success";
+  return result;
+}
+
+
+function evaluateStage6Path(){
+  const challenge=current();
+  const result={success:false,reason:"items"};
+  const tolerance=.35;
+
+  // 두 점프 모두 위로 볼록한 포물선(a<0)을 사용합니다.
+  if(state.params.a1>=0||state.params.a2>=0){
+    result.reason="direction";
+    return result;
+  }
+
+  if(Math.abs(stage4F(1,challenge.jumpStartX)-challenge.dogStartY)>tolerance){
+    result.reason="start";
+    return result;
+  }
+  if(Math.abs(stage4F(1,challenge.landing1.x)-challenge.landing1.y)>tolerance){
+    result.reason="landing1";
+    return result;
+  }
+  if(Math.abs(stage4F(2,challenge.jump2StartX)-challenge.landing1.y)>tolerance){
+    result.reason="takeoff2";
+    return result;
+  }
+  if(Math.abs(stage4F(2,challenge.landing2.x)-challenge.landing2.y)>tolerance){
+    result.reason="landing2";
+    return result;
+  }
+
+  const segments=[
+    {curve:1,from:challenge.jumpStartX,to:challenge.landing1.x},
+    {curve:2,from:challenge.jump2StartX,to:challenge.landing2.x}
+  ];
+  for(const segment of segments){
+    for(let i=0;i<=240;i++){
+      const x=segment.from+(segment.to-segment.from)*i/240;
+      const y=stage4F(segment.curve,x);
+      if(y<plot().yMin+.05||y>plot().yMax-.05){
+        result.reason="height";
+        return result;
+      }
+      if(stage6PathBlocked(x,y)){
+        result.reason="collision";
+        return result;
+      }
+    }
+  }
+
+  if(!challenge.items.every((_,index)=>stage4ItemMatches(index))){
+    result.reason="items";
+    return result;
+  }
+
+  result.success=true;
+  result.reason="success";
+  return result;
+}
+
+function runStage6(token){
+  state.collected=current().items.map(()=>false);
+  const result=evaluateStage6Path();
+  const challenge=current();
+  const duration=6200;
+  const begin=performance.now();
+  let previousX=challenge.dogStartX;
+
+  function collectItems(x,curve){
+    current().items.forEach((item,index)=>{
+      if(state.collected[index]||item.curve!==curve||!stage4ItemMatches(index))return;
+      if((previousX<=item.x&&x>=item.x)||Math.abs(x-item.x)<.16){
+        state.collected[index]=true;
+        playSound(item.type==="star"?"success":"coin");
+      }
+    });
+    previousX=x;
+  }
+
+  function curveRotation(curve,x){
+    if(state.stage4Mode==="factor"){
+      const a=state.params[stage4ValueKey(curve,"a")];
+      const r=state.params[stage4ValueKey(curve,"r")];
+      const s=state.params[stage4ValueKey(curve,"s")];
+      return Math.atan(-(a*(2*x-r-s)))*.12;
+    }
+    const a=state.params[stage4ValueKey(curve,"a")];
+    const p=state.params[stage4ValueKey(curve,"p")];
+    return Math.atan(-(2*a*(x-p)))*.12;
+  }
+
+  function moveOnCurve(curve,fromX,toX,u){
+    const x=fromX+(toX-fromX)*u;
+    const y=stage4F(curve,x);
+    collectItems(x,curve);
+    state.trail.push({x,y,segment:curve});
+    return{x,y,rotation:curveRotation(curve,x)};
+  }
+
+  function frame(now){
+    if(token!==state.runToken)return;
+    const t=Math.min(1,(now-begin)/duration);
+    let x=challenge.dogStartX,y=challenge.dogStartY,rotation=0;
+    const phase=t*52;
+
+    if(t<.08){
+      const u=t/.08;
+      x=challenge.dogStartX+(challenge.jumpStartX-challenge.dogStartX)*u;
+      y=challenge.dogStartY;
+      previousX=x;
+    }else if(t<.36){
+      ({x,y,rotation}=moveOnCurve(1,challenge.jumpStartX,challenge.landing1.x,(t-.08)/.28));
+    }else if(t<.43){
+      // 가운데 벽돌 발판에 정확히 착지해 잠시 멈춥니다.
+      x=challenge.landing1.x;
+      y=challenge.landing1.y;
+      previousX=x;
+    }else if(t<.55){
+      // 벽돌 발판 위를 달려 두 번째 점프 위치로 이동합니다.
+      const u=(t-.43)/.12;
+      x=challenge.landing1.x+(challenge.jump2StartX-challenge.landing1.x)*u;
+      y=challenge.landing1.y;
+      previousX=x;
+    }else if(t<.86){
+      ({x,y,rotation}=moveOnCurve(2,challenge.jump2StartX,challenge.landing2.x,(t-.55)/.31));
+    }else{
+      // 오른쪽 벽돌 발판에 착지한 상태로 끝납니다.
+      x=challenge.landing2.x;
+      y=challenge.landing2.y;
+      rotation=0;
+    }
+
+    if((t>=.08&&t<.36)||(t>=.55&&t<.86)){
+      if(stage6PathBlocked(x,y)){
+        y=stage6ObstacleSurfaceY(x)+.04;
+        state.dog={x,y,rotation:0,phase};
+        drawScene();
+        finishStage4({...result,success:false,reason:"collision"});
+        return;
+      }
+    }
+
+    if(state.trail.length>240)state.trail.shift();
+    state.dog={x,y,rotation,phase};
+    drawScene();
+    if(t<1)requestAnimationFrame(frame);
+    else finishStage4(result);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function runStage5(token){
+  state.collected=current().items.map(()=>false);
+  const result=evaluateStage5Path();
+  const roots1=stage4Roots(1)||[0,0];
+  const roots2=stage4Roots(2)||[0,0];
+  const duration=5200;
+  const begin=performance.now();
+  const startPoint={x:current().dogStartX,y:current().dogStartY};
+  const endPoint={x:current().dogEndX,y:current().dogEndY};
+  let previousX=startPoint.x;
+
+  function collectItems(x,curve){
+    current().items.forEach((item,index)=>{
+      if(state.collected[index]||!stage4ItemMatches(index))return;
+      const sharedRoot=Math.abs(item.x-roots1[1])<.15&&Math.abs(roots1[1]-roots2[0])<.15;
+      if(item.curve!==curve&&!sharedRoot)return;
+      if((previousX<=item.x&&x>=item.x)||
+         (previousX>=item.x&&x<=item.x)||
+         Math.abs(x-item.x)<.13){
+        state.collected[index]=true;
+        playSound(item.type==="star"?"success":"coin");
+      }
+    });
+    previousX=x;
+  }
+
+  function frame(now){
+    if(token!==state.runToken)return;
+
+    const t=Math.min(1,(now-begin)/duration);
+    let x=startPoint.x,y=startPoint.y,rotation=0;
+    const phase=t*48;
+
+    if(t<.12){
+      const u=t/.12;
+      x=startPoint.x+(roots1[0]-startPoint.x)*u;
+      y=startPoint.y+(0-startPoint.y)*u;
+      previousX=x;
+    }else if(t<.46){
+      const u=(t-.12)/.34;
+      x=roots1[0]+(roots1[1]-roots1[0])*u;
+      y=stage4F(1,x);
+      if(state.stage4Mode==="factor"){
+        rotation=Math.atan(-(state.params.a1*(2*x-state.params.r1-state.params.s1)))*.12;
+      }else{
+        rotation=Math.atan(-(2*state.params.a1*(x-state.params.p1)))*.12;
+      }
+      collectItems(x,1);
+      state.trail.push({x,y,segment:1});
+    }else if(Math.abs(roots1[1]-roots2[0])>.12){
+      x=roots1[1];
+      y=0;
+    }else if(t<.80){
+      const u=(t-.46)/.34;
+      x=roots2[0]+(roots2[1]-roots2[0])*u;
+      y=stage4F(2,x);
+      if(state.stage4Mode==="factor"){
+        rotation=Math.atan(-(state.params.a2*(2*x-state.params.r2-state.params.s2)))*.12;
+      }else{
+        rotation=Math.atan(-(2*state.params.a2*(x-state.params.p2)))*.12;
+      }
+      collectItems(x,2);
+      state.trail.push({x,y,segment:2});
+    }else{
+      const u=(t-.80)/.20;
+      x=roots2[1]+(endPoint.x-roots2[1])*u;
+      y=(endPoint.y)*u;
+    }
+
+    if(isStage6()&&stage6PathBlocked(x,y)){
+      y=stage6ObstacleSurfaceY(x)+.04;
+      state.dog={x,y,rotation:0,phase};
+      drawScene();
+      finishStage4({...result,success:false,reason:"collision"});
+      return;
+    }
+
+    if(state.trail.length>230)state.trail.shift();
+    state.dog={x,y,rotation,phase};
+    drawScene();
+
+    if(Math.abs(roots1[1]-roots2[0])>.12&&t>=.58){
+      finishStage4(result);
+      return;
+    }
+
+    if(t<1)requestAnimationFrame(frame);
+    else finishStage4(result);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function evaluateStage4Path(){
+  const challenge=current();
+  const result={success:false,reason:"items"};
+  const startX=challenge.jumpStartX;
+  const landing1=challenge.landing1;
+  const landing2=challenge.landing2;
+  const tolerance=.3;
+
+  if(state.params.a1>=0||state.params.a2>=0){
+    result.reason="direction";
+    return result;
+  }
+
+  // 첫 점프는 바닥에서 시작해야 합니다.
+  if(Math.abs(stage4F(1,startX))>tolerance){
+    result.reason="start";
+    return result;
+  }
+
+  // 첫 기둥에서는 첫 포물선의 끝과 두 번째 포물선의 시작이 같은 높이여야 합니다.
+  if(Math.abs(stage4F(1,landing1.x)-landing1.y)>tolerance||
+     Math.abs(stage4F(2,landing1.x)-landing1.y)>tolerance){
+    result.reason="landing1";
+    return result;
+  }
+
+  // 두 번째 점프는 오른쪽 기둥 위에서 끝나야 합니다.
+  if(Math.abs(stage4F(2,landing2.x)-landing2.y)>tolerance){
+    result.reason="landing2";
+    return result;
+  }
+
+  const segments=[
+    {curve:1,from:startX,to:landing1.x},
+    {curve:2,from:landing1.x,to:landing2.x}
+  ];
+  for(const segment of segments){
+    for(let i=0;i<=220;i++){
+      const x=segment.from+(segment.to-segment.from)*i/220;
+      const y=stage4F(segment.curve,x);
+      if(y<-.05||y>currentStage().plot.yMax-.15){
+        result.reason="height";
+        return result;
+      }
+    }
+  }
+
+  if(!challenge.items.every((_,index)=>stage4ItemMatches(index))){
+    result.reason="items";
+    return result;
+  }
+
+  result.success=true;
+  result.reason="success";
+  return result;
+}
+
+function runStage4(token){
+  state.collected=current().items.map(()=>false);
+  const result=evaluateStage4Path();
+  const challenge=current();
+  const startX=challenge.jumpStartX;
+  const landing1=challenge.landing1;
+  const landing2=challenge.landing2;
+  const dogStartX=challenge.dogStartX??.5;
+  const duration=5900;
+  const begin=performance.now();
+  let previousX=dogStartX;
+
+  function collectItems(x,curve){
+    current().items.forEach((item,index)=>{
+      if(state.collected[index]||!stage4ItemMatches(index)||item.curve!==curve)return;
+      if((previousX<=item.x&&x>=item.x)||Math.abs(x-item.x)<.13){
+        state.collected[index]=true;
+        playSound(item.type==="star"?"success":"coin");
+      }
+    });
+    previousX=x;
+  }
+
+  function curveRotation(curve,x){
+    if(state.stage4Mode==="factor"){
+      const a=state.params[stage4ValueKey(curve,"a")];
+      const r=state.params[stage4ValueKey(curve,"r")];
+      const s=state.params[stage4ValueKey(curve,"s")];
+      return Math.atan(-(a*(2*x-r-s)))*.12;
+    }
+    const a=state.params[stage4ValueKey(curve,"a")];
+    const p=state.params[stage4ValueKey(curve,"p")];
+    return Math.atan(-(2*a*(x-p)))*.12;
+  }
+
+  function moveOnCurve(curve,fromX,toX,u){
+    const x=fromX+(toX-fromX)*u;
+    const y=Math.max(0,stage4F(curve,x));
+    collectItems(x,curve);
+    state.trail.push({x,y});
+    return{x,y,rotation:curveRotation(curve,x)};
+  }
+
+  function frame(now){
+    if(token!==state.runToken)return;
+
+    const t=Math.min(1,(now-begin)/duration);
+    let x=dogStartX,y=0,rotation=0;
+    const phase=t*50;
+
+    if(t<.10){
+      const u=t/.10;
+      x=dogStartX+(startX-dogStartX)*u;
+      y=0;
+      previousX=x;
+    }else if(t<.40){
+      ({x,y,rotation}=moveOnCurve(1,startX,landing1.x,(t-.10)/.30));
+    }else if(t<.48){
+      // 첫 번째 기둥에 정확히 착지하여 잠시 멈춥니다.
+      x=landing1.x;
+      y=landing1.y;
+      rotation=0;
+      previousX=x;
+    }else if(t<.80){
+      ({x,y,rotation}=moveOnCurve(2,landing1.x,landing2.x,(t-.48)/.32));
+    }else{
+      // 오른쪽 기둥에 착지한 상태로 끝납니다.
+      x=landing2.x;
+      y=landing2.y;
+      rotation=0;
+    }
+
+    if(state.trail.length>230)state.trail.shift();
+    state.dog={x,y,rotation,phase};
+    drawScene();
+
+    if(t<1)requestAnimationFrame(frame);
+    else finishStage4(result);
+  }
+
+  requestAnimationFrame(frame);
+}
+
+function stage7MonsterHitBox(monster){
+  return{
+    // 실제 괴물 그림의 폭과 높이에 맞춘 판정 범위입니다.
+    // 머리, 몸통, 등껍질, 다리를 모두 포함하지만 그림 밖에서 미리 맞지는 않습니다.
+    left:monster.x-1.25,
+    right:monster.x+1.25,
+    bottom:monster.groundY-.28,
+    top:monster.groundY+2.9
+  };
+}
+
+function stage7ContactForMonster(monster,launchX){
+  const hitBox=stage7MonsterHitBox(monster);
+  const checkStart=Math.max(launchX,hitBox.left);
+  const checkEnd=Math.min(plot().xMax,hitBox.right);
+  if(checkEnd<=checkStart)return null;
+
+  for(let i=0;i<=400;i++){
+    const x=checkStart+(checkEnd-checkStart)*i/400;
+    const y=f(x);
+    if(y>=hitBox.bottom&&y<=hitBox.top){
+      return{x,y};
+    }
+  }
+  return null;
+}
+
+function stage7DogTouchesMonster(dogX,dogY,monster){
+  if(!monster||Number.isFinite(monster.hitAt))return false;
+  const dogFoot=mapPoint(dogX,dogY);
+  const base=mapPoint(monster.originX,monster.originY);
+
+  // 화면에 그려진 괴물의 실제 외곽과 거의 같은 크기입니다.
+  // 강아지 발 위치가 이 외곽 안으로 들어올 때만 밟은 것으로 처리합니다.
+  return dogFoot.x>=base.x-66&&dogFoot.x<=base.x+66&&
+         dogFoot.y>=base.y-103&&dogFoot.y<=base.y+10;
+}
+
+function stage7SweptDogTouchesMonster(fromX,fromY,toX,toY,monster){
+  const steps=18;
+  for(let i=0;i<=steps;i++){
+    const u=i/steps;
+    const x=fromX+(toX-fromX)*u;
+    const y=fromY+(toY-fromY)*u;
+    if(stage7DogTouchesMonster(x,y,monster))return true;
+  }
+  return false;
+}
+
+function evaluateStage7Path(){
+  const monsters=stage7ChallengeMonsters();
+  const firstMonster=monsters[0]||{x:12,groundY:-5.2};
+  const result={
+    success:false,
+    reason:"monster",
+    launchX:current().dogStartX+1.5,
+    contactX:firstMonster.x,
+    contactY:firstMonster.groundY+1.7,
+    contacts:[],
+    failedMonsterIndex:0
+  };
+  const {a,p,q}=state.params;
+  const groundY=current().dogStartY;
+
+  if(a>=0){result.reason="direction";return result;}
+  if(q>plot().yMax-.15||q<=groundY){result.reason="height";return result;}
+
+  const radiusSquared=(groundY-q)/a;
+  if(radiusSquared<=0){result.reason="start";return result;}
+  const radius=Math.sqrt(radiusSquared);
+  result.launchX=p-radius;
+
+  const firstX=Math.min(...monsters.map(monster=>monster.x));
+  if(result.launchX<plot().xMin-.1||result.launchX>=firstX+1.0){
+    result.reason="start";return result;
+  }
+
+  monsters.forEach((monster,index)=>{
+    const contact=stage7ContactForMonster(monster,result.launchX);
+    if(contact)result.contacts.push({...contact,monsterIndex:index});
+  });
+
+  if(result.contacts.length!==monsters.length){
+    const missingIndex=monsters.findIndex((_,index)=>
+      !result.contacts.some(contact=>contact.monsterIndex===index)
+    );
+    result.failedMonsterIndex=Math.max(0,missingIndex);
+    const missing=monsters[result.failedMonsterIndex]||firstMonster;
+    result.contactX=missing.x;
+    result.contactY=Math.max(plot().yMin,Math.min(plot().yMax,f(missing.x)));
+    result.reason="monster";
+    return result;
+  }
+
+  result.contacts.sort((a,b)=>a.x-b.x);
+  const last=result.contacts[result.contacts.length-1];
+  result.contactX=last.x;
+  result.contactY=last.y;
+  result.success=true;
+  result.reason="success";
+  return result;
+}
+
+function stage7MonsterAnimationAt(t,monster){
+  if(!Number.isFinite(monster.hitAt)){
+    return{...monster,state:"normal",x:monster.originX,y:monster.originY,rotation:0,scale:1,alpha:1};
+  }
+
+  const elapsed=t-monster.hitAt;
+  if(elapsed<.065){
+    const u=Math.max(0,elapsed/.065);
+    return{...monster,state:"squash",x:monster.originX,y:monster.originY,scale:1-.2*u,alpha:1};
+  }
+
+  const u=Math.min(1,(elapsed-.065)/.26);
+  const eased=1-Math.pow(1-u,2);
+  return{
+    ...monster,
+    state:"ball",
+    x:monster.originX-(monster.originX+1.3)*eased,
+    y:monster.originY+.22*Math.sin(Math.PI*u),
+    rotation:-u*Math.PI*9,
+    scale:.82,
+    alpha:1-u*.72
+  };
+}
+
+function runStage7(token){
+  const result=evaluateStage7Path();
+  const challenge=current();
+  const monsters=stage7ChallengeMonsters();
+  const launchX=Number.isFinite(result.launchX)?result.launchX:challenge.dogStartX+1.5;
+  const contacts=(result.contacts||[]).map(contact=>({...contact}));
+  const lastContact=contacts[contacts.length-1];
+  const pathEndX=result.success&&lastContact?lastContact.x:result.contactX;
+  const pathEndY=result.success&&lastContact?lastContact.y:result.contactY;
+  const duration=result.success?6200+(monsters.length-1)*850:3500;
+  const begin=performance.now();
+  let previousDog={x:challenge.dogStartX,y:challenge.dogStartY};
+
+  function frame(now){
+    if(token!==state.runToken)return;
+    const t=Math.min(1,(now-begin)/duration);
+    let x=challenge.dogStartX,y=challenge.dogStartY,rotation=0;
+    const phase=t*52;
+
+    if(t<.14){
+      const u=t/.14;
+      x=challenge.dogStartX+(launchX-challenge.dogStartX)*u;
+      y=challenge.dogStartY;
+    }else if(t<.72){
+      const u=(t-.14)/.58;
+      x=launchX+(pathEndX-launchX)*u;
+      y=Math.max(plot().yMin,Math.min(plot().yMax,f(x)));
+      rotation=Math.atan(-(2*state.params.a*(x-state.params.p)))*.12;
+
+      state.trail.push({x,y});
+      if(state.trail.length>220)state.trail.shift();
+    }else if(result.success){
+      const u=Math.min(1,(t-.72)/.28*1.12);
+      x=pathEndX+(challenge.dogEndX-pathEndX)*u;
+      // 마지막 괴물을 밟은 위치에서 도착 발판까지 부드럽게 내려옵니다.
+      // 기존처럼 곧바로 바닥으로 순간이동하지 않으므로 접촉 장면이 자연스럽습니다.
+      y=pathEndY+(challenge.dogEndY-pathEndY)*u+
+        1.15*Math.sin(Math.PI*u);
+    }else{
+      const u=(t-.72)/.28;
+      x=pathEndX-1.0*u;
+      y=Math.max(challenge.dogEndY,pathEndY-5.8*u*u);
+      rotation=.22*u;
+    }
+
+    // 미리 계산한 시간에 변신시키지 않고, 강아지의 발이 실제 괴물 그림에 닿은 순간을 찾습니다.
+    let justHit=false;
+    state.monsters=state.monsters.map(monster=>{
+      let next=monster;
+      if(!Number.isFinite(monster.hitAt)&&
+         stage7SweptDogTouchesMonster(previousDog.x,previousDog.y,x,y,monster)){
+        next={...monster,hitAt:t,state:"squash"};
+        justHit=true;
+        playSound("coin");
+      }
+      return stage7MonsterAnimationAt(t,next);
+    });
+
+    // 밟는 순간 강아지가 살짝 튀어 올라 접촉감이 보이게 합니다.
+    state.monsters.forEach(monster=>{
+      if(!Number.isFinite(monster.hitAt))return;
+      const elapsed=t-monster.hitAt;
+      if(elapsed>=0&&elapsed<.04){
+        y+=.38*Math.sin(Math.PI*elapsed/.04);
+      }
+    });
+
+    state.dog={x,y,rotation,phase};
+    previousDog={x,y};
+    drawScene();
+    if(t<1)requestAnimationFrame(frame);
+    else finishStage7(result);
+  }
+  requestAnimationFrame(frame);
+}
+function finishStage7(result){
+  if(!state.animating)return;
+  state.runToken++;
+  state.animating=false;
+
+  const allActuallyHit=state.monsters.length>0&&state.monsters.every(monster=>Number.isFinite(monster.hitAt));
+
+  if(result.success&&allActuallyHit){
+    state.status="success";
+    markChallengeComplete();
+    playSound("success");
+    showToast(`${currentStage().name} 도전 ${currentChallengeIndex()+1} 성공! 괴물 ${stage7ChallengeMonsters().length}마리를 모두 물리쳤습니다!`);
+    proceedAfterSuccess();
+  }else{
+    state.status="ready";
+    state.dog=initialDog();
+    state.monsters=initialMonsters();
+    setParameterButtonsDisabled(false);
+    el.run.disabled=false;
+    el.run.textContent=runButtonLabel();
+    playSound("miss");
+    const messages={
+      direction:"a를 음수로 바꾸어 위로 볼록한 포물선을 만드세요.",
+      height:"꼭짓점이 화면 안에 오도록 q값을 조절하세요.",
+      start:"강아지가 왼쪽 발판에서 출발할 수 있도록 식을 조절하세요.",
+      monster:"강아지가 화면의 모든 괴물 몸에 실제로 닿도록 a, p, q값을 조절하세요."
+    };
+    showToast(messages[result.reason]||messages.monster);
+    updateUI();
+  }
+}
+
+function finishStage4(result){
+  if(!state.animating)return;
+
+  state.runToken++;
+  state.animating=false;
+  const allCollected=state.collected.every(Boolean);
+
+  if(result.success&&allCollected){
+    state.status="success";
+    markChallengeComplete();
+    playSound("success");
+    showToast(`${currentStage().name} 도전 ${currentChallengeIndex()+1} 성공!`);
+    proceedAfterSuccess();
+  }else{
+    state.status="ready";
+    setParameterButtonsDisabled(false);
+    el.run.disabled=false;
+    el.run.textContent=runButtonLabel();
+    playSound("miss");
+
+    const messages={
+      direction:isStage6()
+        ?"두 식 모두 a를 음수로 하여 위로 볼록한 포물선을 만들어 주세요."
+        :"두 식 모두 아래로 볼록하게 만들어 주세요.",
+      roots:"표준형에서는 x축과 만나는 포물선이 되도록 값을 조절하세요.",
+      order:"각 식의 왼쪽 근과 오른쪽 근의 위치를 다시 조절하세요.",
+      connection:"첫 번째 식의 오른쪽 교점과 두 번째 식의 왼쪽 교점을 같게 맞추세요.",
+      start:"첫 번째 포물선이 바닥의 출발 지점에서 시작하도록 조절하세요.",
+      landing1:isStage6()?"첫 번째 포물선이 가운데 벽돌 발판 위에 착지하도록 조절하세요.":"첫 번째 기둥 위에서 첫 포물선이 끝나고 두 번째 포물선이 시작하도록 조절하세요.",
+      takeoff2:"가운데 벽돌 발판 위에서 두 번째 포물선이 시작하도록 조절하세요.",
+      landing2:isStage6()?"두 번째 포물선이 오른쪽 벽돌 발판 위에 착지하도록 조절하세요.":"두 번째 포물선이 오른쪽 기둥 위에서 끝나도록 조절하세요.",
+      range:"두 포물선이 좌표평면 안에 들어오도록 조절하세요.",
+      height:"포물선의 높이가 화면을 넘지 않도록 조절하세요.",
+      collision:"강아지의 몸이 벽돌에 닿지 않도록 포물선을 더 높게 조절하세요.",
+      items:isStage6()?"동전과 별을 모두 지나면서 가운데와 오른쪽 벽돌 발판에 착지하도록 조절하세요.":"동전과 별을 모두 지나면서 기둥 위에 착지하도록 조절하세요."
+    };
+    showToast(messages[result.reason]||messages.items);
+    updateUI();
+  }
+}
+
+function finishStage3(result){
+  if(!state.animating)return;
+
+  state.runToken++;
+  state.animating=false;
+  const allCollected=state.collected.every(Boolean);
+
+  if(result.success&&allCollected){
+    state.status="success";
+    markChallengeComplete();
+    playSound("success");
+    showToast(`${currentStage().name} 도전 ${currentChallengeIndex()+1} 성공!`);
+    proceedAfterSuccess();
+  }else{
+    state.status="ready";
+    setParameterButtonsDisabled(false);
+    el.run.disabled=false;
+    el.run.textContent=runButtonLabel();
+    playSound("miss");
+
+    const messages={
+      direction:"두 포물선은 위로 볼록하게 설정되어 있습니다.",
+      order:"각 식에서 첫 번째 근이 두 번째 근보다 작아야 합니다.",
+      connection:"첫 번째 포물선의 오른쪽 근과 두 번째 포물선의 왼쪽 근을 같게 맞추세요.",
+      range:"두 포물선이 좌표평면 안에서 시작하고 끝나도록 조절하세요.",
+      height:"포물선이 화면 위를 벗어나지 않도록 폭을 조절하세요.",
+      items:"동전과 별의 위치를 모두 지나도록 두 식을 조절하세요."
+    };
+    showToast(messages[result.reason]||messages.items);
+    updateUI();
+  }
+}
+
+function runDog(){
+  if(state.animating||state.status==="success")return;
+  if(!state.hasEquationInput){
+    showToast("먼저 함수식의 값을 조절해 주세요.");
+    return;
+  }
+
+  clearTimeout(state.transitionTimer);
+  state.runToken++;
+  const token=state.runToken;
+
+  state.animating=true;
+  state.status="running";
+  state.trail=[];
+  setParameterButtonsDisabled(true);
+  el.run.disabled=true;
+  el.resetProblem.disabled=true;
+  el.run.textContent=isStage7()?"공격 중...":"달리는 중...";
+  playSound("launch");
+
+  if(currentStage().type==="coins")runStage1(token);
+  else if(isStage7())runStage7(token);
+  else if(currentStage().type==="lava")runStage2(token);
+  else if(currentStage().type==="double")runStage3(token);
+  else if(isStage6())runStage6(token);
+  else if(isStage5())runStage5(token);
+  else runStage4(token);
+}
+
+function markChallengeComplete(){
+  const challengeIndex=currentChallengeIndex();
+  state.completedChallenges[state.stage][challengeIndex]=true;
+  saveCurrentAnswer();
+}
+
+function proceedAfterSuccess(){
+  const challengeIndex=currentChallengeIndex();
+
+  if(challengeIndex<currentStage().challenges.length-1){
+    state.transitionTimer=setTimeout(()=>{
+      saveCurrentAnswer();
+      state.challengeByStage[state.stage]=challengeIndex+1;
+      loadCurrent();
+    },850);
+    return;
+  }
+
+  state.status="ready";
+  setParameterButtonsDisabled(false);
+  el.run.disabled=false;
+  el.run.textContent=runButtonLabel();
+
+  if(allStagesCompleted()){
+    showToast("모든 단계를 완료했습니다!");
+  }else{
+    showToast(`${currentStage().name} 완료! 다른 단계도 완료해 보세요.`);
+  }
+  updateUI();
+}
+
+function finishStage1(){
+  state.animating=false;
+
+  if(exactAnswer()){
+    state.collected=current().coinX.map(()=>true);
+  }
+
+  const gained=state.collected.filter(Boolean).length;
+  const total=current().coinX.length;
+
+  if(gained===total){
+    state.status="success";
+    markChallengeComplete();
+    playSound("success");
+    showToast(`${currentStage().name} 도전 ${currentChallengeIndex()+1} 성공!`);
+    proceedAfterSuccess();
+  }else{
+    state.status="ready";
+    setParameterButtonsDisabled(false);
+    el.run.disabled=false;
+    el.run.textContent=runButtonLabel();
+    playSound("miss");
+    showToast("동전 위치에 맞게 함수식을 다시 조절하세요.");
+    updateUI();
+  }
+}
+
+function finishStage2(result){
+  if(!state.animating)return;
+
+  state.runToken++;
+  state.animating=false;
+
+  if(result.success){
+    state.status="success";
+    markChallengeComplete();
+    playSound("success");
+    showToast(`${currentStage().name} 도전 ${currentChallengeIndex()+1} 성공!`);
+    proceedAfterSuccess();
+  }else{
+    state.status="ready";
+    setParameterButtonsDisabled(false);
+    el.run.disabled=false;
+    el.run.textContent=runButtonLabel();
+    playSound("miss");
+
+    const messages={
+      direction:"a를 음수로 바꾸어 위로 볼록한 포물선을 만드세요.",
+      height:"포물선이 발판 높이와 만나도록 꼭짓점의 높이를 조절하세요.",
+      start:"포물선의 왼쪽 교점이 출발 발판 위에 오도록 조절하세요.",
+      collision:"천장에 부딪히거나 용암에 빠졌습니다.",
+      end:"포물선의 오른쪽 교점이 도착 발판 위에 오도록 조절하세요.",
+      landing:"오른쪽 발판에 착지하도록 함수식을 다시 조절하세요."
+    };
+
+    showToast(messages[result.reason]||messages.landing);
+    updateUI();
+  }
+}
+
+function showToast(message){
+  clearTimeout(toastTimer);
+  el.toast.textContent=message;
+  el.toast.classList.add("show");
+  toastTimer=setTimeout(()=>el.toast.classList.remove("show"),2200);
+}
+
+function playSound(type){
+  if(state.muted)return;
+  try{
+    audioCtx=audioCtx||new (window.AudioContext||window.webkitAudioContext)();
+    const oscillator=audioCtx.createOscillator();
+    const gain=audioCtx.createGain();
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+
+    const now=audioCtx.currentTime;
+    const sounds={
+      click:[440,.05,"sine"],
+      launch:[250,.18,"sawtooth"],
+      coin:[900,.08,"sine"],
+      success:[650,.34,"triangle"],
+      miss:[190,.15,"sine"]
+    };
+    const [frequency,duration,wave]=sounds[type]||sounds.click;
+
+    oscillator.type=wave;
+    oscillator.frequency.setValueAtTime(frequency,now);
+    if(type==="success"){
+      oscillator.frequency.exponentialRampToValueAtTime(1100,now+duration);
+    }
+
+    gain.gain.setValueAtTime(.0001,now);
+    gain.gain.exponentialRampToValueAtTime(.11,now+.012);
+    gain.gain.exponentialRampToValueAtTime(.0001,now+duration);
+    oscillator.start(now);
+    oscillator.stop(now+duration+.02);
+  }catch(error){}
+}
+
+document.addEventListener("click",event=>{
+  const button=event.target.closest("[data-param]");
+  if(!button)return;
+  adjustParameter(button.dataset.param,Number(button.dataset.dir));
+});
+
+el.prevStage.addEventListener("click",()=>selectStage(state.stage-1));
+el.nextStage.addEventListener("click",()=>selectStage(state.stage+1));
+el.run.addEventListener("click",runDog);
+el.prevProblem.addEventListener("click",()=>selectProblem(currentChallengeIndex()-1));
+el.resetProblem.addEventListener("click",resetCurrentProblem);
+el.nextProblem.addEventListener("click",()=>selectProblem(currentChallengeIndex()+1));
+el.modeFactorBtn.addEventListener("click",()=>switchStage4Mode("factor"));
+el.modeVertexBtn.addEventListener("click",()=>switchStage4Mode("vertex"));
+el.sound.addEventListener("click",()=>{
+  state.muted=!state.muted;
+  el.sound.textContent=state.muted?"🔇":"🔊";
+  if(!state.muted)playSound("click");
+});
+window.addEventListener("resize",()=>{
+  drawScene();
+  fitEquationEditors();
+});
+
+restoreProblemProgress();
+loadCurrent();
+})();
+</script>
+</body>
+</html>
