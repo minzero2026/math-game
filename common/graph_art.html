@@ -1,0 +1,2778 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>함수 작품 만들기</title>
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <style>
+    :root {
+      --bg:#eef2f7; --panel:#ffffff; --line:#d6dde8; --text:#172033; --muted:#667085;
+      --primary:#3157d5; --primary-soft:#eef2ff; --danger:#c73939; --success:#15835b;
+      --shadow:0 10px 28px rgba(31,42,68,.10); --radius:16px;
+    }
+    * { box-sizing:border-box; }
+    html, body { margin:0; width:100%; height:100%; }
+    body { font-family:"Noto Sans KR","Malgun Gothic","Apple SD Gothic Neo",Arial,sans-serif; color:var(--text); background:var(--bg); overflow:hidden; overscroll-behavior:none; }
+    button, input, select { font:inherit; }
+    button { -webkit-tap-highlight-color:transparent; }
+
+    .app { width:100%; height:100svh; display:grid; grid-template-rows:auto minmax(0,1fr); }
+    .topbar { min-height:62px; background:#fff; border-bottom:1px solid var(--line); padding:6px 10px; display:grid; grid-template-columns:minmax(220px,1fr) minmax(340px,1.2fr) auto; align-items:center; gap:8px; }
+    .title-wrap h1 { margin:0; font-size:clamp(18px,1.8vw,26px); letter-spacing:-.04em; line-height:1.12; }
+    .title-wrap p { margin:2px 0 0; font-size:11px; color:var(--muted); line-height:1.3; }
+    .identity { display:grid; grid-template-columns:1.25fr .72fr .88fr; gap:6px; }
+    .field { display:grid; gap:2px; }
+    .field label { font-size:10px; color:#475467; font-weight:800; }
+    input[type="text"], input[type="number"], select { width:100%; min-height:32px; border:1px solid #cbd5e1; border-radius:8px; padding:5px 8px; background:#fff; color:var(--text); outline:none; }
+    input:focus, select:focus { border-color:#6d87e6; box-shadow:0 0 0 3px rgba(49,87,213,.12); }
+    .top-actions { display:flex; gap:6px; }
+
+    .workspace { min-height:0; display:grid; grid-template-columns:minmax(320px,380px) minmax(560px,1fr); gap:7px; padding:6px; }
+    .side-panel, .canvas-panel { min-height:0; background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); }
+    .side-panel { display:grid; grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
+    .side-head { padding:6px; border-bottom:1px solid var(--line); display:grid; gap:5px; }
+    .side-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:5px; align-items:center; }
+    .side-actions .btn { min-height:30px; padding:4px 8px; font-size:11px; white-space:nowrap; }
+    .add-type-select { min-height:30px !important; padding:3px 7px !important; font-size:11px; font-weight:850; }
+    .side-info { font-size:9.5px; color:#667085; line-height:1.35; }
+    .function-list { min-height:0; overflow:auto; padding:5px; display:flex; flex-direction:column; gap:5px; }
+
+    .empty-function-guide { min-height:120px; border:1px dashed #b8c4d6; border-radius:10px; background:#f8fafc; display:grid; place-items:center; padding:16px; text-align:center; color:#667085; font-size:11px; font-weight:800; line-height:1.65; }
+    .empty-function-guide strong { color:#3157d5; }
+    .function-row { border:1px solid #dbe2ec; border-radius:10px; background:#fff; padding:4px; }
+    .function-row.active { border-color:#b8c7ef; box-shadow:0 0 0 3px rgba(49,87,213,.08); }
+    .function-row-top { overflow-x:auto; overflow-y:hidden; }
+    .function-row-inner { min-width:max-content; display:flex; align-items:center; gap:4px; }
+    .badge-circle { width:23px; height:23px; flex:0 0 23px; border-radius:999px; display:grid; place-items:center; color:#fff; font-size:10px; font-weight:900; border:1px solid rgba(0,0,0,.10); }
+    .type-select { width:116px; min-height:27px; padding:3px 6px; font-size:10px; font-weight:800; }
+    .formula-inline, .endpoint-inline { display:flex; align-items:center; gap:2px; white-space:nowrap; }
+    .formula-inline { padding:2px 4px; border:1px solid #dbe4f3; border-radius:8px; background:#f8fbff; }
+    .formula-text { font-family:Cambria,"Times New Roman",serif; font-size:14px; font-weight:700; white-space:nowrap; }
+    .formula-power { font-family:Cambria,"Times New Roman",serif; font-size:9px; font-weight:700; align-self:flex-start; margin-top:-1px; margin-left:-1px; }
+    .mini-stepper { width:45px; min-width:45px; height:34px; display:grid; grid-template-columns:1fr 13px; border:1.5px solid #9eb4da; border-radius:8px; background:#fff; overflow:hidden; }
+    .mini-stepper.small { width:42px; min-width:42px; }
+    .mini-stepper input { width:100%; min-width:0; min-height:31px; border:0; border-radius:0; padding:0 1px; text-align:center; font-size:13px; font-weight:900; box-shadow:none; outline:none; background:#fff; }
+    .mini-stepper-buttons { display:grid; grid-template-rows:1fr 1fr; border-left:1px solid #b7c5dc; }
+    .mini-stepper-buttons button { border:0; padding:0; background:#f0f4fb; color:#5d7192; font-size:7px; line-height:1; cursor:pointer; }
+    .mini-stepper-buttons button:first-child { border-bottom:1px solid #b7c5dc; }
+    .mini-stepper-buttons button:active { background:#dce6f7; }
+    .endpoint-label { font-size:9px; color:#475467; font-weight:900; margin-left:1px; }
+    .ordered-pair { display:flex; align-items:center; gap:3px; white-space:nowrap; }
+    .ordered-pair span { font-size:10px; color:#526075; font-weight:900; }
+    .ordered-pair input { width:37px; min-width:37px; min-height:26px; padding:2px 3px; text-align:center; font-size:10px; }
+    .function-color { width:30px; height:27px; border:1px solid #cbd5e1; border-radius:7px; background:#fff; padding:2px; }
+    .row-summary { margin-top:3px; font-size:9px; color:#667085; line-height:1.3; }
+
+    .btn { min-height:36px; border:1px solid #cbd5e1; border-radius:9px; padding:7px 11px; color:#344054; background:#fff; font-weight:850; cursor:pointer; }
+    .btn:hover { background:#f8fafc; }
+    .btn.primary { color:#fff; background:var(--primary); border-color:var(--primary); }
+    .btn.primary:hover { background:#294bc0; }
+    .btn.soft { color:var(--primary); background:var(--primary-soft); border-color:#c9d4fa; }
+    .btn.danger { color:var(--danger); background:#fff; border-color:#efb8b8; }
+    .btn.small { min-height:30px; padding:4px 8px; font-size:12px; }
+
+    .canvas-panel { display:grid; grid-template-rows:auto minmax(0,1fr) auto; overflow:hidden; }
+    .canvas-body { min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 72px; background:#e8edf4; }
+    .canvas-toolbar { min-height:34px; padding:3px 6px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:flex-end; gap:4px; flex-wrap:wrap; align-content:center; background:#fff; }
+    .canvas-toolbar .btn { min-height:27px; padding:3px 7px; font-size:10px; }
+    .tool-group { display:flex; gap:4px; }
+    .tool-btn.active { color:#fff; background:var(--primary); border-color:var(--primary); }
+    .divider { width:1px; height:24px; background:#d9e0e9; }
+    .palette { display:flex; flex-direction:column; gap:5px; align-items:center; }
+    .swatch { width:28px; height:28px; border:2px solid #fff; border-radius:7px; box-shadow:0 0 0 1px #cbd5e1; cursor:pointer; }
+    .swatch.active { box-shadow:0 0 0 3px #98aef0; }
+    .custom-color { width:32px; height:30px; padding:2px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
+    .range-wrap { display:flex; gap:4px; align-items:center; color:#475467; font-size:9px; font-weight:850; }
+    .range-wrap input[type="range"] { width:65px; }
+    .range-wrap select { min-height:27px; width:72px; padding:3px 5px; font-size:10px; }
+
+    .canvas-stage { min-height:0; display:grid; place-items:center; padding:4px; background:#e8edf4; overflow:hidden; }
+    .right-tools { min-height:0; border-left:1px solid var(--line); background:#fff; padding:5px 4px; display:flex; flex-direction:column; align-items:center; gap:6px; overflow-y:auto; }
+    .right-tools .tool-btn { width:62px; min-height:29px; padding:3px 4px; font-size:10px; }
+    .right-tools .tool-label { font-size:9px; color:#667085; font-weight:900; writing-mode:horizontal-tb; }
+    .canvas-stack { position:relative; width:min(100%, calc(100svh - 145px)); max-height:100%; aspect-ratio:1; background:#fff; border:1px solid #aeb8c8; box-shadow:0 6px 20px rgba(31,42,68,.12); touch-action:none; transform-origin:center center; will-change:transform; }
+    .canvas-stack canvas, .canvas-stack svg { position:absolute; inset:0; width:100%; height:100%; }
+    .canvas-stack canvas { transform-origin:0 0; will-change:transform; }
+    .svg-layer { overflow:visible; }
+    #gridSvg { z-index:0; }
+    #fillCanvas { z-index:1; }
+    #graphSvg { z-index:2; }
+    #penCanvas { z-index:3; cursor:crosshair; }
+    #penCanvas.fill-mode { cursor:cell; }
+    #penCanvas.erase-mode { cursor:not-allowed; }
+    #penCanvas.pan-mode { cursor:grab; }
+    #penCanvas.pan-mode.dragging { cursor:grabbing; }
+    .zoom-value { min-width:48px; text-align:center; color:#475467; font-size:11px; font-weight:900; }
+
+    .canvas-footer { min-height:40px; border-top:1px solid var(--line); padding:6px 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .footer-tip { font-size:12px; color:#667085; font-weight:800; }
+    .footer-actions { display:flex; gap:6px; }
+
+    .modal { position:fixed; inset:0; background:rgba(15,23,42,.42); display:none; align-items:center; justify-content:center; padding:18px; z-index:100; }
+    .modal.show { display:flex; }
+    .modal-card { width:min(1100px, 100%); max-height:min(90svh, 100%); background:#fff; border-radius:18px; box-shadow:0 24px 56px rgba(15,23,42,.24); overflow:hidden; display:grid; grid-template-rows:auto minmax(0,1fr); }
+    .modal-head { padding:12px 16px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+    .modal-head h2 { margin:0; font-size:21px; letter-spacing:-.03em; }
+    .modal-body { min-height:0; overflow:auto; padding:16px; }
+    .saved-item { border:1px solid #dbe2ec; border-radius:14px; padding:12px; display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; align-items:center; margin-bottom:10px; }
+    .saved-meta h3 { margin:0 0 4px; font-size:18px; }
+    .saved-meta p { margin:3px 0; color:#667085; font-size:13px; }
+    .saved-actions { display:flex; gap:6px; flex-wrap:wrap; }
+    .example-wrap { display:grid; gap:12px; }
+    .example-image { width:100%; border:1px solid #dbe2ec; border-radius:14px; background:#fff; }
+    .example-text { font-size:14px; color:#475467; line-height:1.65; }
+    .example-list { margin:0; padding-left:18px; }
+
+    /* 예시는 학생 저장 형식과 같은 가로형 이미지 한 장으로 표시합니다. */
+    #exampleModal .modal-card { width:min(1240px, 97vw); height:min(94svh, 760px); max-height:94svh; }
+    #exampleModal .modal-head { padding:7px 10px; }
+    #exampleModal .modal-head h2 { font-size:16px; }
+    #exampleModal .modal-body { overflow:hidden; padding:8px; display:grid; place-items:center; }
+    #exampleModal .example-wrap { width:100%; height:100%; min-height:0; display:grid; place-items:center; }
+    #exampleModal .example-image {
+      display:block; width:auto; height:auto; max-width:100%;
+      max-height:calc(94svh - 64px); object-fit:contain; image-rendering:auto;
+      border:1px solid #dbe2ec; border-radius:12px; background:#fff;
+    }
+
+
+    /* v26: 텍스트 선택 방지 및 예시 확대/이동 */
+    #gridSvg text, #graphSvg text, .color-toolbar, .floating-controls, .interaction-layer {
+      user-select:none; -webkit-user-select:none; -ms-user-select:none;
+    }
+    .example-wrap { width:100%; height:100%; min-height:0; display:grid; grid-template-rows:auto minmax(0,1fr); gap:8px; }
+    .example-tools { display:flex; justify-content:center; gap:6px; flex-wrap:wrap; }
+    .example-viewport {
+      position:relative; width:100%; height:100%; min-height:0; overflow:hidden;
+      border:1px solid #dbe2ec; border-radius:12px; background:#fff;
+      cursor:grab; touch-action:none;
+    }
+    .example-viewport.dragging { cursor:grabbing; }
+    #exampleImage {
+      position:absolute; left:50%; top:50%; max-width:none; width:auto; height:auto;
+      border:none; border-radius:0; transform-origin:center center; will-change:transform;
+      user-select:none; -webkit-user-drag:none; pointer-events:none;
+    }
+
+
+    /* v29: 소감 입력 창 */
+    .reflection-action { color:#075985; border-color:#7dd3fc; background:#f0f9ff; }
+    .reflection-action.has-value { color:#ffffff; border-color:#0284c7; background:#0284c7; }
+    #reflectionModal .reflection-card { width:min(680px, 94vw); max-height:86svh; }
+    .reflection-body { min-height:0; overflow:auto; padding:16px; display:grid; gap:10px; }
+    .reflection-body label { color:#344054; font-size:14px; font-weight:800; }
+    #reflectionText {
+      width:100%; min-height:190px; resize:vertical; padding:12px;
+      border:1px solid #cbd5e1; border-radius:12px; outline:none;
+      color:#172033; background:#ffffff; font:500 15px/1.65 "Noto Sans KR","Malgun Gothic",sans-serif;
+    }
+    #reflectionText:focus { border-color:#38bdf8; box-shadow:0 0 0 3px rgba(14,165,233,.14); }
+    .reflection-actions { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    #reflectionCount { color:#667085; font-size:12px; font-weight:700; }
+
+    .toast { position:fixed; left:50%; bottom:16px; transform:translateX(-50%) translateY(20px); background:#172033; color:#fff; padding:10px 14px; border-radius:999px; font-size:13px; font-weight:800; box-shadow:var(--shadow); opacity:0; pointer-events:none; transition:.22s; z-index:120; }
+    .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+
+    @media (max-width: 980px) {
+      .workspace { grid-template-columns:1fr; grid-template-rows:auto minmax(0,1fr); }
+      .side-panel { max-height:44svh; }
+      .canvas-stack { width:min(100%, 720px); }
+    }
+    @media (max-width: 720px) {
+      .topbar { grid-template-columns:1fr; }
+      .identity { grid-template-columns:1fr 1fr; }
+      .canvas-footer { flex-direction:column; align-items:stretch; }
+      .footer-actions { justify-content:flex-end; }
+    }
+
+
+    /* v18: uploaded coordinate-picture layout */
+    .topbar {
+      min-height:46px;
+      padding:5px 10px;
+      grid-template-columns:minmax(220px,1fr) auto;
+      gap:8px;
+    }
+    .title-wrap h1 { font-size:clamp(17px,1.45vw,22px); }
+    .title-wrap p { font-size:9.5px; }
+    .top-actions .btn { min-height:30px; padding:4px 8px; font-size:10px; }
+    .workspace { grid-template-columns:minmax(300px,365px) minmax(600px,1fr); gap:6px; padding:5px; }
+    .canvas-panel { display:grid; grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
+    .student-strip {
+      min-height:40px;
+      padding:4px 9px;
+      border-bottom:1px solid #bbf7d0;
+      background:#ecfdf5;
+      display:grid;
+      grid-template-columns:minmax(190px,.8fr) minmax(230px,1.2fr) auto;
+      align-items:center;
+      gap:8px;
+      z-index:20;
+    }
+    .compact-field { display:flex; align-items:center; gap:6px; min-width:0; }
+    .compact-field label, .compact-range { color:#065f46; font-size:10px; font-weight:900; white-space:nowrap; }
+    .compact-field input {
+      min-width:0;
+      min-height:29px;
+      padding:4px 7px;
+      border-color:#86efac;
+      font-size:11px;
+      font-weight:800;
+    }
+    .compact-range { display:flex; align-items:center; gap:5px; }
+    .compact-range select { width:76px; min-height:29px; padding:3px 5px; font-size:10px; }
+    .canvas-shell { min-height:0; overflow:hidden; background:#f8fafc; }
+    .canvas-stage { min-height:0; height:100%; position:relative; display:grid; place-items:center; padding:4px; background:#f8fafc; overflow:hidden; }
+    .canvas-stack {
+      width:min(calc(100% - 10px), calc(100svh - 100px));
+      max-height:100%;
+      transform:none !important;
+      will-change:auto;
+      overflow:hidden;
+      background:#fff;
+    }
+    .canvas-stack canvas, .canvas-stack svg { transform-origin:center center; }
+    #gridSvg, #graphSvg { shape-rendering:geometricPrecision; text-rendering:geometricPrecision; }
+    #fillCanvas, #penCanvas { transform-origin:0 0 !important; }
+    #penCanvas { pointer-events:none; cursor:default; }
+    .interaction-layer {
+      position:absolute;
+      inset:0;
+      z-index:4;
+      touch-action:none;
+      cursor:crosshair;
+      background:transparent;
+    }
+    .interaction-layer.fill-mode { cursor:cell; }
+    .interaction-layer.erase-mode { cursor:not-allowed; }
+    .interaction-layer.pan-mode { cursor:grab; }
+    .interaction-layer.pan-mode.dragging { cursor:grabbing; }
+
+    .color-toolbar {
+      position:absolute;
+      top:7px;
+      left:7px;
+      z-index:30;
+      max-width:calc(100% - 86px);
+      padding:6px 8px;
+      display:flex;
+      flex-wrap:wrap;
+      align-items:center;
+      gap:6px;
+      border:1px solid #cbd5e1;
+      border-radius:12px;
+      background:rgba(255,255,255,.96);
+      box-shadow:0 4px 12px rgba(15,23,42,.13);
+    }
+    .color-toolbar-title { font-size:11px; font-weight:900; color:#334155; }
+    .color-toolbar .palette { display:flex; flex-direction:row; gap:4px; align-items:center; }
+    .color-toolbar .swatch { width:27px; height:27px; border-radius:999px; }
+    .color-toolbar .custom-color { width:30px; height:28px; }
+    .brush-control { display:flex; align-items:center; gap:4px; font-size:10px; font-weight:800; color:#475569; }
+    .brush-control input { width:70px; }
+    .compact-action {
+      min-height:28px;
+      border:1px solid #cbd5e1;
+      border-radius:8px;
+      padding:4px 8px;
+      background:#fff;
+      color:#334155;
+      font-size:10px;
+      font-weight:900;
+      cursor:pointer;
+    }
+    .compact-action:disabled { opacity:.4; cursor:not-allowed; }
+    .danger-action { color:#be123c; border-color:#fda4af; }
+    .save-action { color:#fff; border-color:#059669; background:#059669; }
+    .hidden-control { display:none !important; }
+
+    .floating-controls {
+      position:absolute;
+      top:7px;
+      right:7px;
+      z-index:31;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .floating-group {
+      padding:4px;
+      display:flex;
+      flex-direction:column;
+      gap:3px;
+      border:1px solid #cbd5e1;
+      border-radius:12px;
+      background:rgba(255,255,255,.97);
+      box-shadow:0 4px 12px rgba(15,23,42,.13);
+    }
+    .icon-tool {
+      width:39px;
+      height:39px;
+      display:grid;
+      place-items:center;
+      border:0;
+      border-radius:8px;
+      color:#64748b;
+      background:transparent;
+      cursor:pointer;
+      font-size:20px;
+    }
+    .icon-tool:hover { background:#f1f5f9; }
+    .icon-tool.active { color:#4338ca; background:#e0e7ff; }
+    .zoom-badge { padding:2px 0 1px; text-align:center; color:#64748b; font-size:8px; font-weight:900; }
+
+    .confirm-card {
+      width:min(360px,100%);
+      padding:20px;
+      border-radius:16px;
+      background:#fff;
+      box-shadow:0 24px 56px rgba(15,23,42,.28);
+    }
+    .confirm-card h2 { margin:0 0 9px; font-size:19px; }
+    .confirm-card p { margin:0; color:#475569; font-size:13px; line-height:1.55; }
+    .confirm-actions { margin-top:16px; display:flex; justify-content:flex-end; gap:7px; }
+
+    @media (max-width:980px) {
+      .workspace { grid-template-columns:1fr; grid-template-rows:minmax(160px,36svh) minmax(0,1fr); }
+      .side-panel { max-height:none; }
+      .student-strip { grid-template-columns:1fr 1fr auto; }
+      .canvas-stack { width:min(calc(100% - 8px), calc(64svh - 55px)); }
+    }
+
+
+    /* v19: 도구 모음 축소 및 저장 버튼 한 줄 배치 */
+    .color-toolbar {
+      top:4px;
+      left:4px;
+      max-width:calc(100% - 52px);
+      padding:3px 4px;
+      gap:3px;
+      flex-wrap:nowrap;
+      overflow-x:auto;
+      overflow-y:hidden;
+      border-radius:8px;
+      white-space:nowrap;
+      scrollbar-width:none;
+    }
+    .color-toolbar::-webkit-scrollbar { display:none; }
+    .color-toolbar-title { font-size:8px; }
+    .color-toolbar .palette { gap:2px; flex-wrap:nowrap; }
+    .color-toolbar .swatch {
+      width:18px;
+      height:18px;
+      min-width:18px;
+      border-width:1px;
+      box-shadow:0 0 0 1px #cbd5e1;
+    }
+    .color-toolbar .swatch.active { box-shadow:0 0 0 2px #98aef0; }
+    .color-toolbar .custom-color { width:22px; min-width:22px; height:20px; padding:1px; border-radius:5px; }
+    .brush-control { gap:2px; font-size:8px; }
+    .brush-control input { width:48px; height:14px; }
+    .compact-action {
+      min-height:21px;
+      padding:2px 5px;
+      border-radius:6px;
+      font-size:8px;
+      line-height:1;
+      white-space:nowrap;
+    }
+    .save-action { order:99; }
+    .floating-controls { top:4px; right:4px; gap:4px; }
+    .floating-group { padding:2px; gap:1px; border-radius:8px; }
+    .icon-tool { width:28px; height:28px; border-radius:6px; font-size:15px; }
+    .zoom-badge { font-size:7px; padding:1px 0; }
+    .student-strip { min-height:35px; padding:3px 7px; gap:6px; }
+    .compact-field label, .compact-range { font-size:9px; }
+    .compact-field input { min-height:25px; padding:2px 6px; font-size:10px; }
+    .compact-range select { min-height:25px; font-size:9px; }
+    .canvas-stack { width:min(calc(100% - 6px), calc(100svh - 88px)); }
+
+
+    /* v25: 위쪽 메뉴와 오른쪽 도구를 제외한 화면 전체를 좌표평면으로 사용 */
+    .canvas-shell,
+    .canvas-stage {
+      width:100%;
+      height:100%;
+      min-width:0;
+      min-height:0;
+    }
+    .canvas-stage {
+      position:relative;
+      display:block;
+      padding:0;
+      overflow:hidden;
+      background:#ffffff;
+    }
+    .canvas-stack {
+      position:absolute;
+      top:50%;
+      left:50%;
+      width:var(--board-cover-size, 100%);
+      height:var(--board-cover-size, 100%);
+      max-width:none;
+      max-height:none;
+      aspect-ratio:1 / 1;
+      transform:translate(-50%, -50%) !important;
+      border:0;
+      box-shadow:none;
+      background:#ffffff;
+      overflow:hidden;
+    }
+    .canvas-stack canvas,
+    .canvas-stack svg,
+    .canvas-stack .interaction-layer {
+      width:100%;
+      height:100%;
+    }
+
+    /* v40: 색칠·펜 레이어와 SVG 그래프가 확대/이동할 때 완전히 같은 변환을 사용 */
+    #fillCanvas, #penCanvas {
+      transform-origin:0 0 !important;
+      backface-visibility:hidden;
+    }
+    .color-toolbar {
+      max-width:calc(100% - 50px);
+    }
+    .floating-controls {
+      right:4px;
+    }
+
+
+    /* v27: 예시 화면 배치 오류 수정 */
+    #exampleModal .modal-body {
+      min-height:0;
+      overflow:hidden;
+      padding:8px;
+      display:block;
+    }
+    #exampleModal .example-wrap {
+      width:100%;
+      height:100%;
+      min-height:0;
+      display:grid;
+      grid-template-rows:auto minmax(0,1fr);
+      gap:8px;
+      place-items:stretch;
+      align-items:stretch;
+      justify-items:stretch;
+    }
+    #exampleModal .example-tools {
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:6px;
+      flex-wrap:nowrap;
+    }
+    #exampleModal .example-viewport {
+      position:relative;
+      width:100%;
+      height:100%;
+      min-width:0;
+      min-height:0;
+      overflow:hidden;
+      border:1px solid #dbe2ec;
+      border-radius:12px;
+      background:#fff;
+      cursor:grab;
+      touch-action:none;
+    }
+    #exampleModal .example-viewport.dragging { cursor:grabbing; }
+    #exampleModal #exampleImage {
+      position:absolute;
+      left:50%;
+      top:50%;
+      display:block;
+      width:auto;
+      height:auto;
+      max-width:none;
+      max-height:none;
+      object-fit:unset;
+      border:0;
+      border-radius:0;
+      transform-origin:center center;
+      will-change:transform;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-user-drag:none;
+      pointer-events:none;
+    }
+
+
+    /* v28: 예시 화면 위치·크기 및 좌표 글자 선택 오류 수정 */
+    .canvas-stage,
+    .canvas-stage * {
+      user-select:none;
+      -webkit-user-select:none;
+      -ms-user-select:none;
+    }
+    #gridSvg,
+    #graphSvg {
+      pointer-events:none;
+    }
+    #exampleModal {
+      padding:5px;
+    }
+    #exampleModal .modal-card {
+      width:min(1500px, 99vw);
+      height:min(97svh, 900px);
+      max-height:97svh;
+    }
+    #exampleModal .modal-head {
+      min-height:42px;
+      padding:5px 10px;
+    }
+    #exampleModal .modal-body {
+      min-height:0;
+      overflow:hidden;
+      padding:6px;
+      display:grid;
+    }
+    #exampleModal .example-wrap {
+      width:100%;
+      height:100%;
+      min-width:0;
+      min-height:0;
+      display:grid;
+      grid-template-rows:36px minmax(0,1fr);
+      gap:5px;
+    }
+    #exampleModal .example-tools {
+      min-height:0;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:5px;
+      flex-wrap:nowrap;
+    }
+    #exampleModal .example-viewport {
+      position:relative;
+      width:100%;
+      height:100%;
+      min-width:0;
+      min-height:0;
+      overflow:hidden;
+      border:1px solid #cbd5e1;
+      border-radius:10px;
+      background:#f8fafc;
+      cursor:grab;
+      touch-action:none;
+    }
+    #exampleModal .example-viewport.dragging { cursor:grabbing; }
+    #exampleModal #exampleImage {
+      position:absolute;
+      left:0;
+      top:0;
+      display:block;
+      width:auto;
+      height:auto;
+      max-width:none;
+      max-height:none;
+      margin:0;
+      padding:0;
+      border:0;
+      border-radius:0;
+      object-fit:unset;
+      transform-origin:0 0;
+      will-change:transform;
+      user-select:none;
+      -webkit-user-select:none;
+      -webkit-user-drag:none;
+      pointer-events:none;
+    }
+
+
+    /* v36: 반비례 분수꼴 및 끝점 검증 표시 */
+    .fraction-ui {
+      display:inline-grid;
+      grid-template-rows:auto auto;
+      align-items:center;
+      justify-items:center;
+      min-width:58px;
+      margin:0 2px;
+      vertical-align:middle;
+      line-height:1;
+    }
+    .fraction-ui .fraction-numerator { display:flex; justify-content:center; padding:0 2px 2px; }
+    .fraction-ui .fraction-denominator {
+      width:100%;
+      border-top:2px solid #172033;
+      padding-top:3px;
+      text-align:center;
+      font-family:Cambria,"Times New Roman",serif;
+      font-size:17px;
+      font-weight:700;
+    }
+    .ordered-pair.invalid input { border-color:#ef4444; background:#fff1f2; }
+    .ordered-pair.valid input { border-color:#22c55e; background:#f0fdf4; }
+    .row-summary.endpoint-error { color:#c62828; font-weight:800; }
+
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="title-wrap">
+        <h1>함수를 이용한 작품 만들기</h1>
+        <p>반비례, 일차함수, 축에 평행한 직선, 이차함수를 이용해 작품을 그리고 색칠해 보세요.</p>
+      </div>
+      <div class="top-actions">
+        <button id="exampleBtn" class="btn soft" type="button">예시 보기</button>
+        <button id="savedListBtn" class="btn" type="button">저장 목록</button>
+        <button id="resetBtn" class="btn danger" type="button">전체 초기화</button>
+      </div>
+    </header>
+
+    <main class="workspace">
+      <section class="side-panel">
+        <div class="side-head">
+          <div class="side-actions">
+            <select id="addFunctionType" class="add-type-select" aria-label="추가할 함수 종류">
+              <option value="inverse">반비례</option>
+              <option value="linear">일차함수</option>
+              <option value="horizontal">x축에 평행한 직선</option>
+              <option value="vertical">y축에 평행한 직선</option>
+              <option value="quadratic">이차함수</option>
+            </select>
+            <button id="addFunctionBtn" class="btn primary" type="button">＋ 함수 추가</button>
+          </div>
+          <div class="side-info">처음에는 함수가 없습니다. 함수 종류를 선택한 뒤 「함수 추가」 버튼을 눌러 필요한 만큼 추가해 작품을 만들어 보세요.</div>
+        </div>
+        <div id="functionList" class="function-list"></div>
+      </section>
+
+      <section class="canvas-panel">
+        <div class="student-strip">
+          <div class="compact-field">
+            <label for="studentInfo">학번 이름</label>
+            <input id="studentInfo" type="text" placeholder="예: 20315 홍길동" maxlength="40" />
+          </div>
+          <div class="compact-field compact-title-field">
+            <label for="artTitle">작품 제목</label>
+            <input id="artTitle" type="text" placeholder="작품 제목을 입력하세요" maxlength="40" />
+          </div>
+          <label class="compact-range">좌표 범위
+            <select id="graphRange">
+              <option value="10">-10~10</option>
+              <option value="12">-12~12</option>
+              <option value="15">-15~15</option>
+            </select>
+          </label>
+        </div>
+
+        <div class="canvas-shell">
+          <div class="canvas-stage">
+            <div class="color-toolbar" aria-label="색칠 도구 모음">
+              <span class="color-toolbar-title">색칠</span>
+              <div id="palette" class="palette"></div>
+              <input id="customColor" class="custom-color" type="color" value="#7c3aed" aria-label="사용자 색상" />
+              <label class="brush-control">붓
+                <input id="brushWidth" type="range" min="2" max="34" step="1" value="5" />
+                <span id="brushWidthValue">5</span>
+              </label>
+              <button id="undoBtn" class="compact-action" type="button"><i class="ph-bold ph-arrow-counter-clockwise"></i> 색칠 취소</button>
+              <button id="redoBtn" class="compact-action hidden-control" type="button" aria-hidden="true">다시 실행</button>
+              <button id="clearColoringBtn" class="compact-action danger-action" type="button"><i class="ph-bold ph-trash"></i> 색칠 삭제</button>
+              <button id="reflectionBtn" class="compact-action reflection-action" type="button"><i class="ph-bold ph-chat-text"></i> 소감</button>
+              <button id="saveArtworkBtn" class="compact-action save-action" type="button"><i class="ph-bold ph-download-simple"></i> 저장</button>
+            </div>
+
+            <div id="canvasStack" class="canvas-stack">
+              <svg id="gridSvg" class="svg-layer" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <canvas id="fillCanvas" width="1000" height="1000"></canvas>
+              <svg id="graphSvg" class="svg-layer" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true"></svg>
+              <canvas id="penCanvas" width="1000" height="1000"></canvas>
+              <div id="interactionLayer" class="interaction-layer" aria-label="좌표평면 조작 영역"></div>
+            </div>
+
+            <div class="floating-controls" aria-label="좌표평면 도구">
+              <div class="floating-group">
+                <button class="icon-tool tool-btn" data-tool="fill" type="button" title="영역 색칠"><i class="ph-fill ph-paint-bucket"></i></button>
+                <button class="icon-tool tool-btn active" data-tool="pen" type="button" title="붓칠"><i class="ph-bold ph-paint-brush"></i></button>
+                <button class="icon-tool tool-btn" data-tool="eraser" type="button" title="색칠 지우개"><i class="ph-bold ph-eraser"></i></button>
+              </div>
+              <div class="floating-group">
+                <button class="icon-tool tool-btn" data-tool="pan" type="button" title="화면 이동"><i class="ph-bold ph-hand-grabbing"></i></button>
+                <button id="zoomInBtn" class="icon-tool" type="button" title="확대"><i class="ph-bold ph-magnifying-glass-plus"></i></button>
+                <button id="zoomOutBtn" class="icon-tool" type="button" title="축소"><i class="ph-bold ph-magnifying-glass-minus"></i></button>
+                <button id="fitViewBtn" class="icon-tool" type="button" title="화면 맞춤"><i class="ph-bold ph-corners-out"></i></button>
+                <span id="zoomValue" class="zoom-badge">100%</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="savedModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head"><h2>완성 작품 저장 목록</h2><button id="closeSavedModal" class="btn small" type="button">닫기</button></div>
+      <div id="savedList" class="modal-body"></div>
+    </div>
+  </div>
+
+  <div id="exampleModal" class="modal" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <div class="modal-head"><span></span><button id="closeExampleModal" class="btn small" type="button">닫기</button></div>
+      <div class="modal-body">
+        <div class="example-wrap">
+          <div class="example-tools">
+            <button id="exampleZoomOutBtn" class="btn small" type="button">－</button>
+            <div id="exampleZoomValue" class="zoom-value">100%</div>
+            <button id="exampleZoomInBtn" class="btn small" type="button">＋</button>
+            <button id="exampleFitBtn" class="btn small" type="button">맞춤</button>
+          </div>
+          <div id="exampleViewport" class="example-viewport">
+            <img id="exampleImage" class="example-image" alt="이차함수, 일차함수, 축에 평행한 직선으로 그린 강아지 예시 작품" />
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="reflectionModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="reflectionTitle">
+    <div class="modal-card reflection-card">
+      <div class="modal-head">
+        <h2 id="reflectionTitle">소감 입력</h2>
+        <button id="closeReflectionModal" class="btn small" type="button">닫기</button>
+      </div>
+      <div class="reflection-body">
+        <label for="reflectionText">함수를 이용해 작품을 만든 소감을 적어 보세요.</label>
+        <textarea id="reflectionText" maxlength="500" placeholder="소감을 입력하세요."></textarea>
+        <div class="reflection-actions">
+          <span id="reflectionCount">0/500</span>
+          <button id="reflectionDoneBtn" class="btn primary" type="button">입력 완료</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="confirmModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="confirm-card">
+      <h2 id="confirmTitle">확인</h2>
+      <p id="confirmMessage"></p>
+      <div class="confirm-actions">
+        <button id="confirmCancelBtn" class="btn" type="button">취소</button>
+        <button id="confirmOkBtn" class="btn danger" type="button">확인</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    "use strict";
+
+    const SIZE = 1000;
+    const PADDING = 52;
+    const DRAFT_KEY = "function-art-tablet-draft-v37";
+    const LEGACY_DRAFT_KEYS = ["function-art-tablet-draft-v36", "function-art-tablet-draft-v35", "function-art-tablet-draft-v34", "function-art-tablet-draft-v33", "function-art-tablet-draft-v32", "function-art-tablet-draft-v31", "function-art-tablet-draft-v30", "function-art-tablet-draft-v29", "function-art-tablet-draft-v28", "function-art-tablet-draft-v27", "function-art-tablet-draft-v26", "function-art-tablet-draft-v25", "function-art-tablet-draft-v24", "function-art-tablet-draft-v22", "function-art-tablet-draft-v21", "function-art-tablet-draft-v20"];
+    const COMPLETED_KEY = "function-art-tablet-completed-v16";
+    const MAX_SAVED = 10;
+    const MAX_HISTORY = 18;
+    const PALETTE = ["#2563eb", "#db2777", "#16a34a", "#f59e0b", "#7c3aed", "#0ea5e9", "#ef4444", "#92400e"];
+    const PEN_PALETTE = ["#111827", "#ef4444", "#f97316", "#facc15", "#22c55e", "#06b6d4", "#2563eb", "#7c3aed", "#ec4899", "#92400e"];
+    const TYPE_OPTIONS = [
+      { value:"inverse", label:"반비례" },
+      { value:"linear", label:"일차함수" },
+      { value:"horizontal", label:"x축에 평행한 직선" },
+      { value:"vertical", label:"y축에 평행한 직선" },
+      { value:"quadratic", label:"이차함수" }
+    ];
+
+    const refs = {
+      artTitle: document.getElementById("artTitle"),
+      studentInfo: document.getElementById("studentInfo"),
+      addFunctionType: document.getElementById("addFunctionType"),
+      addFunctionBtn: document.getElementById("addFunctionBtn"),
+      functionList: document.getElementById("functionList"),
+      graphRange: document.getElementById("graphRange"),
+      palette: document.getElementById("palette"),
+      customColor: document.getElementById("customColor"),
+      brushWidth: document.getElementById("brushWidth"),
+      brushWidthValue: document.getElementById("brushWidthValue"),
+      undoBtn: document.getElementById("undoBtn"),
+      redoBtn: document.getElementById("redoBtn"),
+      zoomOutBtn: document.getElementById("zoomOutBtn"),
+      zoomInBtn: document.getElementById("zoomInBtn"),
+      fitViewBtn: document.getElementById("fitViewBtn"),
+      zoomValue: document.getElementById("zoomValue"),
+      resetBtn: document.getElementById("resetBtn"),
+      savedListBtn: document.getElementById("savedListBtn"),
+      exampleBtn: document.getElementById("exampleBtn"),
+      reflectionBtn: document.getElementById("reflectionBtn"),
+      saveArtworkBtn: document.getElementById("saveArtworkBtn"),
+      clearColoringBtn: document.getElementById("clearColoringBtn"),
+      savedModal: document.getElementById("savedModal"),
+      closeSavedModal: document.getElementById("closeSavedModal"),
+      savedList: document.getElementById("savedList"),
+      exampleModal: document.getElementById("exampleModal"),
+      closeExampleModal: document.getElementById("closeExampleModal"),
+      reflectionModal: document.getElementById("reflectionModal"),
+      closeReflectionModal: document.getElementById("closeReflectionModal"),
+      reflectionText: document.getElementById("reflectionText"),
+      reflectionCount: document.getElementById("reflectionCount"),
+      reflectionDoneBtn: document.getElementById("reflectionDoneBtn"),
+      exampleViewport: document.getElementById("exampleViewport"),
+      exampleImage: document.getElementById("exampleImage"),
+      exampleZoomOutBtn: document.getElementById("exampleZoomOutBtn"),
+      exampleZoomInBtn: document.getElementById("exampleZoomInBtn"),
+      exampleFitBtn: document.getElementById("exampleFitBtn"),
+      exampleZoomValue: document.getElementById("exampleZoomValue"),
+      toast: document.getElementById("toast"),
+      canvasStack: document.getElementById("canvasStack"),
+      gridSvg: document.getElementById("gridSvg"),
+      graphSvg: document.getElementById("graphSvg"),
+      fillCanvas: document.getElementById("fillCanvas"),
+      penCanvas: document.getElementById("penCanvas"),
+      interactionLayer: document.getElementById("interactionLayer"),
+      confirmModal: document.getElementById("confirmModal"),
+      confirmMessage: document.getElementById("confirmMessage"),
+      confirmCancelBtn: document.getElementById("confirmCancelBtn"),
+      confirmOkBtn: document.getElementById("confirmOkBtn")
+    };
+
+    const fillCtx = refs.fillCanvas.getContext("2d");
+    const penCtx = refs.penCanvas.getContext("2d");
+    const boundaryCanvas = document.createElement("canvas");
+    boundaryCanvas.width = SIZE; boundaryCanvas.height = SIZE;
+    const boundaryCtx = boundaryCanvas.getContext("2d", { willReadFrequently:true });
+
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+    function deepCopy(value) { return JSON.parse(JSON.stringify(value)); }
+    function round(value, digits=4) { const f = 10 ** digits; const n = Math.round((Number(value)+Number.EPSILON) * f) / f; return Math.abs(n) < 1 / f ? 0 : n; }
+    function parseMaybe(value) {
+      const text = String(value ?? "").trim().replace(/[−–—]/g, "-").replace(/,/g, "");
+      if (!text) return null;
+      const n = Number(text);
+      return Number.isFinite(n) ? n : null;
+    }
+    function displayNumber(value) {
+      if (value === null || value === undefined || value === "") return "";
+      const n = round(Number(value), 4);
+      return Number.isInteger(n) ? String(n) : String(n);
+    }
+    function formatSigned(value) {
+      const n = round(Number(value), 4);
+      if (n > 0) return `+${displayNumber(n)}`;
+      if (n < 0) return `-${displayNumber(Math.abs(n))}`;
+      return "";
+    }
+
+    function nextColor(index) { return PALETTE[index % PALETTE.length]; }
+    function makeFunction(index=0, type="quadratic") {
+      return {
+        id: Date.now() + Math.floor(Math.random()*100000) + index,
+        type: TYPE_OPTIONS.some(item => item.value === type) ? type : "quadratic",
+        color: nextColor(index),
+        params: { a: 0.5, h: -3, k: -2, m: 1, b: 0, c: 0, r: 2 },
+        endpoints: [{ x:"", y:"" }, { x:"", y:"" }]
+      };
+    }
+    function defaultState() {
+      return {
+        version: 37,
+        title: "",
+        studentInfo: "",
+        reflection: "",
+        studentNumber: "",
+        studentName: "",
+        range: 12,
+        selectedFunctionId: null,
+        functions: [],
+        tool: "pen",
+        selectedColor: "#111827",
+        brushWidth: 5,
+        zoom: 1,
+        pan: { x: 0, y: 0 },
+        fillImage: "",
+        penImage: ""
+      };
+    }
+
+    function sanitizeState(saved) {
+      const base = defaultState();
+      if (!saved || !Array.isArray(saved.functions)) return base;
+      const functions = saved.functions.map((fn, index) => {
+        const fallback = makeFunction(index);
+        const type = TYPE_OPTIONS.some(item => item.value === fn.type) ? fn.type : "quadratic";
+        const params = { ...fallback.params, ...(fn.params || {}) };
+        return {
+          id: Number.isFinite(Number(fn.id)) ? Number(fn.id) : fallback.id,
+          type,
+          color: typeof fn.color === "string" ? fn.color : fallback.color,
+          params: {
+            a: Number.isFinite(Number(params.a)) ? Number(params.a) : fallback.params.a,
+            h: Number.isFinite(Number(params.h)) ? Number(params.h) : fallback.params.h,
+            k: Number.isFinite(Number(params.k)) ? Number(params.k) : fallback.params.k,
+            m: Number.isFinite(Number(params.m)) ? Number(params.m) : fallback.params.m,
+            b: Number.isFinite(Number(params.b)) ? Number(params.b) : fallback.params.b,
+            c: Number.isFinite(Number(params.c)) ? Number(params.c) : fallback.params.c,
+            r: Number.isFinite(Number(params.r)) ? Number(params.r) : fallback.params.r
+          },
+          endpoints: Array.isArray(fn.endpoints) && fn.endpoints.length === 2
+            ? fn.endpoints.map(ep => ({ x: ep?.x ?? "", y: ep?.y ?? "" }))
+            : fallback.endpoints
+        };
+      });
+      return {
+        ...base,
+        ...saved,
+        version: 37,
+        studentInfo: typeof saved.studentInfo === "string"
+          ? saved.studentInfo
+          : [saved.studentNumber, saved.studentName].filter(Boolean).join(" "),
+        reflection: typeof saved.reflection === "string" ? saved.reflection : "",
+        range: [10,12,15].includes(Number(saved.range)) ? Number(saved.range) : 12,
+        selectedFunctionId: functions.some(fn => fn.id === saved.selectedFunctionId) ? saved.selectedFunctionId : (functions[0]?.id ?? null),
+        functions,
+        tool: ["pen","fill","eraser","pan"].includes(saved.tool) ? saved.tool : "pen",
+        selectedColor: typeof saved.selectedColor === "string" ? saved.selectedColor : base.selectedColor,
+        brushWidth: clamp(Number(saved.brushWidth) || 5, 2, 34),
+        zoom: clamp(Number(saved.zoom) || 1, 0.5, 4),
+        pan: saved.pan && Number.isFinite(Number(saved.pan.x)) && Number.isFinite(Number(saved.pan.y)) ? { x:Number(saved.pan.x), y:Number(saved.pan.y) } : { x:0, y:0 },
+        fillImage: typeof saved.fillImage === "string" ? saved.fillImage : "",
+        penImage: typeof saved.penImage === "string" ? saved.penImage : ""
+      };
+    }
+    function loadDraft() {
+      try {
+        let raw = localStorage.getItem(DRAFT_KEY);
+        if (!raw) {
+          for (const key of LEGACY_DRAFT_KEYS) {
+            raw = localStorage.getItem(key);
+            if (raw) break;
+          }
+        }
+        if (!raw) return defaultState();
+        return sanitizeState(JSON.parse(raw));
+      } catch (error) {
+        console.warn(error);
+        return defaultState();
+      }
+    }
+
+    let state = loadDraft();
+    if (!state.selectedFunctionId && state.functions[0]) state.selectedFunctionId = state.functions[0].id;
+    let undoStack = [];
+    let redoStack = [];
+    let saveTimer = null;
+    let toastTimer = null;
+    let drawing = false;
+    let panning = false;
+    let activePointerId = null;
+    let lastPoint = null;
+    let beforeActionSnapshot = null;
+    let actionChanged = false;
+    let panStart = null;
+    let exampleBaseScale = 1;
+    let exampleZoom = 1;
+    let examplePan = { x:0, y:0 };
+    let exampleDragging = false;
+    let exampleDragPointerId = null;
+    let exampleDragStart = null;
+    let savingArtwork = false;
+
+    function mapX(x) { const r = Number(state.range); return PADDING + ((x + r) / (2 * r)) * (SIZE - PADDING * 2); }
+    function mapY(y) { const r = Number(state.range); return PADDING + ((r - y) / (2 * r)) * (SIZE - PADDING * 2); }
+
+    // 좌표 그림 코드와 같은 방식으로 화면 좌표를 고정된 SVG 좌표로 바꿉니다.
+    function pointerToRoot(event) {
+      const rect = refs.canvasStack.getBoundingClientRect();
+      return {
+        x: (event.clientX - rect.left) * (SIZE / Math.max(1, rect.width)),
+        y: (event.clientY - rect.top) * (SIZE / Math.max(1, rect.height))
+      };
+    }
+
+    // translate(pan) → 중심 기준 scale(zoom)의 역변환입니다.
+    function pointerToCanvas(event) {
+      const point = pointerToRoot(event);
+      const originX = mapX(0);
+      const originY = mapY(0);
+      return {
+        x: originX + (point.x - originX - state.pan.x) / state.zoom,
+        y: originY + (point.y - originY - state.pan.y) / state.zoom
+      };
+    }
+
+    function scheduleSave() {
+      clearTimeout(saveTimer);
+      saveTimer = setTimeout(() => {
+        try {
+          state.fillImage = refs.fillCanvas.toDataURL("image/png");
+          state.penImage = refs.penCanvas.toDataURL("image/png");
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(state));
+        } catch (error) {
+          showToast("자동 저장 공간이 부족합니다.");
+        }
+      }, 180);
+    }
+    function showToast(message) {
+      refs.toast.textContent = message;
+      refs.toast.classList.add("show");
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => refs.toast.classList.remove("show"), 2200);
+    }
+
+    let pendingConfirmAction = null;
+    function showConfirm(message, action) {
+      pendingConfirmAction = typeof action === "function" ? action : null;
+      refs.confirmMessage.textContent = message;
+      refs.confirmModal.classList.add("show");
+    }
+    function closeConfirm() {
+      refs.confirmModal.classList.remove("show");
+      pendingConfirmAction = null;
+    }
+
+    function formulaText(fn) {
+      const p = fn.params;
+      if (fn.type === "quadratic") {
+        const hPart = p.h >= 0 ? `(x-${displayNumber(p.h)})` : `(x+${displayNumber(Math.abs(p.h))})`;
+        const a = round(p.a, 4);
+        const coefficient = a === 1 ? "" : a === -1 ? "-" : displayNumber(a);
+        return `y = ${coefficient}${hPart}²${formatSigned(p.k)}`;
+      }
+      if (fn.type === "linear") {
+        const a = round(p.m, 4);
+        let slopePart = "";
+        if (a === 1) slopePart = "x";
+        else if (a === -1) slopePart = "-x";
+        else slopePart = `${displayNumber(a)}x`;
+        return `y = ${slopePart}${formatSigned(p.b)}`;
+      }
+      if (fn.type === "inverse") return `y = ${displayNumber(p.r)}/x`;
+      if (fn.type === "horizontal") return `y = ${displayNumber(p.c)}`;
+      return `x = ${displayNumber(p.c)}`;
+    }
+
+    function endpointPairText(point) {
+      const x = String(point?.x ?? "").trim();
+      const y = String(point?.y ?? "").trim();
+      if (!x && !y) return "";
+      return `(${x || " "}, ${y || " "})`;
+    }
+
+    function endpointUsageText(fn) {
+      const spec = getDrawSpec(fn);
+      const pointText = point => `(${displayNumber(point.x)}, ${displayNumber(point.y)})`;
+      if (spec.mode === "vertical") {
+        if (spec.endpoints[0] && spec.endpoints[1]) return `${pointText(spec.endpoints[0])} ~ ${pointText(spec.endpoints[1])}`;
+        if (spec.endpoints[0]) return `${pointText(spec.endpoints[0])}부터 위쪽 부분 사용`;
+        if (spec.endpoints[1]) return `아래쪽 부분부터 ${pointText(spec.endpoints[1])}까지 사용`;
+        return `전체 직선 사용`;
+      }
+      if (spec.endpoints[0] && spec.endpoints[1]) return `${pointText(spec.endpoints[0])} ~ ${pointText(spec.endpoints[1])}`;
+      if (spec.endpoints[0]) return `${pointText(spec.endpoints[0])}부터 오른쪽 부분 사용`;
+      if (spec.endpoints[1]) return `왼쪽 부분부터 ${pointText(spec.endpoints[1])}까지 사용`;
+      return `전체 그래프 사용`;
+    }
+
+    function savedEndpointText(fn) {
+      return endpointUsageText(fn);
+    }
+
+    function validateEndpointSlot(fn, slotIndex) {
+      const point = fn.endpoints?.[slotIndex] || { x:"", y:"" };
+      const rawX = String(point.x ?? "").trim();
+      const rawY = String(point.y ?? "").trim();
+      if (!rawX && !rawY) return { state:"blank", valid:true, point:null, message:"" };
+      if (!rawX || !rawY) return { state:"invalid", valid:false, point:null, message:"x좌표와 y좌표를 모두 입력하세요." };
+      const x = parseMaybe(rawX);
+      const y = parseMaybe(rawY);
+      if (x === null || y === null) return { state:"invalid", valid:false, point:null, message:"순서쌍에는 숫자만 입력하세요." };
+
+      if (fn.type === "vertical") {
+        const expectedX = Number(fn.params.c);
+        const tolerance = Math.max(0.01, Math.abs(expectedX) * 0.001);
+        if (Math.abs(x - expectedX) > tolerance) {
+          return { state:"invalid", valid:false, point:null, message:"입력한 순서쌍은 해당 직선 위의 점이 아닙니다." };
+        }
+      } else {
+        const expectedY = evaluateY(fn, x);
+        if (!Number.isFinite(expectedY)) {
+          return { state:"invalid", valid:false, point:null, message:"반비례에서는 x좌표로 0을 사용할 수 없습니다." };
+        }
+        const tolerance = Math.max(0.05, Math.abs(expectedY) * 0.005);
+        if (Math.abs(y - expectedY) > tolerance) {
+          return { state:"invalid", valid:false, point:null, message:"입력한 순서쌍은 그래프 위의 점이 아닙니다." };
+        }
+      }
+      return { state:"valid", valid:true, point:{ x, y }, message:"" };
+    }
+
+    function endpointErrorsForFunction(fn) {
+      return [0,1].map(slot => validateEndpointSlot(fn, slot)).filter(result => !result.valid);
+    }
+
+    function firstEndpointError() {
+      for (let index = 0; index < state.functions.length; index++) {
+        const fn = state.functions[index];
+        for (let slot = 0; slot < 2; slot++) {
+          const result = validateEndpointSlot(fn, slot);
+          if (!result.valid) return { fn, index, slot, result };
+        }
+      }
+      return null;
+    }
+
+    function functionSummaryText(fn) {
+      const errors = endpointErrorsForFunction(fn);
+      return errors.length ? `⚠ ${errors[0].message}` : getSummaryText(fn);
+    }
+
+    function applyEndpointValidationToRow(fnId) {
+      const fn = state.functions.find(item => item.id === fnId);
+      const row = refs.functionList.querySelector(`.function-row[data-row-id="${fnId}"]`);
+      if (!fn || !row) return;
+      [0,1].forEach(slot => {
+        const result = validateEndpointSlot(fn, slot);
+        const xInput = row.querySelector(`[data-endpoint="${slot}-x"]`);
+        const pair = xInput?.closest('.ordered-pair');
+        pair?.classList.toggle('invalid', result.state === 'invalid');
+        pair?.classList.toggle('valid', result.state === 'valid');
+      });
+      const summary = row.querySelector('.row-summary');
+      const errors = endpointErrorsForFunction(fn);
+      if (summary) {
+        summary.textContent = errors.length ? `⚠ ${errors[0].message}` : getSummaryText(fn);
+        summary.classList.toggle('endpoint-error', errors.length > 0);
+      }
+    }
+
+    function getCompleteEndpoint(fn, slotIndex) {
+      const result = validateEndpointSlot(fn, slotIndex);
+      return result.state === "valid" ? result.point : null;
+    }
+
+    function evaluateY(fn, x) {
+      const p = fn.params;
+      if (fn.type === "quadratic") return p.a * (x - p.h) ** 2 + p.k;
+      if (fn.type === "linear") return p.m * x + p.b;
+      if (fn.type === "inverse") return Math.abs(x) < 1e-9 ? null : p.r / x;
+      if (fn.type === "horizontal") return p.c;
+      return null;
+    }
+
+    function getDrawSpec(fn) {
+      const r = Number(state.range);
+      const ep1 = getCompleteEndpoint(fn, 0);
+      const ep2 = getCompleteEndpoint(fn, 1);
+      if (fn.type === "vertical") {
+        let yMin = -r, yMax = r;
+        if (ep1 && ep2) { yMin = Math.min(ep1.y, ep2.y); yMax = Math.max(ep1.y, ep2.y); }
+        else if (ep1) { yMin = ep1.y; yMax = r; }
+        else if (ep2) { yMin = -r; yMax = ep2.y; }
+        return { mode:"vertical", x:fn.params.c, yMin, yMax, endpoints:[ep1, ep2] };
+      }
+      let xMin = -r, xMax = r;
+      if (ep1 && ep2) { xMin = Math.min(ep1.x, ep2.x); xMax = Math.max(ep1.x, ep2.x); }
+      else if (ep1) { xMin = ep1.x; xMax = r; }
+      else if (ep2) { xMin = -r; xMax = ep2.x; }
+      return { mode:"xy", xMin, xMax, endpoints:[ep1, ep2] };
+    }
+
+    function getSummaryText(fn) {
+      return `${formulaText(fn)} · ${endpointUsageText(fn)}`;
+    }
+
+    function miniStepperHtml(fnId, key, value, step, cssClass="") {
+      return `<span class="mini-stepper ${cssClass}"><input data-fn-id="${fnId}" data-input-param="${key}" value="${displayNumber(value)}" /><span class="mini-stepper-buttons"><button type="button" data-fn-id="${fnId}" data-step-param="${key}" data-delta="${step}">▲</button><button type="button" data-fn-id="${fnId}" data-step-param="${key}" data-delta="-${step}">▼</button></span></span>`;
+    }
+
+    function formulaControlsHtml(fn) {
+      const p = fn.params;
+      if (fn.type === "quadratic") {
+        return `<div class="formula-inline"><span class="formula-text">y =</span>${miniStepperHtml(fn.id, "a", p.a, 0.5)}<span class="formula-text">(x −</span>${miniStepperHtml(fn.id, "h", p.h, 0.5)}<span class="formula-text">)</span><span class="formula-power">2</span><span class="formula-text">+</span>${miniStepperHtml(fn.id, "k", p.k, 0.5, "small")}</div>`;
+      }
+      if (fn.type === "linear") {
+        return `<div class="formula-inline"><span class="formula-text">y =</span>${miniStepperHtml(fn.id, "m", p.m, 0.5)}<span class="formula-text">x +</span>${miniStepperHtml(fn.id, "b", p.b, 0.5, "small")}</div>`;
+      }
+      if (fn.type === "inverse") {
+        return `<div class="formula-inline"><span class="formula-text">y =</span><span class="fraction-ui"><span class="fraction-numerator">${miniStepperHtml(fn.id, "r", p.r, 0.5, "small")}</span><span class="fraction-denominator">x</span></span></div>`;
+      }
+      if (fn.type === "horizontal") {
+        return `<div class="formula-inline"><span class="formula-text">y =</span>${miniStepperHtml(fn.id, "c", p.c, 0.5, "small")}</div>`;
+      }
+      return `<div class="formula-inline"><span class="formula-text">x =</span>${miniStepperHtml(fn.id, "c", p.c, 0.5, "small")}</div>`;
+    }
+
+    function renderFunctionList() {
+      if (!state.functions.length) {
+        refs.functionList.innerHTML = '<div class="empty-function-guide"><div><strong>등록된 함수가 없습니다.</strong><br>위에서 함수 종류를 선택하고<br>「＋ 함수 추가」를 눌러 시작하세요.</div></div>';
+        return;
+      }
+      refs.functionList.innerHTML = state.functions.map((fn, index) => `
+        <div class="function-row ${fn.id === state.selectedFunctionId ? 'active' : ''}" data-row-id="${fn.id}">
+          <div class="function-row-top">
+            <div class="function-row-inner">
+              <div class="badge-circle" style="background:${fn.color}">${index + 1}</div>
+              <select class="type-select" data-fn-id="${fn.id}" data-change-type="type">
+                ${TYPE_OPTIONS.map(item => `<option value="${item.value}" ${item.value === fn.type ? 'selected' : ''}>${item.label}</option>`).join('')}
+              </select>
+              ${formulaControlsHtml(fn)}
+              <span class="endpoint-label">끝점</span>
+              <div class="endpoint-inline">
+                <div class="ordered-pair ${validateEndpointSlot(fn,0).state === 'invalid' ? 'invalid' : validateEndpointSlot(fn,0).state === 'valid' ? 'valid' : ''}"><span>(</span><input data-fn-id="${fn.id}" data-endpoint="0-x" value="${fn.endpoints[0].x}" placeholder="x" /><span>,</span><input data-fn-id="${fn.id}" data-endpoint="0-y" value="${fn.endpoints[0].y}" placeholder="y" /><span>)</span></div>
+                <span>~</span>
+                <div class="ordered-pair ${validateEndpointSlot(fn,1).state === 'invalid' ? 'invalid' : validateEndpointSlot(fn,1).state === 'valid' ? 'valid' : ''}"><span>(</span><input data-fn-id="${fn.id}" data-endpoint="1-x" value="${fn.endpoints[1].x}" placeholder="x" /><span>,</span><input data-fn-id="${fn.id}" data-endpoint="1-y" value="${fn.endpoints[1].y}" placeholder="y" /><span>)</span></div>
+              </div>
+              <input class="function-color" type="color" data-fn-id="${fn.id}" data-color-input="true" value="${fn.color}" />
+              <button class="btn small danger" type="button" data-remove-fn="${fn.id}">삭제</button>
+            </div>
+          </div>
+          <div class="row-summary ${endpointErrorsForFunction(fn).length ? 'endpoint-error' : ''}">${functionSummaryText(fn)}</div>
+        </div>
+      `).join('');
+    }
+
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    function createSvgNode(tag, attrs={}, text="") {
+      const node = document.createElementNS(SVG_NS, tag);
+      Object.entries(attrs).forEach(([k,v]) => { if (v !== null && v !== undefined) node.setAttribute(k, String(v)); });
+      if (text !== "") node.textContent = text;
+      return node;
+    }
+
+    function drawGridSvg() {
+      const svg = refs.gridSvg;
+      svg.innerHTML = "";
+      svg.setAttribute("viewBox", `0 0 ${SIZE} ${SIZE}`);
+      const range = Number(state.range);
+      const left = mapX(-range), right = mapX(range), top = mapY(range), bottom = mapY(-range);
+
+      const world = createSvgNode("g", { id:"gridWorld" });
+      world.appendChild(createSvgNode("rect", { x:0, y:0, width:SIZE, height:SIZE, fill:"#ffffff" }));
+
+      const gridGroup = createSvgNode("g", {
+        stroke:"#c7cbd1",
+        "stroke-width":1,
+        fill:"none",
+        "shape-rendering":"crispEdges"
+      });
+      for (let v = -range; v <= range; v += 1) {
+        const x = mapX(v), y = mapY(v);
+        gridGroup.appendChild(createSvgNode("line", { x1:x, y1:top, x2:x, y2:bottom }));
+        gridGroup.appendChild(createSvgNode("line", { x1:left, y1:y, x2:right, y2:y }));
+      }
+      world.appendChild(gridGroup);
+
+      world.appendChild(createSvgNode("rect", {
+        x:left, y:top, width:right-left, height:bottom-top,
+        fill:"none", stroke:"#9ca3af", "stroke-width":1.4,
+        "shape-rendering":"crispEdges"
+      }));
+
+      const axisX = mapX(0), axisY = mapY(0);
+      const axisGroup = createSvgNode("g", { stroke:"#111827", fill:"#111827", "shape-rendering":"crispEdges" });
+      axisGroup.appendChild(createSvgNode("line", { x1:left, y1:axisY, x2:right - 12, y2:axisY, "stroke-width":3.2, "stroke-linecap":"round" }));
+      axisGroup.appendChild(createSvgNode("path", { d:`M ${right} ${axisY} L ${right - 12} ${axisY - 6} L ${right - 12} ${axisY + 6} Z` }));
+      axisGroup.appendChild(createSvgNode("line", { x1:axisX, y1:bottom, x2:axisX, y2:top + 12, "stroke-width":3.2, "stroke-linecap":"round" }));
+      axisGroup.appendChild(createSvgNode("path", { d:`M ${axisX} ${top} L ${axisX - 6} ${top + 12} L ${axisX + 6} ${top + 12} Z` }));
+      world.appendChild(axisGroup);
+
+      const labelStyle = { fill:"#374151", "font-size":18, "font-family":"Arial, sans-serif" };
+      for (let x = -range; x <= range; x += 1) {
+        if (x === 0) continue;
+        world.appendChild(createSvgNode("text", { x:mapX(x), y:axisY + 25, ...labelStyle, "text-anchor":"middle" }, String(x)));
+      }
+      for (let y = -range; y <= range; y += 1) {
+        if (y === 0) continue;
+        world.appendChild(createSvgNode("text", { x:axisX - 10, y:mapY(y), ...labelStyle, "text-anchor":"end", "dominant-baseline":"middle" }, String(y)));
+      }
+      world.appendChild(createSvgNode("text", { x:right - 8, y:axisY + 24, fill:"#111827", "font-size":24, "font-family":"Cambria, serif", "font-style":"italic" }, "x"));
+      world.appendChild(createSvgNode("text", { x:axisX - 18, y:top + 20, fill:"#111827", "font-size":24, "font-family":"Cambria, serif", "font-style":"italic" }, "y"));
+      world.appendChild(createSvgNode("text", { x:axisX - 10, y:axisY - 9, fill:"#111827", "font-size":22, "font-family":"Cambria, serif", "font-style":"italic", "text-anchor":"end" }, "O"));
+
+      svg.appendChild(world);
+      applyViewTransform();
+    }
+
+    function buildPathDataForFn(fn, spec) {
+      if (spec.mode === "vertical") return `M ${mapX(spec.x)} ${mapY(spec.yMin)} L ${mapX(spec.x)} ${mapY(spec.yMax)}`;
+      const samples = Math.max(220, Math.ceil(Math.abs(spec.xMax - spec.xMin) * 60));
+      let d = "";
+      let started = false;
+      let previousX = null;
+      for (let i=0; i<=samples; i++) {
+        const x = spec.xMin + (spec.xMax - spec.xMin) * (i / samples);
+        const crossedAsymptote = fn.type === "inverse" && previousX !== null && previousX * x < 0;
+        if (crossedAsymptote) started = false;
+        const y = evaluateY(fn, x);
+        previousX = x;
+        if (!Number.isFinite(y)) { started = false; continue; }
+        const px = round(mapX(x), 3), py = round(mapY(y), 3);
+        d += `${started ? ' L' : 'M'}${px} ${py}`;
+        started = true;
+      }
+      return d;
+    }
+
+    function drawFunctionsSvg() {
+      const svg = refs.graphSvg;
+      svg.innerHTML = "";
+      svg.setAttribute("viewBox", `0 0 ${SIZE} ${SIZE}`);
+      const clipId = "graphClipRegion";
+      const defs = createSvgNode("defs");
+      const clipPath = createSvgNode("clipPath", { id:clipId, clipPathUnits:"userSpaceOnUse" });
+      clipPath.appendChild(createSvgNode("rect", { x:PADDING, y:PADDING, width:SIZE - PADDING * 2, height:SIZE - PADDING * 2 }));
+      defs.appendChild(clipPath);
+      svg.appendChild(defs);
+
+      const world = createSvgNode("g", { id:"graphWorld" });
+      state.functions.forEach((fn, index) => {
+        const spec = getDrawSpec(fn);
+        const pathData = buildPathDataForFn(fn, spec);
+        const width = fn.id === state.selectedFunctionId ? 3.6 : 2.7;
+        world.appendChild(createSvgNode("path", { d:pathData, fill:"none", stroke:fn.color, "stroke-width":width, "stroke-linecap":"round", "stroke-linejoin":"round", "shape-rendering":"geometricPrecision", "clip-path":`url(#${clipId})` }));
+        spec.endpoints.forEach(point => {
+          if (!point) return;
+          const actual = spec.mode === "vertical" ? { x:fn.params.c, y:point.y } : { x:point.x, y:evaluateY(fn, point.x) };
+          world.appendChild(createSvgNode("circle", { cx:mapX(actual.x), cy:mapY(actual.y), r:5.6, fill:"#fff", stroke:fn.color, "stroke-width":2.2 }));
+        });
+        let labelX = 0, labelY = 0;
+        if (spec.mode === "vertical") { labelX = fn.params.c; labelY = (spec.yMin + spec.yMax) / 2; }
+        else {
+          labelX = (spec.xMin + spec.xMax) / 2;
+          labelY = evaluateY(fn, labelX);
+          if (!Number.isFinite(labelY)) {
+            const alt1 = spec.xMin + (spec.xMax - spec.xMin) * 0.25;
+            const alt2 = spec.xMin + (spec.xMax - spec.xMin) * 0.75;
+            labelX = Math.abs(alt1) > 0.15 ? alt1 : alt2;
+            labelY = evaluateY(fn, labelX);
+            if (!Number.isFinite(labelY)) { labelX = spec.xMin; labelY = evaluateY(fn, labelX) ?? 0; }
+          }
+        }
+        const px = mapX(labelX), py = mapY(labelY);
+        const circleY = clamp(py - 16, PADDING + 16, SIZE - PADDING - 16);
+        const circleX = clamp(spec.mode === "vertical" ? px + 16 : px, PADDING + 16, SIZE - PADDING - 16);
+        world.appendChild(createSvgNode("circle", { cx:circleX, cy:circleY, r:13.5, fill:"#ffffff", stroke:fn.color, "stroke-width":2.8 }));
+        world.appendChild(createSvgNode("text", { x:circleX, y:circleY + 4.8, fill:fn.color, "font-size":13, "font-weight":900, "text-anchor":"middle", "font-family":"Arial, sans-serif" }, String(index + 1)));
+      });
+      svg.appendChild(world);
+      applyViewTransform();
+    }
+
+    function renderPalette() {
+      refs.palette.innerHTML = "";
+      PEN_PALETTE.forEach(color => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "swatch" + (state.selectedColor.toLowerCase() === color.toLowerCase() ? " active" : "");
+        button.style.backgroundColor = color;
+        button.addEventListener("click", () => { state.selectedColor = color; refs.customColor.value = color; renderPalette(); scheduleSave(); });
+        refs.palette.appendChild(button);
+      });
+    }
+
+    function applyViewTransform() {
+      state.zoom = clamp(Number(state.zoom) || 1, 0.5, 4);
+      state.pan = { x:Number(state.pan.x) || 0, y:Number(state.pan.y) || 0 };
+
+      // 좌표 그림 코드처럼 viewBox는 고정하고, 좌표평면 전체 그룹을 확대·이동합니다.
+      const originX = mapX(0);
+      const originY = mapY(0);
+      const svgTransform = `translate(${state.pan.x} ${state.pan.y}) translate(${originX} ${originY}) scale(${state.zoom}) translate(${-originX} ${-originY})`;
+      const gridWorld = refs.gridSvg.querySelector("#gridWorld");
+      const graphWorld = refs.graphSvg.querySelector("#graphWorld");
+      if (gridWorld) gridWorld.setAttribute("transform", svgTransform);
+      if (graphWorld) graphWorld.setAttribute("transform", svgTransform);
+
+      // 캔버스 색칠·붓칠은 SVG의 사용자 좌표 변환과 정확히 같은 CSS 행렬을 사용합니다.
+      // transform-origin을 0 0으로 고정하고, 중심 확대 보정값을 행렬의 이동값에 직접 합칩니다.
+      const rect = refs.canvasStack.getBoundingClientRect();
+      const cssScaleX = Math.max(1, rect.width) / SIZE;
+      const cssScaleY = Math.max(1, rect.height) / SIZE;
+      const panCssX = state.pan.x * cssScaleX;
+      const panCssY = state.pan.y * cssScaleY;
+      const originCssX = originX * cssScaleX;
+      const originCssY = originY * cssScaleY;
+      const translateX = panCssX + originCssX * (1 - state.zoom);
+      const translateY = panCssY + originCssY * (1 - state.zoom);
+      const canvasTransform = `matrix(${state.zoom}, 0, 0, ${state.zoom}, ${translateX}, ${translateY})`;
+      refs.fillCanvas.style.transformOrigin = "0 0";
+      refs.penCanvas.style.transformOrigin = "0 0";
+      refs.fillCanvas.style.transform = canvasTransform;
+      refs.penCanvas.style.transform = canvasTransform;
+      refs.zoomValue.textContent = `${Math.round(state.zoom * 100)}%`;
+    }
+    function setViewZoom(zoom) { state.zoom = clamp(Number(zoom) || 1, 0.5, 4); applyViewTransform(); scheduleSave(); }
+    function resetView() { state.zoom = 1; state.pan = { x:0, y:0 }; applyViewTransform(); scheduleSave(); }
+
+
+    // 좌표 그림 코드처럼 좌표평면이 작업 영역 전체를 덮도록 정사각형 보드를 크게 배치합니다.
+    // 가로 화면에서는 보드의 위·아래 일부가 잘리고, 세로 화면에서는 좌·우 일부가 잘리지만
+    // 위 메뉴와 오른쪽 도구를 제외한 빈 공간은 모두 좌표평면으로 채워집니다.
+    function fitBoardToCanvasArea() {
+      const stage = refs.canvasStack.parentElement;
+      if (!stage) return;
+      const rect = stage.getBoundingClientRect();
+      const side = Math.max(1, Math.ceil(Math.max(rect.width, rect.height)));
+      refs.canvasStack.style.setProperty("--board-cover-size", `${side}px`);
+      requestAnimationFrame(applyViewTransform);
+    }
+    function clearCanvas(ctx) { ctx.clearRect(0,0,SIZE,SIZE); }
+
+    function snapshotLayers() {
+      return { fillImage: refs.fillCanvas.toDataURL("image/png"), penImage: refs.penCanvas.toDataURL("image/png") };
+    }
+    function pushUndoSnapshot(snapshot) {
+      if (!snapshot) return;
+      undoStack.push(snapshot);
+      if (undoStack.length > MAX_HISTORY) undoStack.shift();
+      redoStack = [];
+      updateHistoryButtons();
+    }
+    function restoreLayer(ctx, dataUrl) {
+      clearCanvas(ctx);
+      if (!dataUrl) return Promise.resolve();
+      return new Promise(resolve => {
+        const image = new Image();
+        image.onload = () => { ctx.drawImage(image, 0, 0); resolve(); };
+        image.onerror = () => resolve();
+        image.src = dataUrl;
+      });
+    }
+    function undoAction() {
+      if (!undoStack.length) return;
+      const current = snapshotLayers();
+      const prev = undoStack.pop();
+      redoStack.push(current);
+      Promise.all([restoreLayer(fillCtx, prev.fillImage), restoreLayer(penCtx, prev.penImage)]).then(() => { state.fillImage = prev.fillImage; state.penImage = prev.penImage; scheduleSave(); updateHistoryButtons(); });
+    }
+    function redoAction() {
+      if (!redoStack.length) return;
+      const current = snapshotLayers();
+      const next = redoStack.pop();
+      undoStack.push(current);
+      Promise.all([restoreLayer(fillCtx, next.fillImage), restoreLayer(penCtx, next.penImage)]).then(() => { state.fillImage = next.fillImage; state.penImage = next.penImage; scheduleSave(); updateHistoryButtons(); });
+    }
+    function updateHistoryButtons() { refs.undoBtn.disabled = !undoStack.length; refs.redoBtn.disabled = !redoStack.length; }
+
+    function clearColoring() {
+      const before = snapshotLayers();
+      clearCanvas(fillCtx);
+      clearCanvas(penCtx);
+      pushUndoSnapshot(before);
+      state.fillImage = "";
+      state.penImage = "";
+      scheduleSave();
+      showToast("색칠을 모두 삭제했습니다.");
+    }
+
+    function setActiveTool(tool) {
+      if (!["pen","fill","eraser","pan"].includes(tool)) return;
+      state.tool = tool;
+      document.querySelectorAll(".tool-btn").forEach(btn => btn.classList.toggle("active", btn.dataset.tool === tool));
+      refs.interactionLayer.classList.toggle("fill-mode", tool === "fill");
+      refs.interactionLayer.classList.toggle("erase-mode", tool === "eraser");
+      refs.interactionLayer.classList.toggle("pan-mode", tool === "pan");
+      refs.interactionLayer.classList.remove("dragging");
+      scheduleSave();
+    }
+
+    function renderAll() {
+      refs.artTitle.value = state.title || "";
+      refs.studentInfo.value = state.studentInfo || "";
+      refs.graphRange.value = String(state.range || 12);
+      refs.brushWidth.value = String(state.brushWidth || 5);
+      refs.brushWidthValue.textContent = String(state.brushWidth || 5);
+      refs.customColor.value = state.selectedColor || "#111827";
+      refs.reflectionText.value = state.reflection || "";
+      refs.reflectionCount.textContent = `${(state.reflection || "").length}/500`;
+      refs.reflectionBtn.classList.toggle("has-value", Boolean((state.reflection || "").trim()));
+      renderFunctionList();
+      renderPalette();
+      drawGridSvg();
+      drawFunctionsSvg();
+      applyViewTransform();
+      setActiveTool(state.tool || "pen");
+      updateHistoryButtons();
+    }
+
+    function captureFunctionListView() {
+      const active = document.activeElement;
+      const canRestoreFocus = active && refs.functionList.contains(active) && active.matches("input, select");
+      const focusInfo = canRestoreFocus ? {
+        fnId: active.dataset?.fnId || "",
+        inputParam: active.dataset?.inputParam || "",
+        endpoint: active.dataset?.endpoint || "",
+        colorInput: active.dataset?.colorInput || "",
+        changeType: active.dataset?.changeType || "",
+        selectionStart: typeof active.selectionStart === "number" ? active.selectionStart : null,
+        selectionEnd: typeof active.selectionEnd === "number" ? active.selectionEnd : null
+      } : null;
+      const rowScroll = {};
+      refs.functionList.querySelectorAll(".function-row").forEach(row => {
+        const id = row.dataset.rowId;
+        const scroller = row.querySelector(".function-row-top");
+        if (id && scroller) rowScroll[id] = scroller.scrollLeft;
+      });
+      return {
+        top: refs.functionList.scrollTop,
+        left: refs.functionList.scrollLeft,
+        rowScroll,
+        focusInfo
+      };
+    }
+
+    function restoreFunctionListView(view) {
+      if (!view) return;
+      const apply = () => {
+        refs.functionList.scrollTop = view.top;
+        refs.functionList.scrollLeft = view.left;
+        Object.entries(view.rowScroll || {}).forEach(([id, left]) => {
+          const row = refs.functionList.querySelector(`.function-row[data-row-id="${id}"]`);
+          const scroller = row?.querySelector(".function-row-top");
+          if (scroller) scroller.scrollLeft = left;
+        });
+        const f = view.focusInfo;
+        if (!f) return;
+        let selector = `[data-fn-id="${f.fnId}"]`;
+        if (f.inputParam) selector += `[data-input-param="${f.inputParam}"]`;
+        else if (f.endpoint) selector += `[data-endpoint="${f.endpoint}"]`;
+        else if (f.colorInput) selector += `[data-color-input="${f.colorInput}"]`;
+        else if (f.changeType) selector += `[data-change-type="${f.changeType}"]`;
+        const target = refs.functionList.querySelector(selector);
+        if (target && target !== document.activeElement) {
+          target.focus({ preventScroll:true });
+          if (f.selectionStart !== null && typeof target.setSelectionRange === "function") {
+            try { target.setSelectionRange(f.selectionStart, f.selectionEnd ?? f.selectionStart); } catch (_) {}
+          }
+        }
+      };
+      apply();
+      requestAnimationFrame(apply);
+    }
+
+    function updateFunction(fnId, callback, options = {}) {
+      const index = state.functions.findIndex(fn => fn.id === fnId);
+      if (index < 0) return;
+      const view = options.preserveView === false ? null : captureFunctionListView();
+      callback(state.functions[index], index);
+      renderFunctionList();
+      restoreFunctionListView(view);
+      drawFunctionsSvg();
+      scheduleSave();
+    }
+
+    function resetParamsForType(fn) {
+      fn.params = { a:0.5, h:-3, k:-2, m:1, b:0, c:0, r:2 };
+    }
+
+    function buildBoundaryCanvas(radius=1) {
+      boundaryCtx.clearRect(0,0,SIZE,SIZE);
+      boundaryCtx.save();
+      boundaryCtx.strokeStyle = "#000";
+      boundaryCtx.fillStyle = "#000";
+      boundaryCtx.lineCap = "round";
+      boundaryCtx.lineJoin = "round";
+      boundaryCtx.lineWidth = 5;
+      boundaryCtx.strokeRect(PADDING, PADDING, SIZE - PADDING * 2, SIZE - PADDING * 2);
+      renderFunctionsToContext(boundaryCtx, true);
+      radius = Math.max(0, Math.min(5, Math.round(Number(radius) || 0)));
+      for (let dy=-radius; dy<=radius; dy++) for (let dx=-radius; dx<=radius; dx++) if (dx*dx + dy*dy <= radius*radius + 0.2) boundaryCtx.drawImage(refs.penCanvas, dx, dy);
+      boundaryCtx.restore();
+    }
+
+    function hexToRgba(hex, alpha) {
+      const value = hex.replace("#", "");
+      const full = value.length === 3 ? value.split("").map(ch => ch + ch).join("") : value;
+      return { r:parseInt(full.slice(0,2),16), g:parseInt(full.slice(2,4),16), b:parseInt(full.slice(4,6),16), a:alpha };
+    }
+    function boundaryAlphaAt(boundary, x, y) {
+      if (x < 0 || x >= SIZE || y < 0 || y >= SIZE) return 255;
+      return boundary[(y * SIZE + x) * 4 + 3];
+    }
+    function isBoundaryPixel(boundary, x, y, threshold=12) { return boundaryAlphaAt(boundary, x, y) > threshold; }
+    function collectRegion(boundary, seedX, seedY, min, max, threshold=12) {
+      const visited = new Uint8Array(SIZE * SIZE);
+      const queue = new Int32Array(SIZE * SIZE);
+      let head = 0, tail = 0;
+      const start = seedY * SIZE + seedX;
+      queue[tail++] = start; visited[start] = 1;
+      let touchesBorder = false;
+      const region = [];
+      while (head < tail) {
+        const idx = queue[head++];
+        const x = idx % SIZE, y = (idx / SIZE) | 0;
+        if (boundary[idx * 4 + 3] > threshold) continue;
+        region.push(idx);
+        if (x <= min || x >= max || y <= min || y >= max) touchesBorder = true;
+        if (x > min) { const n = idx - 1; if (!visited[n]) { visited[n] = 1; queue[tail++] = n; } }
+        if (x < max) { const n = idx + 1; if (!visited[n]) { visited[n] = 1; queue[tail++] = n; } }
+        if (y > min) { const n = idx - SIZE; if (!visited[n]) { visited[n] = 1; queue[tail++] = n; } }
+        if (y < max) { const n = idx + SIZE; if (!visited[n]) { visited[n] = 1; queue[tail++] = n; } }
+      }
+      return { region, touchesBorder };
+    }
+    function findFillRegion(startX, startY) {
+      const min = PADDING + 2;
+      const max = SIZE - PADDING - 3;
+      const maxRegionArea = (SIZE - PADDING * 2) ** 2 * 0.68;
+      let best = null;
+
+      // 먼저 실제 화면 선과 가까운 얇은 경계로 검사하고,
+      // 작은 틈이 있을 때만 경계를 조금씩 보강합니다.
+      for (const radius of [0,1,2,3]) {
+        buildBoundaryCanvas(radius);
+        const boundary = boundaryCtx.getImageData(0,0,SIZE,SIZE).data;
+        const seeds = [];
+        for (let ring=0; ring<=14; ring++) {
+          for (let dy=-ring; dy<=ring; dy++) for (let dx=-ring; dx<=ring; dx++) {
+            if (Math.max(Math.abs(dx), Math.abs(dy)) !== ring) continue;
+            const x = clamp(startX + dx, min, max);
+            const y = clamp(startY + dy, min, max);
+            if (!isBoundaryPixel(boundary, x, y, 12)) seeds.push({ x, y, dist:Math.abs(dx)+Math.abs(dy) });
+          }
+          if (seeds.length) break;
+        }
+        for (const seed of seeds) {
+          const result = collectRegion(boundary, seed.x, seed.y, min, max, 12);
+          if (result.touchesBorder) continue;
+          if (result.region.length < 8 || result.region.length > maxRegionArea) continue;
+          const candidate = {
+            region:result.region,
+            boundary,
+            dist:seed.dist,
+            area:result.region.length
+          };
+          if (!best || candidate.dist < best.dist || (candidate.dist === best.dist && candidate.area < best.area)) best = candidate;
+        }
+        if (best) break;
+      }
+      return best;
+    }
+
+    function expandFillToBoundary(region, boundary, maxSteps=8, threshold=12) {
+      // 내부 영역에서 경계선 안쪽으로만 색을 확장합니다.
+      // 함수선과 펜선이 위에 다시 그려지므로 바깥으로 새지 않고 선까지 꽉 차 보입니다.
+      const mask = new Uint8Array(SIZE * SIZE);
+      const depth = new Uint8Array(SIZE * SIZE);
+      const queue = new Int32Array(SIZE * SIZE);
+      const expanded = region.slice();
+      let head = 0;
+      let tail = 0;
+
+      region.forEach(index => { mask[index] = 1; });
+
+      const tryAddBoundary = (index, nextDepth) => {
+        if (index < 0 || index >= SIZE * SIZE || mask[index]) return;
+        if (boundary[index * 4 + 3] <= threshold) return;
+        mask[index] = 1;
+        depth[index] = nextDepth;
+        queue[tail++] = index;
+        expanded.push(index);
+      };
+
+      region.forEach(index => {
+        const x = index % SIZE;
+        const y = (index / SIZE) | 0;
+        if (x > 0) tryAddBoundary(index - 1, 1);
+        if (x < SIZE - 1) tryAddBoundary(index + 1, 1);
+        if (y > 0) tryAddBoundary(index - SIZE, 1);
+        if (y < SIZE - 1) tryAddBoundary(index + SIZE, 1);
+      });
+
+      while (head < tail) {
+        const index = queue[head++];
+        const currentDepth = depth[index];
+        if (currentDepth >= maxSteps) continue;
+        const x = index % SIZE;
+        const y = (index / SIZE) | 0;
+        const nextDepth = currentDepth + 1;
+        if (x > 0) tryAddBoundary(index - 1, nextDepth);
+        if (x < SIZE - 1) tryAddBoundary(index + 1, nextDepth);
+        if (y > 0) tryAddBoundary(index - SIZE, nextDepth);
+        if (y < SIZE - 1) tryAddBoundary(index + SIZE, nextDepth);
+      }
+
+      return expanded;
+    }
+
+    function fillClosedRegion(startX, startY) {
+      startX = clamp(startX, 0, SIZE - 1); startY = clamp(startY, 0, SIZE - 1);
+      const result = findFillRegion(startX, startY);
+      if (!result) { showToast("닫힌 작은 영역의 안쪽을 눌러 주세요."); return; }
+
+      const region = expandFillToBoundary(result.region, result.boundary, 8, 12);
+      const before = snapshotLayers();
+      const image = fillCtx.getImageData(0,0,SIZE,SIZE);
+      const rgba = hexToRgba(state.selectedColor, 180);
+      region.forEach(idx => {
+        const offset = idx * 4;
+        image.data[offset] = rgba.r;
+        image.data[offset+1] = rgba.g;
+        image.data[offset+2] = rgba.b;
+        image.data[offset+3] = rgba.a;
+      });
+      fillCtx.putImageData(image, 0, 0);
+      pushUndoSnapshot(before);
+      state.fillImage = refs.fillCanvas.toDataURL("image/png");
+      scheduleSave();
+      showToast("닫힌 영역을 선까지 꽉 채워 색칠했습니다.");
+    }
+
+
+
+    function dogExampleFunctions() {
+      const outline = "#334155";
+      const detail = "#111827";
+      const ear = "#475569";
+      const colors = ["#2563eb", "#db2777", "#16a34a", "#f59e0b", "#7c3aed", "#0ea5e9", "#ef4444", "#92400e"];
+      const make = (type, params, p1, p2, group="outline") => ({
+        type,
+        params,
+        endpoints:[{x:p1[0], y:p1[1]}, {x:p2[0], y:p2[1]}],
+        stroke: group === "detail" ? detail : group === "ear" ? ear : outline,
+        badge: colors[(dogExampleFunctions._index = (dogExampleFunctions._index || 0) + 1) % colors.length]
+      });
+      dogExampleFunctions._index = -1;
+      return [
+        make("horizontal", {c:2.5}, [-8,2.5], [-3,2.5]),
+        make("linear", {m:1,b:5.5}, [-3,2.5], [-1,4.5]),
+        make("horizontal", {c:4.5}, [-1,4.5], [4,4.5]),
+        make("linear", {m:-1.5,b:10.5}, [4,4.5], [6,1.5]),
+        make("linear", {m:1.5,b:-7.5}, [6,1.5], [4,-1.5]),
+        make("linear", {m:2.5,b:-11.5}, [4,-1.5], [3,-4]),
+        make("horizontal", {c:-4}, [-1,-4], [3,-4]),
+        make("linear", {m:-0.5,b:-4.5}, [-2,-3.5], [-1,-4]),
+        make("linear", {m:0.75,b:8.5}, [-10,1], [-8,2.5]),
+        make("vertical", {c:-10}, [-10,-2], [-10,1]),
+        make("linear", {m:-0.75,b:-9.5}, [-10,-2], [-8,-3.5]),
+        make("horizontal", {c:-3.5}, [-8,-3.5], [-2,-3.5]),
+        make("quadratic", {a:0.08,h:-4.5,k:-3.1}, [-7.5,-2.38], [-1.5,-2.38], "detail"),
+        make("linear", {m:1.25,b:-2.25}, [1,-1], [3,1.5], "ear"),
+        make("vertical", {c:1}, [1,-4], [1,-1], "ear"),
+        make("linear", {m:-0.3333,b:-3.6667}, [1,-4], [4,-5], "ear"),
+        make("linear", {m:3.75,b:-20}, [4,-5], [5.6,1], "ear"),
+        make("quadratic", {a:-1.2,h:-0.4,k:2.2}, [-0.8,2.008], [0,2.008], "detail"),
+        make("quadratic", {a:1.2,h:-0.4,k:1.816}, [-0.8,2.008], [0,2.008], "detail"),
+        make("quadratic", {a:-1.2,h:1.1,k:2.2}, [0.7,2.008], [1.5,2.008], "detail"),
+        make("quadratic", {a:1.2,h:1.1,k:1.816}, [0.7,2.008], [1.5,2.008], "detail"),
+        make("quadratic", {a:-0.6,h:-8.7,k:0.6}, [-9.5,0.216], [-7.9,0.216], "detail"),
+        make("quadratic", {a:0.6,h:-8.7,k:-0.168}, [-9.5,0.216], [-7.9,0.216], "detail"),
+        make("linear", {m:5,b:1}, [-2,-9], [-1,-4]),
+        make("linear", {m:-5,b:11}, [3,-4], [4,-9]),
+        make("linear", {m:-0.5,b:3}, [-1.1,3.55], [-0.1,3.05], "detail"),
+        make("linear", {m:-0.5,b:4.1}, [1.2,3.5], [2.2,3], "detail")
+      ];
+    }
+
+    function exampleFormulaText(fn) {
+      if (fn.type === "quadratic") {
+        const h = Number(fn.params.h);
+        const hPart = h >= 0 ? `(x-${displayNumber(h)})` : `(x+${displayNumber(Math.abs(h))})`;
+        const a = round(Number(fn.params.a), 4);
+        const coefficient = a === 1 ? "" : a === -1 ? "-" : displayNumber(a);
+        return `y = ${coefficient}${hPart}²${formatSigned(fn.params.k)}`;
+      }
+      if (fn.type === "linear") {
+        const m = Number(fn.params.m);
+        const slope = m === 1 ? "x" : m === -1 ? "-x" : `${displayNumber(m)}x`;
+        return `y = ${slope}${formatSigned(fn.params.b)}`;
+      }
+      if (fn.type === "inverse") return `y = ${displayNumber(fn.params.r)}/x`;
+      if (fn.type === "horizontal") return `y = ${displayNumber(fn.params.c)}`;
+      return `x = ${displayNumber(fn.params.c)}`;
+    }
+
+    function exampleFormulaSvg(fn, x, y, esc) {
+      if (fn.type !== "inverse") {
+        return `<text x="${x}" y="${y}" class="kr" font-size="17" font-weight="600" fill="#172033">${esc(exampleFormulaText(fn))}</text>`;
+      }
+      const numerator = esc(displayNumber(fn.params.r));
+      return [
+        `<text x="${x}" y="${y}" class="kr" font-size="17" font-weight="600" fill="#172033">y =</text>`,
+        `<text x="${x+46}" y="${y-8}" class="math" font-size="15" font-weight="600" text-anchor="middle" fill="#172033">${numerator}</text>`,
+        `<line x1="${x+32}" y1="${y-2}" x2="${x+60}" y2="${y-2}" stroke="#172033" stroke-width="1.5"/>`,
+        `<text x="${x+46}" y="${y+15}" class="math" font-size="15" font-weight="600" text-anchor="middle" fill="#172033">x</text>`
+      ].join("");
+    }
+
+    function buildFunctionDogExample() {
+      const funcs = dogExampleFunctions();
+      const graphSize = 1760;
+      const panelWidth = 1240;
+      const headerHeight = 0;
+      const totalWidth = graphSize + panelWidth;
+      const totalHeight = headerHeight + graphSize;
+      const range = 11;
+      const pad = 72;
+      const left = pad;
+      const top = headerHeight + pad;
+      const right = graphSize - pad;
+      const bottom = headerHeight + graphSize - pad;
+      const mapXExample = x => left + ((x + range) / (2 * range)) * (right - left);
+      const mapYExample = y => top + ((range - y) / (2 * range)) * (bottom - top);
+      const esc = value => String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+      const svg = [];
+      svg.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${totalWidth}" height="${totalHeight}" viewBox="0 0 ${totalWidth} ${totalHeight}">`);
+      svg.push(`<rect width="100%" height="100%" fill="#ffffff"/>`);
+      svg.push(`<style>
+        .kr{font-family:'Noto Sans KR','Malgun Gothic','Apple SD Gothic Neo',sans-serif}
+        .num{font-family:Arial,sans-serif}
+        .math{font-family:Cambria,'Times New Roman',serif}
+      </style>`);
+      svg.push(`<rect x="0" y="${headerHeight}" width="${graphSize}" height="${graphSize}" fill="#ffffff"/>`);
+
+      for (let v=-range; v<=range; v+=1) {
+        const x = mapXExample(v);
+        const y = mapYExample(v);
+        svg.push(`<line x1="${x}" y1="${top}" x2="${x}" y2="${bottom}" stroke="#c7cbd1" stroke-width="1"/>`);
+        svg.push(`<line x1="${left}" y1="${y}" x2="${right}" y2="${y}" stroke="#c7cbd1" stroke-width="1"/>`);
+      }
+      svg.push(`<rect x="${left}" y="${top}" width="${right-left}" height="${bottom-top}" fill="none" stroke="#9ca3af" stroke-width="1.5"/>`);
+      const axisX = mapXExample(0);
+      const axisY = mapYExample(0);
+      svg.push(`<line x1="${left}" y1="${axisY}" x2="${right-12}" y2="${axisY}" stroke="#111827" stroke-width="3.2"/>`);
+      svg.push(`<path d="M ${right} ${axisY} L ${right-12} ${axisY-6} L ${right-12} ${axisY+6} Z" fill="#111827"/>`);
+      svg.push(`<line x1="${axisX}" y1="${bottom}" x2="${axisX}" y2="${top+12}" stroke="#111827" stroke-width="3.2"/>`);
+      svg.push(`<path d="M ${axisX} ${top} L ${axisX-6} ${top+12} L ${axisX+6} ${top+12} Z" fill="#111827"/>`);
+      for (let x=-range; x<=range; x+=1) {
+        if (x === 0) continue;
+        svg.push(`<text x="${mapXExample(x)}" y="${axisY+27}" class="num" font-size="17" text-anchor="middle" fill="#374151">${x}</text>`);
+      }
+      for (let y=-range; y<=range; y+=1) {
+        if (y === 0) continue;
+        svg.push(`<text x="${axisX-9}" y="${mapYExample(y)+6}" class="num" font-size="17" text-anchor="end" fill="#374151">${y}</text>`);
+      }
+      svg.push(`<text x="${right-8}" y="${axisY+25}" class="math" font-size="24" font-style="italic" fill="#111827">x</text>`);
+      svg.push(`<text x="${axisX-18}" y="${top+20}" class="math" font-size="24" font-style="italic" fill="#111827">y</text>`);
+      svg.push(`<text x="${axisX-10}" y="${axisY-10}" class="math" font-size="24" font-style="italic" text-anchor="end" fill="#111827">O</text>`);
+
+      const polygon = (points, fill) => {
+        const data = points.map(([x,y]) => `${mapXExample(x)},${mapYExample(y)}`).join(" ");
+        svg.push(`<polygon points="${data}" fill="${fill}"/>`);
+      };
+      polygon([[3,1.5],[1,-1],[1,-4],[4,-5],[5.6,1],[6,1.5]], "rgba(71,85,105,.72)");
+      polygon([[-1,-4],[3,-4],[4,-9],[-2,-9]], "rgba(148,163,184,.22)");
+
+      const pathForExample = fn => {
+        const p1 = fn.endpoints[0];
+        const p2 = fn.endpoints[1];
+        if (fn.type === "vertical") return `M ${mapXExample(fn.params.c)} ${mapYExample(p1.y)} L ${mapXExample(fn.params.c)} ${mapYExample(p2.y)}`;
+        const minX = Math.min(p1.x,p2.x);
+        const maxX = Math.max(p1.x,p2.x);
+        const count = fn.type === "quadratic" || fn.type === "inverse" ? 180 : 2;
+        let d = "";
+        let started = false;
+        let previousX = null;
+        for (let i=0; i<count; i++) {
+          const x = minX + (maxX-minX) * (count === 1 ? 0 : i/(count-1));
+          if (fn.type === "inverse" && previousX !== null && previousX*x < 0) started = false;
+          let y = 0;
+          if (fn.type === "quadratic") y = fn.params.a * (x-fn.params.h) ** 2 + fn.params.k;
+          else if (fn.type === "linear") y = fn.params.m*x + fn.params.b;
+          else if (fn.type === "inverse") y = Math.abs(x) < 1e-9 ? null : fn.params.r/x;
+          else y = fn.params.c;
+          previousX = x;
+          if (!Number.isFinite(y)) { started = false; continue; }
+          d += `${started ? " L" : "M"} ${mapXExample(x)} ${mapYExample(y)}`;
+          started = true;
+        }
+        return d;
+      };
+
+      funcs.forEach(fn => {
+        const width = fn.stroke === "#111827" ? 5.2 : 4.2;
+        svg.push(`<path d="${pathForExample(fn)}" fill="none" stroke="${fn.stroke}" stroke-width="${width}" stroke-linecap="round" stroke-linejoin="round"/>`);
+      });
+
+      const fillBetween = (topFn, bottomFn, x1, x2, color) => {
+        let d = "";
+        for (let i=0;i<=100;i++) {
+          const x=x1+(x2-x1)*i/100;
+          const y=topFn.params.a*(x-topFn.params.h)**2+topFn.params.k;
+          d += `${i ? " L" : "M"} ${mapXExample(x)} ${mapYExample(y)}`;
+        }
+        for (let i=100;i>=0;i--) {
+          const x=x1+(x2-x1)*i/100;
+          const y=bottomFn.params.a*(x-bottomFn.params.h)**2+bottomFn.params.k;
+          d += ` L ${mapXExample(x)} ${mapYExample(y)}`;
+        }
+        d += " Z";
+        svg.push(`<path d="${d}" fill="${color}"/>`);
+        svg.push(`<path d="${pathForExample(topFn)}" fill="none" stroke="${topFn.stroke}" stroke-width="5.2" stroke-linecap="round"/>`);
+        svg.push(`<path d="${pathForExample(bottomFn)}" fill="none" stroke="${bottomFn.stroke}" stroke-width="5.2" stroke-linecap="round"/>`);
+      };
+      fillBetween(funcs[17], funcs[18], -0.8, 0, "#111827");
+      fillBetween(funcs[19], funcs[20], 0.7, 1.5, "#111827");
+      fillBetween(funcs[21], funcs[22], -9.5, -7.9, "#111827");
+
+      const badgeOffsets = [[0,-18],[0,-20],[0,-18],[18,0],[18,4],[-18,4],[0,18],[0,18],[-18,-4],[-18,0],[-18,6],[0,18],[0,-20],[-18,0],[-18,0],[0,18],[18,0],[-18,-14],[-18,14],[18,-14],[18,14],[-18,-14],[-18,14],[-18,0],[18,0],[0,-18],[0,-18]];
+      funcs.forEach((fn,index) => {
+        const p1=fn.endpoints[0], p2=fn.endpoints[1];
+        let x=(p1.x+p2.x)/2;
+        let y=(p1.y+p2.y)/2;
+        if (fn.type === "quadratic") y=fn.params.a*(x-fn.params.h)**2+fn.params.k;
+        if (fn.type === "linear") y=fn.params.m*x+fn.params.b;
+        if (fn.type === "inverse") y=fn.params.r/x;
+        if (fn.type === "horizontal") y=fn.params.c;
+        if (fn.type === "vertical") x=fn.params.c;
+        const [ox,oy]=badgeOffsets[index] || [0,-18];
+        const cx=mapXExample(x)+ox, cy=mapYExample(y)+oy;
+        svg.push(`<circle cx="${cx}" cy="${cy}" r="11.5" fill="#fff" stroke="${fn.badge}" stroke-width="2.3"/>`);
+        svg.push(`<text x="${cx}" y="${cy+4}" class="num" font-size="11" font-weight="700" text-anchor="middle" fill="${fn.badge}">${index+1}</text>`);
+      });
+
+      const panelX = graphSize;
+      svg.push(`<rect x="${panelX}" y="${headerHeight}" width="${panelWidth}" height="${graphSize}" fill="#f8fafc"/>`);
+      svg.push(`<line x1="${panelX}" y1="${headerHeight}" x2="${panelX}" y2="${totalHeight}" stroke="#d6dde8" stroke-width="2"/>`);
+      svg.push(`<text x="${panelX+28}" y="${headerHeight+42}" class="kr" font-size="27" font-weight="700" fill="#172033">사용한 함수와 끝점</text>`);
+      const columns = 2;
+      const rows = Math.ceil(funcs.length / columns);
+      const colWidth = (panelWidth - 56) / columns;
+      const rowHeight = 76;
+      funcs.forEach((fn,index) => {
+        const col=Math.floor(index/rows);
+        const row=index%rows;
+        const x=panelX+28+col*colWidth;
+        const y=headerHeight+84+row*rowHeight;
+        svg.push(`<circle cx="${x+14}" cy="${y-3}" r="12" fill="${fn.badge}"/>`);
+        svg.push(`<text x="${x+14}" y="${y+1}" class="num" font-size="12" font-weight="700" text-anchor="middle" fill="#fff">${index+1}</text>`);
+        svg.push(exampleFormulaSvg(fn, x+34, y, esc));
+        svg.push(`<text x="${x+34}" y="${y+24}" class="kr" font-size="13" font-weight="500" fill="#667085">${esc(savedEndpointText(fn))}</text>`);
+      });
+
+      const reflectionTop = headerHeight + graphSize - 250;
+      svg.push(`<line x1="${panelX+28}" y1="${reflectionTop}" x2="${totalWidth-28}" y2="${reflectionTop}" stroke="#d6dde8" stroke-width="1.5"/>`);
+      svg.push(`<text x="${panelX+28}" y="${reflectionTop+36}" class="kr" font-size="22" font-weight="700" fill="#075985">소감</text>`);
+      const reflectionLines = [
+        "수학 시간에 배운 일차함수와 이차함수를 이용해 나만의 강아지 캐릭터를",
+        "완성해 보았습니다. 무려 27개나 되는 함수의 식을 세우고, 선이 끊기지",
+        "않도록 교점과 끝점을 일일이 계산해 맞추는 과정은 생각보다 까다로웠습니다.",
+        "하지만 수식의 숫자를 조절할 때마다 그래프가 딱 맞물려 그림이 형태를",
+        "갖춰가는 것을 보며 엄청난 뿌듯함을 느꼈습니다. 끈기 있게 도전하여 멋진",
+        "결과물을 만들어내어 기쁩니다."
+      ];
+      reflectionLines.forEach((line, index) => {
+        svg.push(`<text x="${panelX+28}" y="${reflectionTop+72+index*27}" class="kr" font-size="19" font-weight="500" fill="#475467">${esc(line)}</text>`);
+      });
+      svg.push(`</svg>`);
+      refs.exampleImage.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.join(""))}`;
+    }
+
+    function clearTextSelection() {
+      const sel = window.getSelection?.();
+      if (sel && sel.removeAllRanges) sel.removeAllRanges();
+    }
+
+    function updateExampleTransform() {
+      if (!refs.exampleViewport || !refs.exampleImage || !refs.exampleImage.naturalWidth) return;
+      const scale = exampleBaseScale * exampleZoom;
+      const viewportWidth = refs.exampleViewport.clientWidth;
+      const viewportHeight = refs.exampleViewport.clientHeight;
+      const imageWidth = refs.exampleImage.naturalWidth * scale;
+      const imageHeight = refs.exampleImage.naturalHeight * scale;
+      const left = (viewportWidth - imageWidth) / 2 + examplePan.x;
+      const top = (viewportHeight - imageHeight) / 2 + examplePan.y;
+      refs.exampleImage.style.transform = `translate3d(${left}px, ${top}px, 0) scale(${scale})`;
+      if (refs.exampleZoomValue) refs.exampleZoomValue.textContent = `${Math.round(exampleZoom * 100)}%`;
+    }
+    function fitExampleImage() {
+      if (!refs.exampleViewport || !refs.exampleImage || !refs.exampleImage.naturalWidth) return;
+      const viewportWidth = refs.exampleViewport.clientWidth;
+      const viewportHeight = refs.exampleViewport.clientHeight;
+      if (viewportWidth < 20 || viewportHeight < 20) return;
+      exampleBaseScale = Math.min(
+        (viewportWidth - 12) / refs.exampleImage.naturalWidth,
+        (viewportHeight - 12) / refs.exampleImage.naturalHeight
+      );
+      if (!Number.isFinite(exampleBaseScale) || exampleBaseScale <= 0) exampleBaseScale = 1;
+      exampleZoom = 1;
+      examplePan = { x:0, y:0 };
+      updateExampleTransform();
+    }
+    function setExampleZoom(nextZoom) {
+      exampleZoom = Math.max(0.5, Math.min(4, nextZoom));
+      updateExampleTransform();
+    }
+    function beginExamplePan(event) {
+      clearTextSelection();
+      exampleDragging = true;
+      exampleDragPointerId = event.pointerId;
+      exampleDragStart = { x:event.clientX, y:event.clientY, panX:examplePan.x, panY:examplePan.y };
+      refs.exampleViewport.setPointerCapture?.(event.pointerId);
+      refs.exampleViewport.classList.add('dragging');
+      event.preventDefault();
+    }
+    function moveExamplePan(event) {
+      if (!exampleDragging || event.pointerId !== exampleDragPointerId || !exampleDragStart) return;
+      examplePan = {
+        x: exampleDragStart.panX + (event.clientX - exampleDragStart.x),
+        y: exampleDragStart.panY + (event.clientY - exampleDragStart.y)
+      };
+      updateExampleTransform();
+      event.preventDefault();
+    }
+    function endExamplePan(event) {
+      if (!exampleDragging || event.pointerId !== exampleDragPointerId) return;
+      exampleDragging = false;
+      refs.exampleViewport.classList.remove('dragging');
+      refs.exampleViewport.releasePointerCapture?.(event.pointerId);
+      exampleDragPointerId = null;
+      exampleDragStart = null;
+    }
+
+    function beginDrawing(event) {
+      clearTextSelection();
+      if (state.tool === "fill") {
+        const point = pointerToCanvas(event);
+        fillClosedRegion(Math.round(point.x), Math.round(point.y));
+        return;
+      }
+      if (state.tool === "pan") {
+        panning = true;
+        activePointerId = event.pointerId;
+        const rootPoint = pointerToRoot(event);
+        panStart = { x:rootPoint.x, y:rootPoint.y, panX:state.pan.x, panY:state.pan.y };
+        refs.interactionLayer.setPointerCapture?.(event.pointerId);
+        refs.interactionLayer.classList.add("dragging");
+        event.preventDefault();
+        return;
+      }
+      drawing = true;
+      activePointerId = event.pointerId;
+      beforeActionSnapshot = snapshotLayers();
+      actionChanged = false;
+      lastPoint = pointerToCanvas(event);
+      refs.interactionLayer.setPointerCapture?.(event.pointerId);
+      penCtx.save();
+      penCtx.lineCap = "round";
+      penCtx.lineJoin = "round";
+      penCtx.lineWidth = Number(state.brushWidth);
+      if (state.tool === "eraser") {
+        penCtx.globalCompositeOperation = "destination-out";
+        fillCtx.globalCompositeOperation = "destination-out";
+        fillCtx.lineCap = "round";
+        fillCtx.lineJoin = "round";
+        fillCtx.lineWidth = Number(state.brushWidth) + 2;
+      } else {
+        penCtx.globalCompositeOperation = "source-over";
+        penCtx.strokeStyle = state.selectedColor;
+      }
+      event.preventDefault();
+    }
+    function moveDrawing(event) {
+      if (panning && event.pointerId === activePointerId && panStart) {
+        const rootPoint = pointerToRoot(event);
+        state.pan = {
+          x: panStart.panX + (rootPoint.x - panStart.x),
+          y: panStart.panY + (rootPoint.y - panStart.y)
+        };
+        applyViewTransform();
+        event.preventDefault();
+        return;
+      }
+      if (!drawing || event.pointerId !== activePointerId) return;
+      const point = pointerToCanvas(event);
+      if (!lastPoint) lastPoint = point;
+      penCtx.beginPath(); penCtx.moveTo(lastPoint.x, lastPoint.y); penCtx.lineTo(point.x, point.y); penCtx.stroke();
+      if (state.tool === "eraser") { fillCtx.beginPath(); fillCtx.moveTo(lastPoint.x, lastPoint.y); fillCtx.lineTo(point.x, point.y); fillCtx.stroke(); }
+      lastPoint = point;
+      actionChanged = true;
+      event.preventDefault();
+    }
+    function endDrawing(event) {
+      if (panning && event.pointerId === activePointerId) {
+        panning = false; panStart = null; refs.interactionLayer.classList.remove("dragging"); refs.interactionLayer.releasePointerCapture?.(event.pointerId); activePointerId = null; scheduleSave(); return;
+      }
+      if (!drawing || event.pointerId !== activePointerId) return;
+      drawing = false;
+      penCtx.restore();
+      if (state.tool === "eraser") fillCtx.globalCompositeOperation = "source-over";
+      refs.interactionLayer.releasePointerCapture?.(event.pointerId);
+      activePointerId = null;
+      lastPoint = null;
+      if (actionChanged) { pushUndoSnapshot(beforeActionSnapshot); state.fillImage = refs.fillCanvas.toDataURL("image/png"); state.penImage = refs.penCanvas.toDataURL("image/png"); scheduleSave(); }
+      beforeActionSnapshot = null; actionChanged = false;
+    }
+
+    function drawGridToContext(ctx, size, offsetY=0) {
+      const ratio = size / SIZE;
+      const range = Number(state.range);
+      const left = mapX(-range) * ratio;
+      const right = mapX(range) * ratio;
+      const top = mapY(range) * ratio + offsetY;
+      const bottom = mapY(-range) * ratio + offsetY;
+      ctx.fillStyle = "#fff";
+      ctx.fillRect(0, offsetY, size, size);
+
+      ctx.save();
+      ctx.strokeStyle = "#c7cbd1";
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      for (let v = -range; v <= range; v += 1) {
+        const x = mapX(v) * ratio;
+        const y = mapY(v) * ratio + offsetY;
+        ctx.beginPath();
+        ctx.moveTo(x, top);
+        ctx.lineTo(x, bottom);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(left, y);
+        ctx.lineTo(right, y);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.strokeStyle = "#9ca3af";
+      ctx.lineWidth = 1.4;
+      ctx.strokeRect(left, top, right - left, bottom - top);
+
+      const axisX = mapX(0) * ratio;
+      const axisY = mapY(0) * ratio + offsetY;
+      ctx.strokeStyle = "#111827";
+      ctx.fillStyle = "#111827";
+      ctx.lineWidth = 3.2;
+      ctx.beginPath(); ctx.moveTo(left, axisY); ctx.lineTo(right - 12, axisY); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(right, axisY); ctx.lineTo(right - 12, axisY - 6); ctx.lineTo(right - 12, axisY + 6); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(axisX, bottom); ctx.lineTo(axisX, top + 12); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(axisX, top); ctx.lineTo(axisX - 6, top + 12); ctx.lineTo(axisX + 6, top + 12); ctx.closePath(); ctx.fill();
+
+      ctx.font = "18px Arial, sans-serif";
+      ctx.fillStyle = "#374151";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "top";
+      for (let x = -range; x <= range; x += 1) {
+        if (x === 0) continue;
+        ctx.fillText(String(x), mapX(x) * ratio, axisY + 8);
+      }
+      ctx.textAlign = "right";
+      ctx.textBaseline = "middle";
+      for (let y = -range; y <= range; y += 1) {
+        if (y === 0) continue;
+        ctx.fillText(String(y), axisX - 10, mapY(y) * ratio + offsetY);
+      }
+      ctx.font = "italic 24px Cambria, serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = "#111827";
+      ctx.fillText("x", right - 8, axisY + 24);
+      ctx.fillText("y", axisX - 18, top + 20);
+      ctx.font = "italic 22px Cambria, serif";
+      ctx.textAlign = "right";
+      ctx.fillText("O", axisX - 10, axisY - 10);
+    }
+
+    function renderFunctionsToContext(ctx, boundaryMode=false, size=SIZE, offsetY=0) {
+      const ratio = size / SIZE;
+      state.functions.forEach((fn, index) => {
+        const spec = getDrawSpec(fn);
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(PADDING * ratio, PADDING * ratio + offsetY, (SIZE - PADDING * 2) * ratio, (SIZE - PADDING * 2) * ratio);
+        ctx.clip();
+        ctx.strokeStyle = boundaryMode ? "#000" : fn.color;
+        ctx.lineCap = "round";
+        ctx.lineJoin = "round";
+        ctx.lineWidth = boundaryMode ? 5 : (fn.id === state.selectedFunctionId ? 3.6 : 2.7);
+        if (spec.mode === "vertical") {
+          ctx.beginPath();
+          ctx.moveTo(mapX(fn.params.c) * ratio, mapY(spec.yMin) * ratio + offsetY);
+          ctx.lineTo(mapX(fn.params.c) * ratio, mapY(spec.yMax) * ratio + offsetY);
+          ctx.stroke();
+        } else {
+          const samples = Math.max(220, Math.ceil(Math.abs(spec.xMax - spec.xMin) * 60));
+          ctx.beginPath();
+          let started = false;
+          let previousX = null;
+          for (let i=0; i<=samples; i++) {
+            const x = spec.xMin + (spec.xMax - spec.xMin) * (i / samples);
+            const crossedAsymptote = fn.type === "inverse" && previousX !== null && previousX * x < 0;
+            if (crossedAsymptote) started = false;
+            const y = evaluateY(fn, x);
+            previousX = x;
+            if (!Number.isFinite(y)) { started = false; continue; }
+            const px = mapX(x) * ratio, py = mapY(y) * ratio + offsetY;
+            if (!started) { ctx.moveTo(px, py); started = true; }
+            else ctx.lineTo(px, py);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+        if (!boundaryMode) {
+          spec.endpoints.forEach(point => {
+            if (!point) return;
+            const actual = spec.mode === "vertical" ? { x:fn.params.c, y:point.y } : { x:point.x, y:evaluateY(fn, point.x) };
+            if (!Number.isFinite(actual.y)) return;
+            ctx.beginPath();
+            ctx.arc(mapX(actual.x) * ratio, mapY(actual.y) * ratio + offsetY, 5.6 * ratio, 0, Math.PI * 2);
+            ctx.fillStyle = "#fff"; ctx.fill();
+            ctx.lineWidth = 2.2; ctx.strokeStyle = fn.color; ctx.stroke();
+          });
+          let labelX = 0, labelY = 0;
+          if (spec.mode === "vertical") { labelX = fn.params.c; labelY = (spec.yMin + spec.yMax) / 2; }
+          else {
+            labelX = (spec.xMin + spec.xMax) / 2;
+            labelY = evaluateY(fn, labelX);
+            if (!Number.isFinite(labelY)) {
+              const alt1 = spec.xMin + (spec.xMax - spec.xMin) * 0.25;
+              const alt2 = spec.xMin + (spec.xMax - spec.xMin) * 0.75;
+              labelX = Math.abs(alt1) > 0.15 ? alt1 : alt2;
+              labelY = evaluateY(fn, labelX);
+              if (!Number.isFinite(labelY)) return;
+            }
+          }
+          const px = mapX(labelX) * ratio;
+          const py = clamp(mapY(labelY) * ratio + offsetY - 16 * ratio, PADDING * ratio + 16, size - PADDING * ratio - 16 + offsetY);
+          const circleX = clamp(spec.mode === "vertical" ? px + 16 * ratio : px, PADDING * ratio + 16, size - PADDING * ratio - 16);
+          ctx.beginPath(); ctx.arc(circleX, py, 13.5 * ratio, 0, Math.PI * 2); ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = 2.8 * ratio; ctx.strokeStyle = fn.color; ctx.stroke();
+          ctx.fillStyle = fn.color; ctx.font = `${Math.max(10, 13 * ratio)}px Arial`; ctx.textAlign = "center"; ctx.textBaseline = "middle"; ctx.fillText(String(index + 1), circleX, py + 0.5);
+        }
+      });
+    }
+
+    function wrapCanvasText(ctx, text, maxWidth, maxLines = Infinity) {
+      const paragraphs = String(text || "").replace(/\r/g, "").split("\n");
+      const lines = [];
+      for (const paragraph of paragraphs) {
+        if (!paragraph) {
+          lines.push("");
+          if (lines.length >= maxLines) break;
+          continue;
+        }
+        let current = "";
+        for (const char of paragraph) {
+          const test = current + char;
+          if (!current || ctx.measureText(test).width <= maxWidth) {
+            current = test;
+          } else {
+            lines.push(current);
+            current = char;
+            if (lines.length >= maxLines) break;
+          }
+        }
+        if (lines.length >= maxLines) break;
+        if (current) lines.push(current);
+        if (lines.length >= maxLines) break;
+      }
+      if (lines.length > maxLines) lines.length = maxLines;
+      return lines;
+    }
+
+    function drawFormulaOnCanvas(ctx, fn, x, centerY, fontSize, color="#172033") {
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "middle";
+      ctx.font = `600 ${fontSize}px Noto Sans KR, sans-serif`;
+      if (fn.type !== "inverse") {
+        ctx.fillText(formulaText(fn), x, centerY);
+        ctx.restore();
+        return;
+      }
+      const prefix = "y =";
+      ctx.fillText(prefix, x, centerY);
+      const prefixWidth = ctx.measureText(prefix).width;
+      const fractionX = x + prefixWidth + 8;
+      const fractionWidth = Math.max(fontSize * 1.45, ctx.measureText(displayNumber(fn.params.r)).width + 10);
+      ctx.font = `600 ${Math.max(9, fontSize * 0.82)}px Cambria, serif`;
+      ctx.textAlign = "center";
+      ctx.fillText(displayNumber(fn.params.r), fractionX + fractionWidth / 2, centerY - fontSize * 0.38);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = Math.max(1, fontSize / 11);
+      ctx.beginPath();
+      ctx.moveTo(fractionX, centerY - 1);
+      ctx.lineTo(fractionX + fractionWidth, centerY - 1);
+      ctx.stroke();
+      ctx.fillText("x", fractionX + fractionWidth / 2, centerY + fontSize * 0.42);
+      ctx.restore();
+    }
+
+    function makeCompositeCanvas() {
+      // 태블릿 가로 화면에서 좌표평면은 왼쪽, 함수식과 소감은 오른쪽에 표시합니다.
+      const graphSize = 900;
+      const headerHeight = 108;
+      const formulaPanelWidth = 680;
+      const canvas = document.createElement("canvas");
+      canvas.width = graphSize + formulaPanelWidth;
+      canvas.height = headerHeight + graphSize;
+      const ctx = canvas.getContext("2d");
+
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 제목과 학번·이름은 충분한 줄 간격으로 분리합니다.
+      ctx.fillStyle = "#172033";
+      ctx.font = "700 31px Noto Sans KR, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(state.title || "함수 작품", 24, 42);
+      ctx.font = "500 16px Noto Sans KR, sans-serif";
+      ctx.fillStyle = "#475467";
+      const meta = state.studentInfo ? `${state.studentInfo}` : "";
+      ctx.fillText(meta, 24, 82);
+      ctx.strokeStyle = "#d6dde8";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, headerHeight - 1);
+      ctx.lineTo(canvas.width, headerHeight - 1);
+      ctx.stroke();
+
+      // 왼쪽 좌표평면과 작품
+      drawGridToContext(ctx, graphSize, headerHeight);
+      ctx.drawImage(refs.fillCanvas, 0, headerHeight, graphSize, graphSize);
+      renderFunctionsToContext(ctx, false, graphSize, headerHeight);
+      ctx.drawImage(refs.penCanvas, 0, headerHeight, graphSize, graphSize);
+
+      // 오른쪽 함수식·소감 영역
+      const panelX = graphSize;
+      const panelTop = headerHeight;
+      ctx.fillStyle = "#f8fafc";
+      ctx.fillRect(panelX, panelTop, formulaPanelWidth, graphSize);
+      ctx.strokeStyle = "#d6dde8";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(panelX, panelTop);
+      ctx.lineTo(panelX, canvas.height);
+      ctx.stroke();
+
+      ctx.fillStyle = "#172033";
+      ctx.font = "700 22px Noto Sans KR, sans-serif";
+      ctx.textAlign = "left";
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText("사용한 함수와 끝점", panelX + 28, panelTop + 38);
+
+      const reflectionText = String(state.reflection || "").trim();
+      const reflectionHeight = reflectionText ? 190 : 0;
+      const functionCount = state.functions.length;
+      const listTop = panelTop + 72;
+      const listBottom = panelTop + graphSize - reflectionHeight - 24;
+
+      if (functionCount === 0) {
+        ctx.fillStyle = "#667085";
+        ctx.font = "500 17px Noto Sans KR, sans-serif";
+        ctx.fillText("사용한 함수가 없습니다.", panelX + 28, panelTop + 82);
+      } else {
+        const maxRowsPerColumn = 20;
+        const columnCount = Math.max(1, Math.min(3, Math.ceil(functionCount / maxRowsPerColumn)));
+        const rowCount = Math.ceil(functionCount / columnCount);
+        const sidePadding = 28;
+        const columnGap = 14;
+        const usableHeight = Math.max(80, listBottom - listTop);
+        const rowHeight = Math.max(32, Math.min(54, Math.floor(usableHeight / Math.max(1, rowCount))));
+        const columnWidth = (formulaPanelWidth - sidePadding * 2 - columnGap * (columnCount - 1)) / columnCount;
+        const formulaFontSize = rowHeight >= 48 ? 14 : (rowHeight >= 40 ? 12 : 10);
+        const endpointFontSize = Math.max(8, formulaFontSize - 2);
+        const circleRadius = rowHeight >= 42 ? 10 : 8;
+
+        state.functions.forEach((fn, index) => {
+          const column = Math.floor(index / rowCount);
+          const row = index % rowCount;
+          const x = panelX + sidePadding + column * (columnWidth + columnGap);
+          const centerY = listTop + row * rowHeight + rowHeight / 2;
+          if (centerY > listBottom) return;
+
+          ctx.beginPath();
+          ctx.arc(x + circleRadius, centerY, circleRadius, 0, Math.PI * 2);
+          ctx.fillStyle = fn.color;
+          ctx.fill();
+
+          ctx.fillStyle = "#ffffff";
+          ctx.font = `700 ${Math.max(8, formulaFontSize - 2)}px Arial`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(index + 1), x + circleRadius, centerY + 0.5);
+
+          const textX = x + circleRadius * 2 + 8;
+          const textWidth = columnWidth - circleRadius * 2 - 11;
+          ctx.save();
+          ctx.beginPath();
+          ctx.rect(textX, centerY - rowHeight / 2, textWidth, rowHeight);
+          ctx.clip();
+          ctx.textAlign = "left";
+          ctx.textBaseline = "middle";
+
+          drawFormulaOnCanvas(ctx, fn, textX, centerY - rowHeight * 0.16, formulaFontSize, "#172033");
+
+          ctx.fillStyle = "#667085";
+          ctx.font = `500 ${endpointFontSize}px Noto Sans KR, sans-serif`;
+          ctx.fillText(savedEndpointText(fn), textX, centerY + rowHeight * 0.23);
+          ctx.restore();
+        });
+      }
+
+      if (reflectionText) {
+        const reflectionTop = panelTop + graphSize - reflectionHeight;
+        ctx.strokeStyle = "#d6dde8";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(panelX + 28, reflectionTop);
+        ctx.lineTo(panelX + formulaPanelWidth - 28, reflectionTop);
+        ctx.stroke();
+
+        ctx.fillStyle = "#172033";
+        ctx.font = "700 20px Noto Sans KR, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "alphabetic";
+        ctx.fillText("소감", panelX + 28, reflectionTop + 36);
+
+        ctx.fillStyle = "#475467";
+        ctx.font = "500 15px Noto Sans KR, sans-serif";
+        const lines = wrapCanvasText(ctx, reflectionText, formulaPanelWidth - 56, 6);
+        lines.forEach((line, index) => {
+          ctx.fillText(line, panelX + 28, reflectionTop + 68 + index * 23);
+        });
+      }
+
+      return canvas;
+    }
+
+    function downloadCanvas(canvas, filename) {
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download = filename;
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    }
+
+    function loadSavedWorks() {
+      try { return JSON.parse(localStorage.getItem(COMPLETED_KEY) || "[]"); } catch (error) { return []; }
+    }
+    function saveSavedWorks(list) {
+      const compactList = list.slice(0, MAX_SAVED).map(item => {
+        const { preview, ...rest } = item || {};
+        return rest;
+      });
+      localStorage.setItem(COMPLETED_KEY, JSON.stringify(compactList));
+    }
+    function openSavedList() {
+      const list = loadSavedWorks();
+      if (!list.length) { refs.savedList.innerHTML = '<div class="saved-item"><div class="saved-meta"><h3>저장된 작품이 없습니다.</h3><p>작품 저장(PNG)을 누르면 이곳에 저장됩니다.</p></div></div>'; }
+      else {
+        refs.savedList.innerHTML = list.map((item, index) => `
+          <div class="saved-item">
+            <div class="saved-meta">
+              <h3>${item.title || '제목 없음'}</h3>
+              <p>${item.studentInfo || item.studentNumber || ''} ${item.studentName || ''}</p>
+              <p>${item.savedAt || ''}</p>
+            </div>
+            <div class="saved-actions">
+              <button class="btn small soft" type="button" data-load-saved="${index}">불러오기</button>
+              <button class="btn small danger" type="button" data-delete-saved="${index}">삭제</button>
+            </div>
+          </div>
+        `).join('');
+      }
+      refs.savedModal.classList.add("show");
+    }
+
+    function updateReflectionCount() {
+      const value = refs.reflectionText.value || "";
+      refs.reflectionCount.textContent = `${value.length}/500`;
+      refs.reflectionBtn.classList.toggle("has-value", Boolean(value.trim()));
+    }
+
+    function openReflectionModal() {
+      refs.reflectionText.value = state.reflection || "";
+      updateReflectionCount();
+      refs.reflectionModal.classList.add("show");
+      setTimeout(() => refs.reflectionText.focus(), 30);
+    }
+
+    function closeReflectionModal() {
+      state.reflection = refs.reflectionText.value || "";
+      updateReflectionCount();
+      refs.reflectionModal.classList.remove("show");
+      scheduleSave();
+    }
+
+    function saveArtwork(event) {
+      event?.preventDefault();
+      event?.stopPropagation();
+      if (savingArtwork) return;
+
+      const endpointError = firstEndpointError();
+      if (endpointError) {
+        state.functions.forEach(fn => applyEndpointValidationToRow(fn.id));
+        showToast("그래프 위의 점이 되도록 끝점 순서쌍을 확인하세요.");
+        return;
+      }
+
+      savingArtwork = true;
+      refs.saveArtworkBtn.disabled = true;
+      try {
+        state.fillImage = refs.fillCanvas.toDataURL("image/png");
+        state.penImage = refs.penCanvas.toDataURL("image/png");
+        const canvas = makeCompositeCanvas();
+        const filename = `${(state.title || '함수작품').replace(/\s+/g, '_')}.png`;
+        const snapshot = deepCopy(state);
+        const savedAt = new Date().toLocaleString('ko-KR');
+
+        try {
+          const savedWorks = loadSavedWorks();
+          savedWorks.unshift({ title:state.title || '제목 없음', studentInfo:state.studentInfo || '', savedAt, snapshot });
+          saveSavedWorks(savedWorks);
+        } catch (storageError) {
+          console.warn(storageError);
+        }
+
+        downloadCanvas(canvas, filename);
+        showToast("작품을 PNG로 저장했습니다.");
+      } catch (error) {
+        console.error(error);
+        showToast("저장 중 문제가 발생했습니다. 다시 눌러 주세요.");
+      } finally {
+        setTimeout(() => {
+          savingArtwork = false;
+          refs.saveArtworkBtn.disabled = false;
+        }, 350);
+      }
+    }
+
+    refs.functionList.addEventListener("click", event => {
+      const row = event.target.closest("[data-row-id]");
+      if (row) state.selectedFunctionId = Number(row.dataset.rowId);
+      const removeButton = event.target.closest("[data-remove-fn]");
+      if (removeButton) {
+        const id = Number(removeButton.dataset.removeFn);
+        state.functions = state.functions.filter(fn => fn.id !== id);
+        if (!state.functions.some(fn => fn.id === state.selectedFunctionId)) state.selectedFunctionId = state.functions[0]?.id ?? null;
+        renderAll(); scheduleSave(); return;
+      }
+      const stepButton = event.target.closest("[data-step-param]");
+      if (stepButton) {
+        const fnId = Number(stepButton.dataset.fnId);
+        const key = stepButton.dataset.stepParam;
+        const delta = Number(stepButton.dataset.delta);
+        const fn = state.functions.find(item => item.id === fnId);
+        if (!fn) return;
+        fn.params[key] = round((Number(fn.params[key]) || 0) + delta, 4);
+        const input = refs.functionList.querySelector(`[data-fn-id="${fnId}"][data-input-param="${key}"]`);
+        if (input) input.value = displayNumber(fn.params[key]);
+        applyEndpointValidationToRow(fnId);
+        drawFunctionsSvg();
+        scheduleSave();
+        return;
+      }
+      if (row) {
+        refs.functionList.querySelectorAll(".function-row").forEach(item => item.classList.toggle("active", Number(item.dataset.rowId) === state.selectedFunctionId));
+        drawFunctionsSvg();
+        scheduleSave();
+      }
+    });
+
+    refs.functionList.addEventListener("change", event => {
+      const typeSelect = event.target.closest("[data-change-type='type']");
+      if (typeSelect) {
+        const fnId = Number(typeSelect.dataset.fnId);
+        updateFunction(fnId, fn => { fn.type = typeSelect.value; resetParamsForType(fn); });
+        return;
+      }
+      const colorInput = event.target.closest("[data-color-input='true']");
+      if (colorInput) {
+        const fnId = Number(colorInput.dataset.fnId);
+        const fn = state.functions.find(item => item.id === fnId);
+        if (!fn) return;
+        fn.color = colorInput.value;
+        const row = refs.functionList.querySelector(`.function-row[data-row-id="${fnId}"]`);
+        const badge = row?.querySelector('.badge-circle');
+        if (badge) badge.style.background = fn.color;
+        drawFunctionsSvg();
+        scheduleSave();
+        return;
+      }
+      const endpointInput = event.target.closest("[data-endpoint]");
+      if (endpointInput) {
+        const fnId = Number(endpointInput.dataset.fnId);
+        const [slot, axis] = endpointInput.dataset.endpoint.split("-");
+        const fn = state.functions.find(item => item.id === fnId);
+        if (!fn) return;
+        fn.endpoints[Number(slot)][axis] = endpointInput.value;
+        applyEndpointValidationToRow(fnId);
+        drawFunctionsSvg();
+        scheduleSave();
+        return;
+      }
+      const paramInput = event.target.closest("[data-input-param]");
+      if (paramInput) {
+        const fnId = Number(paramInput.dataset.fnId);
+        const key = paramInput.dataset.inputParam;
+        const value = parseMaybe(paramInput.value);
+        const fn = state.functions.find(item => item.id === fnId);
+        if (!fn) return;
+        if (value !== null) fn.params[key] = value;
+        applyEndpointValidationToRow(fnId);
+        drawFunctionsSvg();
+        scheduleSave();
+      }
+    });
+
+    refs.functionList.addEventListener("input", event => {
+      const endpointInput = event.target.closest("[data-endpoint]");
+      if (endpointInput) {
+        const fnId = Number(endpointInput.dataset.fnId);
+        const [slot, axis] = endpointInput.dataset.endpoint.split("-");
+        const fn = state.functions.find(item => item.id === fnId);
+        if (!fn) return;
+        fn.endpoints[Number(slot)][axis] = endpointInput.value;
+        applyEndpointValidationToRow(fnId);
+        drawFunctionsSvg(); scheduleSave(); return;
+      }
+      const paramInput = event.target.closest("[data-input-param]");
+      if (paramInput) {
+        const fnId = Number(paramInput.dataset.fnId);
+        const key = paramInput.dataset.inputParam;
+        const fn = state.functions.find(item => item.id === fnId);
+        if (!fn) return;
+        const value = parseMaybe(paramInput.value);
+        if (value !== null) fn.params[key] = value;
+        applyEndpointValidationToRow(fnId);
+        drawFunctionsSvg(); scheduleSave();
+      }
+    });
+
+    refs.addFunctionBtn.addEventListener("click", () => {
+      const fn = makeFunction(state.functions.length, refs.addFunctionType.value);
+      state.functions.push(fn);
+      state.selectedFunctionId = fn.id;
+      renderAll(); scheduleSave();
+    });
+    [refs.artTitle, refs.studentInfo].forEach(input => input.addEventListener("input", () => {
+      state.title = refs.artTitle.value;
+      state.studentInfo = refs.studentInfo.value;
+      scheduleSave();
+    }));
+    refs.graphRange.addEventListener("change", () => { state.range = Number(refs.graphRange.value); drawGridSvg(); drawFunctionsSvg(); scheduleSave(); });
+    refs.customColor.addEventListener("input", () => { state.selectedColor = refs.customColor.value; renderPalette(); scheduleSave(); });
+    refs.brushWidth.addEventListener("input", () => { state.brushWidth = Number(refs.brushWidth.value); refs.brushWidthValue.textContent = String(state.brushWidth); scheduleSave(); });
+    refs.undoBtn.addEventListener("click", undoAction);
+    refs.redoBtn.addEventListener("click", redoAction);
+    refs.zoomOutBtn.addEventListener("click", () => setViewZoom(state.zoom - 0.1));
+    refs.zoomInBtn.addEventListener("click", () => setViewZoom(state.zoom + 0.1));
+    refs.fitViewBtn.addEventListener("click", resetView);
+    document.querySelectorAll(".tool-btn").forEach(btn => btn.addEventListener("click", () => setActiveTool(btn.dataset.tool)));
+
+    document.querySelector(".canvas-stage")?.addEventListener("pointerdown", clearTextSelection, true);
+    document.addEventListener("selectionchange", () => {
+      const selection = window.getSelection?.();
+      if (!selection || selection.isCollapsed) return;
+      const anchor = selection.anchorNode?.parentElement;
+      if (anchor?.closest?.("#gridSvg, #graphSvg, .canvas-stage")) selection.removeAllRanges();
+    });
+
+    refs.interactionLayer.addEventListener("pointerdown", beginDrawing);
+    refs.interactionLayer.addEventListener("pointermove", moveDrawing);
+    refs.interactionLayer.addEventListener("pointerup", endDrawing);
+    refs.interactionLayer.addEventListener("pointerleave", endDrawing);
+    refs.interactionLayer.addEventListener("pointercancel", endDrawing);
+    refs.interactionLayer.addEventListener("wheel", event => { event.preventDefault(); const factor = event.deltaY < 0 ? 1.12 : 0.89; setViewZoom(state.zoom * factor); }, { passive:false });
+
+    refs.resetBtn.addEventListener("click", event => {
+      event.preventDefault();
+      event.stopPropagation();
+      closeConfirm();
+      localStorage.removeItem(DRAFT_KEY);
+      LEGACY_DRAFT_KEYS.forEach(key => localStorage.removeItem(key));
+      state = defaultState();
+      clearCanvas(fillCtx);
+      clearCanvas(penCtx);
+      undoStack = [];
+      redoStack = [];
+      renderAll();
+      scheduleSave();
+      showToast("현재 작업을 초기화했습니다.");
+    });
+    refs.exampleBtn.addEventListener("click", () => {
+      clearTextSelection();
+      refs.exampleModal.classList.add("show");
+      requestAnimationFrame(() => {
+        requestAnimationFrame(fitExampleImage);
+      });
+      setTimeout(fitExampleImage, 80);
+    });
+    refs.closeExampleModal.addEventListener("click", () => refs.exampleModal.classList.remove("show"));
+    refs.exampleZoomOutBtn.addEventListener("click", () => setExampleZoom(exampleZoom * 0.89));
+    refs.exampleZoomInBtn.addEventListener("click", () => setExampleZoom(exampleZoom * 1.12));
+    refs.exampleFitBtn.addEventListener("click", fitExampleImage);
+    refs.exampleViewport.addEventListener("pointerdown", beginExamplePan);
+    refs.exampleViewport.addEventListener("pointermove", moveExamplePan);
+    refs.exampleViewport.addEventListener("pointerup", endExamplePan);
+    refs.exampleViewport.addEventListener("pointercancel", endExamplePan);
+    refs.exampleViewport.addEventListener("pointerleave", endExamplePan);
+    refs.exampleViewport.addEventListener("wheel", event => { event.preventDefault(); const factor = event.deltaY < 0 ? 1.12 : 0.89; setExampleZoom(exampleZoom * factor); }, { passive:false });
+    refs.exampleImage.addEventListener("load", fitExampleImage);
+    window.addEventListener("resize", () => { if (refs.exampleModal.classList.contains("show")) fitExampleImage(); });
+    refs.savedListBtn.addEventListener("click", openSavedList);
+    refs.closeSavedModal.addEventListener("click", () => refs.savedModal.classList.remove("show"));
+    refs.reflectionBtn.addEventListener("click", openReflectionModal);
+    refs.closeReflectionModal.addEventListener("click", closeReflectionModal);
+    refs.reflectionDoneBtn.addEventListener("click", closeReflectionModal);
+    refs.reflectionText.addEventListener("input", () => {
+      state.reflection = refs.reflectionText.value || "";
+      updateReflectionCount();
+      scheduleSave();
+    });
+    refs.saveArtworkBtn.addEventListener("click", saveArtwork);
+    refs.clearColoringBtn.addEventListener("click", clearColoring);
+    refs.confirmCancelBtn.addEventListener("click", closeConfirm);
+    refs.confirmOkBtn.addEventListener("click", () => {
+      const action = pendingConfirmAction;
+      refs.confirmModal.classList.remove("show");
+      pendingConfirmAction = null;
+      if (action) action();
+    });
+
+    refs.savedList.addEventListener("click", event => {
+      const loadBtn = event.target.closest("[data-load-saved]");
+      if (loadBtn) {
+        const index = Number(loadBtn.dataset.loadSaved);
+        const item = loadSavedWorks()[index];
+        if (!item) return;
+        state = sanitizeState(item.snapshot);
+        Promise.all([restoreLayer(fillCtx, state.fillImage), restoreLayer(penCtx, state.penImage)]).then(() => { undoStack = []; redoStack = []; renderAll(); scheduleSave(); refs.savedModal.classList.remove("show"); showToast("저장한 작품을 불러왔습니다."); });
+        return;
+      }
+      const deleteBtn = event.target.closest("[data-delete-saved]");
+      if (deleteBtn) {
+        event.preventDefault();
+        event.stopPropagation();
+        const index = Number(deleteBtn.dataset.deleteSaved);
+        const list = loadSavedWorks();
+        list.splice(index, 1);
+        saveSavedWorks(list);
+        openSavedList();
+        showToast("저장 작품을 삭제했습니다.");
+      }
+    });
+
+    window.addEventListener("click", event => {
+      if (event.target === refs.savedModal) refs.savedModal.classList.remove("show");
+      if (event.target === refs.exampleModal) refs.exampleModal.classList.remove("show");
+      if (event.target === refs.reflectionModal) closeReflectionModal();
+      if (event.target === refs.confirmModal) closeConfirm();
+    });
+
+    function initCanvasImages() {
+      return Promise.all([
+        restoreLayer(fillCtx, state.fillImage),
+        restoreLayer(penCtx, state.penImage)
+      ]);
+    }
+
+    window.addEventListener("resize", applyViewTransform);
+
+    buildFunctionDogExample();
+    renderAll();
+    initCanvasImages().then(() => updateHistoryButtons());
+
+    fitBoardToCanvasArea();
+    if ("ResizeObserver" in window) {
+      const boardResizeObserver = new ResizeObserver(() => fitBoardToCanvasArea());
+      boardResizeObserver.observe(refs.canvasStack.parentElement);
+    }
+    window.addEventListener("resize", fitBoardToCanvasArea);
+  </script>
+</body>
+</html>
