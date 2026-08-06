@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>제곱수 마스터 모바일</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-height: 100%;
+            margin: 0;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: 16px;
+            font-family: "Apple SD Gothic Neo", "Noto Sans KR", Arial, sans-serif;
+            background: #f0fdf4;
+            -webkit-tap-highlight-color: transparent;
+            touch-action: manipulation;
+        }
+
+        button {
+            font: inherit;
+        }
+
+        .game-shell {
+            display: flex;
+            flex-direction: column;
+            width: min(100%, 448px);
+            height: min(90vh, 700px);
+            height: min(90dvh, 700px);
+            overflow: hidden;
+            background: #ffffff;
+            border-radius: 24px;
+            box-shadow: 0 18px 45px rgba(22, 101, 52, 0.18);
+        }
+
+        .game-header {
+            position: relative;
+            z-index: 2;
+            padding: 24px;
+            color: #ffffff;
+            background: #16a34a;
+            border-radius: 0 0 24px 24px;
+            box-shadow: 0 5px 14px rgba(21, 128, 61, 0.25);
+        }
+
+        .game-title {
+            margin: 0 0 10px;
+            font-size: 26px;
+            font-weight: 800;
+            line-height: 1.2;
+            text-align: center;
+        }
+
+        .status-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            color: #dcfce7;
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .score-badge {
+            flex-shrink: 0;
+            padding: 7px 13px;
+            color: #ffffff;
+            font-size: 19px;
+            background: #15803d;
+            border-radius: 999px;
+        }
+
+        .question-area {
+            position: relative;
+            display: flex;
+            flex: 1;
+            align-items: center;
+            justify-content: center;
+            min-height: 0;
+            padding: 54px 24px 20px;
+        }
+
+        .feedback-message {
+            position: absolute;
+            top: 18px;
+            left: 16px;
+            right: 16px;
+            min-height: 27px;
+            font-size: 18px;
+            font-weight: 800;
+            line-height: 1.45;
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.25s ease;
+        }
+
+        .feedback-correct {
+            color: #16a34a;
+        }
+
+        .feedback-wrong {
+            color: #ef4444;
+        }
+
+        .question-card {
+            width: 100%;
+            padding: 34px 20px;
+            text-align: center;
+            background: #f0fdf4;
+            border-radius: 18px;
+            box-shadow: inset 0 2px 8px rgba(22, 101, 52, 0.10);
+        }
+
+        .question-text {
+            color: #1f2937;
+            font-size: clamp(42px, 12vw, 54px);
+            font-weight: 800;
+            line-height: 1.2;
+            letter-spacing: 1px;
+        }
+
+        .question-text sup {
+            font-size: 0.55em;
+            vertical-align: super;
+        }
+
+        .options-section {
+            padding: 0 24px 24px;
+        }
+
+        .options-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+        }
+
+        .option-button {
+            min-height: 82px;
+            padding: 18px 10px;
+            color: #374151;
+            font-size: 25px;
+            font-weight: 800;
+            background: #ffffff;
+            border: 2px solid #bbf7d0;
+            border-radius: 14px;
+            box-shadow: 0 2px 5px rgba(22, 101, 52, 0.08);
+            cursor: pointer;
+            transition: transform 0.12s ease, background-color 0.18s ease, border-color 0.18s ease;
+        }
+
+        .option-button:active {
+            transform: scale(0.96);
+        }
+
+        .option-button:focus-visible {
+            outline: 4px solid rgba(34, 197, 94, 0.25);
+            outline-offset: 2px;
+        }
+
+        .btn-correct {
+            color: #ffffff !important;
+            background: #22c55e !important;
+            border-color: #16a34a !important;
+        }
+
+        .btn-wrong {
+            color: #ffffff !important;
+            background: #ef4444 !important;
+            border-color: #dc2626 !important;
+        }
+
+        .btn-disabled {
+            pointer-events: none;
+            opacity: 0.72;
+        }
+
+        @keyframes pop {
+            0% { transform: scale(0.95); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-5px); }
+            40%, 80% { transform: translateX(5px); }
+        }
+
+        .animate-pop {
+            animation: pop 0.3s ease-out;
+        }
+
+        .animate-shake {
+            animation: shake 0.4s ease-in-out;
+        }
+
+        @media (max-height: 620px) {
+            body {
+                padding: 8px;
+            }
+
+            .game-shell {
+                height: calc(100dvh - 16px);
+                border-radius: 18px;
+            }
+
+            .game-header {
+                padding: 14px 20px;
+            }
+
+            .game-title {
+                margin-bottom: 7px;
+                font-size: 22px;
+            }
+
+            .question-area {
+                padding: 44px 20px 12px;
+            }
+
+            .question-card {
+                padding: 23px 16px;
+            }
+
+            .options-section {
+                padding: 0 20px 16px;
+            }
+
+            .option-button {
+                min-height: 62px;
+                padding: 12px 8px;
+                font-size: 22px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="game-shell">
+        <header class="game-header">
+            <h1 class="game-title">제곱수 마스터</h1>
+            <div class="status-row">
+                <span id="streakDisplay">연속 정답: 0</span>
+                <span id="scoreDisplay" class="score-badge">점수: 0</span>
+            </div>
+        </header>
+
+        <section class="question-area">
+            <div id="feedbackMsg" class="feedback-message" aria-live="polite"></div>
+            <div id="questionCard" class="question-card">
+                <div id="questionText" class="question-text"></div>
+            </div>
+        </section>
+
+        <section class="options-section">
+            <div id="optionsGrid" class="options-grid"></div>
+        </section>
+    </main>
+
+    <script>
+        // 출제 범위: 11²~26²
+        const minNum = 11;
+        const maxNum = 26;
+
+        // 정답 검증용 제곱수 표
+        const expectedSquares = Object.freeze([
+            121, 144, 169, 196, 225, 256, 289, 324,
+            361, 400, 441, 484, 529, 576, 625, 676
+        ]);
+
+        // 게임 상태
+        let score = 0;
+        let streak = 0;
+        let currentAnswer = null;
+        let isWaiting = false;
+        let questionPool = [];
+        let lastQuestionKey = null;
+        let nextQuestionTimer = null;
+
+        // DOM 요소
+        const questionText = document.getElementById('questionText');
+        const optionsGrid = document.getElementById('optionsGrid');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const streakDisplay = document.getElementById('streakDisplay');
+        const feedbackMsg = document.getElementById('feedbackMsg');
+        const questionCard = document.getElementById('questionCard');
+
+        // Fisher-Yates 무작위 섞기
+        function shuffleArray(array) {
+            const copied = [...array];
+
+            for (let i = copied.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [copied[i], copied[j]] = [copied[j], copied[i]];
+            }
+
+            return copied;
+        }
+
+        // 11~26의 정방향 16문제와 역방향 16문제를 모두 만든다.
+        function refillQuestionPool() {
+            const newPool = [];
+
+            for (let base = minNum; base <= maxNum; base++) {
+                newPool.push({ base, type: 'forward', key: `forward-${base}` });
+                newPool.push({ base, type: 'reverse', key: `reverse-${base}` });
+            }
+
+            questionPool = shuffleArray(newPool);
+
+            // 새 묶음의 첫 문제가 직전 문제와 같아지는 것을 방지한다.
+            const nextIndex = questionPool.length - 1;
+            if (nextIndex > 0 && questionPool[nextIndex].key === lastQuestionKey) {
+                [questionPool[nextIndex], questionPool[0]] =
+                    [questionPool[0], questionPool[nextIndex]];
+            }
+        }
+
+        function getNextQuestion() {
+            if (questionPool.length === 0) {
+                refillQuestionPool();
+            }
+
+            const question = questionPool.pop();
+            lastQuestionKey = question.key;
+            return question;
+        }
+
+        // 정답 외의 후보 중 3개를 골라 중복 없는 4지선다를 만든다.
+        function makeOptions(correctAnswer, type) {
+            const candidates = [];
+
+            for (let base = minNum; base <= maxNum; base++) {
+                const value = type === 'forward' ? base * base : base;
+
+                if (value !== correctAnswer) {
+                    candidates.push(value);
+                }
+            }
+
+            const distractors = shuffleArray(candidates).slice(0, 3);
+            return shuffleArray([correctAnswer, ...distractors]);
+        }
+
+        function restartAnimation(element, animationClass) {
+            element.classList.remove(animationClass);
+            void element.offsetWidth;
+            element.classList.add(animationClass);
+        }
+
+        function showFeedback(message, type) {
+            feedbackMsg.textContent = message;
+            feedbackMsg.className = `feedback-message ${type === 'correct' ? 'feedback-correct' : 'feedback-wrong'}`;
+            feedbackMsg.style.opacity = '1';
+        }
+
+        function generateQuestion() {
+            if (nextQuestionTimer !== null) {
+                clearTimeout(nextQuestionTimer);
+                nextQuestionTimer = null;
+            }
+
+            isWaiting = false;
+
+            const { base, type } = getNextQuestion();
+            const square = base * base;
+
+            if (type === 'forward') {
+                questionText.innerHTML = `${base}<sup>2</sup> = ?`;
+                currentAnswer = square;
+            } else {
+                questionText.innerHTML = `?<sup>2</sup> = ${square}`;
+                currentAnswer = base;
+            }
+
+            questionCard.classList.remove('animate-pop', 'animate-shake');
+            feedbackMsg.style.opacity = '0';
+            renderOptions(makeOptions(currentAnswer, type));
+        }
+
+        function renderOptions(options) {
+            optionsGrid.innerHTML = '';
+
+            options.forEach(optionValue => {
+                const button = document.createElement('button');
+                button.type = 'button';
+                button.className = 'option-button';
+                button.textContent = String(optionValue);
+                button.addEventListener('click', () => handleAnswer(button, optionValue));
+                optionsGrid.appendChild(button);
+            });
+        }
+
+        function handleAnswer(clickedButton, selectedValue) {
+            if (isWaiting) return;
+            isWaiting = true;
+
+            const allButtons = optionsGrid.querySelectorAll('button');
+            allButtons.forEach(button => button.classList.add('btn-disabled'));
+
+            if (selectedValue === currentAnswer) {
+                clickedButton.classList.add('btn-correct');
+                restartAnimation(clickedButton, 'animate-pop');
+                restartAnimation(questionCard, 'animate-pop');
+
+                score += 10;
+                streak += 1;
+                scoreDisplay.textContent = `점수: ${score}`;
+                streakDisplay.textContent = `연속 정답: ${streak}`;
+                showFeedback('정답입니다! 🎉', 'correct');
+
+                nextQuestionTimer = setTimeout(generateQuestion, 800);
+                return;
+            }
+
+            clickedButton.classList.add('btn-wrong');
+            restartAnimation(clickedButton, 'animate-shake');
+            restartAnimation(questionCard, 'animate-shake');
+
+            streak = 0;
+            streakDisplay.textContent = `연속 정답: ${streak}`;
+            showFeedback(`아쉽습니다. 정답은 ${currentAnswer}입니다.`, 'wrong');
+
+            allButtons.forEach(button => {
+                if (Number(button.textContent) === currentAnswer) {
+                    button.classList.add('btn-correct');
+                }
+            });
+
+            nextQuestionTimer = setTimeout(generateQuestion, 1500);
+        }
+
+        // 11²~26²의 계산 결과를 명시된 정답표와 대조한다.
+        function validateSquareAnswers() {
+            for (let base = minNum; base <= maxNum; base++) {
+                const calculated = base * base;
+                const expected = expectedSquares[base - minNum];
+
+                if (calculated !== expected) {
+                    throw new Error(`${base}² 정답 오류: ${calculated} (예상값 ${expected})`);
+                }
+            }
+        }
+
+        window.addEventListener('load', () => {
+            validateSquareAnswers();
+            refillQuestionPool();
+            generateQuestion();
+        });
+    </script>
+</body>
+</html>
