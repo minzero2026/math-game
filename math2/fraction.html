@@ -1,0 +1,1807 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f8fafc" />
+  <title>분수 땅따먹기</title>
+  <style>
+    :root {
+      --bg-1: #f4f6fb;
+      --bg-2: #eef4f8;
+      --panel: rgba(255,255,255,.97);
+      --text: #25333b;
+      --muted: #6f7d85;
+      --accent: #405699;
+      --accent-dark: #2f417d;
+      --soft-blue: #edf2ff;
+      --border-red: #ca4c59;
+      --border-blue: #3f568f;
+      --shadow: 0 10px 28px rgba(67,77,92,.15);
+      --line: #cbd5e1;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; min-height: 100%; }
+    body {
+      min-height: 100vh;
+      padding: 10px;
+      font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+      color: var(--text);
+      background: linear-gradient(145deg, var(--bg-1), var(--bg-2));
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      -webkit-user-select: none;
+      display: flex;
+      justify-content: center;
+    }
+
+    button, input { font: inherit; }
+    button { -webkit-tap-highlight-color: transparent; }
+    .hidden { display: none !important; }
+
+    .app {
+      width: min(100%, 1220px);
+      min-height: calc(100vh - 20px);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .topbar {
+      flex: 0 0 auto;
+      min-height: 48px;
+      background: var(--panel);
+      border: 1px solid rgba(64, 86, 153, .14);
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      padding: 6px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .title-wrap { text-align:center; }
+    .title-wrap h1 {
+      font-size: clamp(20px, 2.2vw, 26px);
+      letter-spacing: -.035em;
+      line-height: 1.08;
+      color: var(--accent-dark);
+      margin: 0;
+    }
+    .title-wrap p {
+      margin-top: 3px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .game-layout {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 370px;
+      gap: 10px;
+    }
+
+    .board-panel,
+    .side-panel {
+      background: var(--panel);
+      border: 1px solid rgba(64, 86, 153, .12);
+      border-radius: 18px;
+      box-shadow: var(--shadow);
+    }
+
+    .board-panel {
+      min-width: 0;
+      min-height: 0;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow: hidden;
+    }
+
+    .turn-message {
+      position: relative;
+      z-index: 2;
+      flex: 0 0 auto;
+      min-height: 50px;
+      background: var(--soft-blue);
+      border-radius: 13px;
+      padding: 6px 11px;
+      color: var(--accent-dark);
+      display: grid;
+      grid-template-columns: 28px minmax(0,1fr);
+      gap: 9px;
+      align-items: center;
+    }
+    .turn-stone {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 1px solid rgba(64, 55, 37, .28);
+      display: inline-block;
+      flex: none;
+    }
+    /* 색상 점이 숨겨져도 안내 문구가 2번째 열에 고정되도록 한다.
+       게임 준비/게임 종료 상태에서 글자가 한 글자씩 세로로 늘어나는 현상 방지 */
+    .turn-stone { grid-column: 1; grid-row: 1; }
+    .turn-texts { min-width: 0; grid-column: 2; grid-row: 1; }
+    .turn-main { font-size: 17px; font-weight: 900; line-height: 1.2; word-break: keep-all; }
+    .turn-sub { font-size: 12px; font-weight: 800; color: #68759a; line-height: 1.4; margin-top: 2px; }
+
+    .board-wrap {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      overflow: hidden;
+      padding-top: 4px;
+    }
+    .board-frame {
+      width: min(100%, calc((100vh - 195px) * 529 / 540), 720px);
+      max-height: calc(100vh - 195px);
+      aspect-ratio: 529 / 540;
+      border-radius: 8px;
+      background: var(--border-blue);
+      padding: 5px;
+      box-shadow: 0 14px 30px rgba(83, 60, 52, .22);
+      flex: 0 1 auto;
+    }
+    .board-border {
+      width: 100%;
+      height: 100%;
+      border-radius: 4px;
+      background: var(--border-red);
+      padding: 5px;
+    }
+    .board-surface {
+      width: 100%;
+      height: 100%;
+      background: #ececec;
+      overflow: hidden;
+    }
+    #board {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: manipulation;
+    }
+    #board image {
+      image-rendering: auto;
+    }
+
+    /* 문제 팝업의 도형은 래스터 확대가 아니라 SVG로 다시 그려 선명하게 표시 */
+    #questionFigure {
+      shape-rendering: geometricPrecision;
+      text-rendering: geometricPrecision;
+    }
+    .edge-hit { cursor: pointer; stroke: transparent; stroke-width: 20; pointer-events: stroke; }
+    .edge-preview { opacity: 0; stroke: #7b8fb9; stroke-width: 5.5; stroke-linecap: round; pointer-events: none; }
+    .edge-hit:hover + .edge-preview { opacity: .45; }
+    .edge-preview.disabled { opacity: 0 !important; }
+    .dot { fill: #222; pointer-events: none; }
+    .drawn-edge, .fixed-edge { stroke-width: 5.5; stroke-linecap: round; pointer-events: none; }
+    .fixed-edge { stroke: #2b2b2b; }
+    .claim-label { font-weight: 950; font-size: 15px; text-anchor: middle; dominant-baseline: middle; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,.92); stroke-width: 2px; stroke-linejoin: round; }
+
+    .side-panel {
+      min-height: 0;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 9px;
+      overflow-y: auto;
+    }
+    .mode-badge {
+      display: inline-flex;
+      align-self: flex-start;
+      align-items: center;
+      min-height: 31px;
+      padding: 5px 11px;
+      border-radius: 999px;
+      background: #f7eee9;
+      color: #8d4d43;
+      font-size: 13px;
+      font-weight: 900;
+    }
+    .players {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 8px;
+    }
+    .player-card {
+      border: 3px solid transparent;
+      border-radius: 15px;
+      background: #fff;
+      box-shadow: 0 6px 16px rgba(70, 79, 100, .10);
+      padding: 9px 10px;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+      transition: .18s ease;
+    }
+    .player-card.active {
+      border-color: var(--active-color, var(--accent));
+      transform: translateY(-1px);
+    }
+    .stone {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      flex: 0 0 auto;
+      border: 1px solid rgba(64,55,37,.28);
+    }
+    .player-info { min-width: 0; flex: 1; }
+    .player-name {
+      font-weight: 900;
+      font-size: 16px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .player-role { color: var(--muted); font-size: 12px; margin-top: 2px; }
+    .player-score { flex: 0 0 auto; font-weight: 900; color: var(--accent-dark); font-size: 20px; }
+
+    .status-card {
+      min-height: 50px;
+      border-radius: 13px;
+      padding: 10px 12px;
+      background: #fff8df;
+      color: #795e17;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1.4;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+    .btn, .primary-btn, .soft-btn, .danger-btn {
+      min-height: 46px;
+      border: none;
+      border-radius: 13px;
+      font-weight: 900;
+      font-size: 15px;
+      box-shadow: 0 6px 16px rgba(70, 79, 100, .11);
+      cursor: pointer;
+      padding: 9px 11px;
+    }
+    .btn, .soft-btn { background:#fff; color: var(--text); }
+    .primary-btn { background: var(--accent); color:#fff; }
+    .danger-btn { background: #fff1d7; color: #805718; }
+    .btn:active, .primary-btn:active, .soft-btn:active, .danger-btn:active { transform: scale(.97); }
+    .btn:disabled, .primary-btn:disabled, .soft-btn:disabled, .danger-btn:disabled { opacity:.42; pointer-events:none; }
+
+    .rules {
+      margin-top: auto;
+      background: #f8f1ed;
+      border-radius: 14px;
+      padding: 12px;
+      color: #5b5d62;
+      font-size: 12.5px;
+      line-height: 1.48;
+      word-break: keep-all;
+      overflow-wrap: normal;
+      line-break: strict;
+      hyphens: none;
+    }
+    .rules h2 {
+      color: #8a4e45;
+      white-space: nowrap;
+      word-break: keep-all;
+      font-size: 16px;
+      font-weight: 900;
+      margin-bottom: 8px;
+    }
+    .rules ol { display: grid; gap: 7px; list-style: none; padding-left: 0; }
+    .rules li {
+      display: grid;
+      grid-template-columns: 25px minmax(0, 1fr);
+      gap: 8px;
+      align-items: start;
+      background: rgba(255, 255, 255, .72);
+      border-radius: 10px;
+      padding: 8px 9px 8px 7px;
+      word-break: keep-all;
+      overflow-wrap: normal;
+      line-break: strict;
+    }
+    .rules li > span {
+      min-width: 0;
+      word-break: keep-all;
+      overflow-wrap: normal;
+      line-break: strict;
+      hyphens: none;
+    }
+    .rules li::before {
+      content: counter(item);
+      counter-increment: item;
+      width:25px;
+      height:25px;
+      border-radius:50%;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      background: var(--border-red);
+      color:#fff;
+      font-weight:900;
+      line-height:1;
+    }
+    .rules ol { counter-reset:item; }
+    .rules strong { color:#8a4e45; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      background: rgba(45, 52, 65, .38);
+      backdrop-filter: blur(4px);
+      padding: 16px;
+      z-index: 50;
+    }
+    .modal-backdrop.hidden { display:none; }
+    .modal {
+      width: min(95vw, 690px);
+      max-height: calc(100vh - 32px);
+      overflow-y: auto;
+      background: #fff;
+      border-radius: 22px;
+      box-shadow: 0 20px 48px rgba(49, 57, 77, .30);
+      padding: 21px;
+    }
+    .setup-modal { width:min(96vw, 760px); }
+    .modal h2 {
+      text-align:center;
+      font-size: clamp(26px, 4vw, 32px);
+      margin-bottom: 8px;
+      color: var(--accent-dark);
+    }
+    .modal .lead, .winner-message {
+      text-align:center;
+      color: var(--muted);
+      line-height: 1.55;
+      margin-bottom: 15px;
+      font-size: 14px;
+    }
+
+    .field { margin-top: 13px; }
+    .field label { display:block; font-weight:900; margin-bottom:7px; font-size:16px; }
+    .seg, .modal-actions {
+      display:grid;
+      grid-template-columns:1fr 1fr;
+      gap:8px;
+    }
+    .seg.three { grid-template-columns: repeat(3, 1fr); }
+    .seg button, .first-player-buttons button, .class-choice button, .choice-btn {
+      min-height: 56px;
+      border: 2px solid #dce1ed;
+      border-radius: 14px;
+      background: #fafbff;
+      color: #5e687c;
+      font-weight: 900;
+      font-size: 18px;
+      cursor: pointer;
+      padding: 7px;
+    }
+    .seg button.on, .first-player-buttons button.on, .class-choice button.selected, .choice-btn.selected {
+      background: var(--soft-blue);
+      border-color: var(--accent);
+      color: var(--accent-dark);
+    }
+    .name-fields {
+      display:grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap:10px;
+    }
+    .name-field {
+      display:grid;
+      grid-template-columns: 26px minmax(0,1fr);
+      align-items:center;
+      gap:10px;
+    }
+    .name-field .swatch, .player-color-dot {
+      width:26px;
+      height:26px;
+      border-radius:50%;
+      border: 1px solid rgba(50,45,35,.22);
+      box-shadow: 0 3px 8px rgba(0,0,0,.14) inset, 0 2px 5px rgba(0,0,0,.15);
+    }
+    .name-field input, .fraction-input {
+      width:100%;
+      min-width:0;
+      min-height:56px;
+      border:2px solid #dce1ed;
+      border-radius:14px;
+      padding: 9px 12px;
+      color: var(--text);
+      background:#fbfcff;
+      font-weight:800;
+      user-select:text;
+      -webkit-user-select:text;
+      outline:none;
+      font-size: 17px;
+    }
+    .name-field input:focus, .fraction-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(64,86,153,.12); }
+    .first-box {
+      margin-top: 16px;
+      background: #fff7df;
+      border: 1px solid #ead48a;
+      border-radius: 18px;
+      padding: 14px;
+    }
+    .first-box .guide {
+      color: #675828;
+      font-size: 14px;
+      line-height: 1.5;
+      margin-bottom: 10px;
+      text-align:left;
+    }
+    .modal-actions { margin-top: 17px; }
+    .modal-actions.two-right { grid-template-columns: 1fr 1.35fr; }
+
+    .question-modal {
+      width: min(92vw, 470px);
+      padding: 15px 17px;
+    }
+    .question-modal h2 {
+      font-size: 24px;
+      margin-bottom: 3px;
+    }
+    .question-modal .lead {
+      margin-bottom: 7px;
+      font-size: 13px;
+      line-height: 1.4;
+      word-break: keep-all;
+    }
+    .question-modal #questionFigure {
+      width: 150px;
+      height: 150px;
+      margin: 0 auto 6px;
+      border-radius: 14px;
+    }
+    .question-modal .fraction-answer {
+      margin: 5px auto 9px;
+    }
+    .question-modal .fraction-stack {
+      width: min(190px, 62vw);
+      grid-template-rows: 45px 3px 45px;
+      gap: 5px;
+    }
+    .question-modal .fraction-input {
+      min-height: 45px;
+      height: 45px;
+      padding: 5px 10px;
+      font-size: 20px;
+      border-radius: 11px;
+    }
+    .question-modal .fraction-bar {
+      height: 3px;
+    }
+    .question-modal .class-choice {
+      gap: 7px;
+    }
+    .question-modal .class-choice button {
+      min-height: 47px;
+      font-size: 16px;
+      padding: 6px;
+      word-break: keep-all;
+    }
+    .question-modal .feedback {
+      margin-top: 8px;
+      padding: 8px 10px;
+      font-size: 14px;
+    }
+    .question-modal .modal-actions {
+      margin-top: 9px;
+    }
+    .question-modal .primary-btn {
+      min-height: 42px;
+      padding: 7px 10px;
+    }
+
+    .question-head {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:10px;
+    }
+    .question-badge {
+      border-radius:999px;
+      padding:7px 11px;
+      font-weight:900;
+      color:#fff;
+      white-space:nowrap;
+    }
+    #questionFigure {
+      width: 190px;
+      height: 190px;
+      display:block;
+      margin: 2px auto 8px;
+      background:#f1f3f5;
+      border:1px solid #d9e0ea;
+      border-radius:18px;
+    }
+    .fraction-answer { display:flex; justify-content:center; margin:10px auto 18px; }
+    .fraction-stack {
+      width:min(240px,72vw);
+      display:grid;
+      grid-template-rows:58px 4px 58px;
+      gap:7px;
+      align-items:center;
+    }
+    .fraction-bar { width:100%; height:4px; border-radius:999px; background:#18212f; }
+    .fraction-input { height:58px; text-align:center; font-size:24px; }
+    .inline-fraction {
+      display:inline-grid;
+      grid-template-rows:auto 2px auto;
+      gap:2px;
+      min-width:34px;
+      margin:0 4px;
+      vertical-align:middle;
+      text-align:center;
+      line-height:1.05;
+    }
+    .inline-fraction .fraction-line { width:100%; height:2px; background: currentColor; }
+    .class-choice { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+    .feedback {
+      display:none;
+      margin-top:14px;
+      padding:12px;
+      border-radius:12px;
+      font-weight:900;
+      line-height:1.45;
+    }
+    .feedback.good { display:block; background:#dcfce7; color:#166534; }
+    .feedback.bad { display:block; background:#fee2e2; color:#991b1b; }
+    .feedback .answer-line { display:block; margin-top:7px; }
+
+    .winner-list { display:grid; gap:9px; margin:18px 0; }
+    .winner-row { display:flex; align-items:center; gap:10px; padding:12px; border-radius:14px; background:#f8fafc; }
+    .winner-rank { width:34px; font-weight:950; font-size:22px; }
+    .winner-row strong { margin-left:auto; font-size:24px; }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: max(18px, env(safe-area-inset-bottom));
+      transform: translate(-50%, 30px);
+      z-index: 200;
+      padding: 11px 16px;
+      border-radius: 999px;
+      color: white;
+      background: rgba(15, 23, 42, .92);
+      font-weight: 800;
+      opacity: 0;
+      pointer-events: none;
+      transition: .22s;
+      max-width: calc(100% - 30px);
+      text-align: center;
+    }
+    .toast.show { opacity:1; transform: translate(-50%, 0); }
+
+    @media (max-width: 860px), (orientation: portrait) {
+      body {
+        min-height:100vh;
+        height:auto;
+        overflow-y:auto;
+        padding:8px;
+      }
+      .app { min-height: calc(100vh - 16px); gap:8px; }
+      .topbar { min-height: 52px; border-radius:15px; padding:8px 12px; }
+      .game-layout { display:flex; flex-direction:column; min-height:auto; }
+      .board-panel { padding:8px; border-radius:15px; }
+      .board-frame { width:min(94vw, 680px); max-height:none; }
+      .side-panel { overflow:visible; border-radius:15px; padding:8px; }
+      .players { grid-template-columns: repeat(3, minmax(0,1fr)); }
+      .player-card { padding:7px; gap:6px; }
+      .stone { width:27px; height:27px; }
+      .player-name { font-size:14px; }
+      .player-role { font-size:10.5px; }
+      .player-score { font-size:16px; }
+      .rules { margin-top:0; }
+      .name-fields { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 620px) {
+      .players { grid-template-columns:1fr; }
+      .name-fields, .seg.three, .class-choice { grid-template-columns:1fr; }
+      .rules { display:none; }
+      .modal-actions, .modal-actions.two-right { grid-template-columns:1fr; }
+      .controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+  </style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="title-wrap">
+      <h1>분수 땅따먹기</h1>
+      <p>2인용 · 3인용</p>
+    </div>
+  </header>
+
+  <section class="game-layout">
+    <section class="board-panel" aria-label="분수 땅따먹기 게임판 영역">
+      <div class="turn-message" id="turnCard">
+        <span class="turn-stone hidden" id="turnDot" aria-hidden="true"></span>
+        <div class="turn-texts">
+          <div class="turn-main" id="turnName">게임 준비</div>
+          <div class="turn-sub" id="statusBox">두 점 사이의 선을 눌러 시작하세요.</div>
+        </div>
+      </div>
+
+      <div class="board-wrap">
+        <div class="board-frame">
+          <div class="board-border">
+            <div class="board-surface">
+              <svg id="board" viewBox="0 0 735 751" role="img" aria-label="9 곱하기 9 점으로 이루어진 게임판"></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side-panel">
+      <div class="mode-badge" id="modeBadge">2인용 · 9 × 9</div>
+      <section class="players" id="scoreList"></section>
+      <section class="controls">
+        <button class="btn" id="undoBtn" type="button">취소</button>
+        <button class="danger-btn" id="endGameBtn" type="button">게임 종료</button>
+        <button class="btn" id="newGameBtn" type="button">설정</button>
+      </section>
+
+      <button class="soft-btn" id="resumeBtn" type="button" disabled>자동 저장</button>
+
+      <section class="rules" id="rulesCard">
+        <h2>분수 땅따먹기 규칙</h2>
+        <ol>
+          <li><span>한 사람씩 차례대로 <strong>서로 이웃한 두 점</strong> 사이에 수직 또는 수평선을 하나 긋습니다.</span></li>
+          <li><span>그림이 없는 직사각형을 만들면 <strong>+1점</strong>입니다.</span></li>
+          <li><span>그림이 있으면 색칠한 부분을 분수로 나타내고, 유한소수인지 순환소수로만 나타낼 수 있는지 맞힙니다. 맞히면 <strong>+2점</strong>, 틀리면 <strong>-1점</strong>입니다.</span></li>
+          <li><span>그림이 여러 개면 그림마다 점수를 따로 계산합니다.</span></li>
+          <li><span>이미 만들어진 직사각형 안에 새로운 선을 그을 수 없습니다.</span></li>
+          <li><span>2인용은 1→2, 3인용은 1→2→3 순서로 진행합니다. 시작 플레이어는 처음 설정에서 정합니다.</span></li>
+          <li><span>더 이상 직사각형을 만들 수 없을 때 게임을 끝내고, 점수가 가장 높은 사람이 이깁니다.</span></li>
+        </ol>
+      </section>
+    </aside>
+  </section>
+</div>
+
+<!-- 시작 설정 -->
+<div class="modal-backdrop" id="setupModal">
+  <section class="modal setup-modal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+    <h2 id="setupTitle">분수 땅따먹기 준비</h2>
+
+    <div class="field">
+      <label>게임 인원</label>
+      <div class="seg">
+        <button class="choice-btn selected" data-count="2" type="button">2인용</button>
+        <button class="choice-btn" data-count="3" type="button">3인용</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>학생 이름</label>
+      <div class="name-fields" id="nameFields"></div>
+    </div>
+
+    <div class="first-box">
+      <div class="guide"><strong>첫 번째로 시작할 사람은 누구인가요?</strong><br>선택한 학생이 먼저 시작합니다.</div>
+      <div class="seg three first-player-buttons" id="firstPlayerButtons"></div>
+    </div>
+
+    <div class="modal-actions two-right">
+      <button class="soft-btn hidden" id="cancelSetupBtn" type="button">취소</button>
+      <button class="primary-btn" id="startBtn" type="button">게임 시작</button>
+    </div>
+    <button class="soft-btn hidden" id="continueBtn" type="button" style="margin-top:10px;width:100%">저장한 게임 이어하기</button>
+  </section>
+</div>
+
+<!-- 분수 문제 -->
+<div class="modal-backdrop hidden" id="questionModal">
+  <section class="modal question-modal" role="dialog" aria-modal="true" aria-labelledby="questionTitle">
+    <div class="question-head">
+      <h2 id="questionTitle">분수 문제</h2>
+      <span class="question-badge" id="questionBadge">1 / 1</span>
+    </div>
+    <p class="lead" id="questionLead">색칠한 부분을 분수로 나타내고 알맞은 종류를 고르세요.</p>
+    <svg id="questionFigure" viewBox="0 0 200 200" aria-label="문제 그림"></svg>
+    <div class="fraction-answer">
+      <div class="fraction-stack" aria-label="분수 입력">
+        <input class="fraction-input" id="numeratorInput" type="number" inputmode="numeric" min="0" max="99" aria-label="분자" placeholder="분자" />
+        <span class="fraction-bar" aria-hidden="true"></span>
+        <input class="fraction-input" id="denominatorInput" type="number" inputmode="numeric" min="1" max="99" aria-label="분모" placeholder="분모" />
+      </div>
+    </div>
+    <div class="class-choice">
+      <button class="choice-btn" data-class="finite" type="button">유한소수</button>
+      <button class="choice-btn" data-class="repeat" type="button">순환소수로만</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+    <div class="modal-actions">
+      <button class="primary-btn" id="submitAnswerBtn" type="button">정답 확인</button>
+      <button class="primary-btn" id="nextQuestionBtn" type="button" style="display:none">다음</button>
+    </div>
+  </section>
+</div>
+
+<!-- 결과 -->
+<div class="modal-backdrop hidden" id="resultModal">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <h2 id="resultTitle">게임 결과</h2>
+    <p class="lead" id="resultLead"></p>
+    <div class="winner-list" id="winnerList"></div>
+    <div class="modal-actions">
+      <button class="primary-btn" id="resultNewBtn" type="button">새 게임</button>
+      <button class="soft-btn" id="closeResultBtn" type="button">게임판 보기</button>
+    </div>
+  </section>
+</div>
+
+
+<!-- 새 게임·게임 종료 확인 -->
+<div class="modal-backdrop hidden" id="confirmModal">
+  <section class="modal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <h2 id="confirmTitle">확인</h2>
+    <p class="lead" id="confirmMessage"></p>
+    <div class="modal-actions">
+      <button class="soft-btn" id="confirmCancelBtn" type="button">취소</button>
+      <button class="danger-btn" id="confirmOkBtn" type="button">확인</button>
+    </div>
+  </section>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const NS = 'http://www.w3.org/2000/svg';
+  const GRID = 9;
+  const CELL = 89;
+  const GRID_X = 13.6;
+  const GRID_Y = 15;
+  const BOARD_WIDTH = 735;
+  const BOARD_HEIGHT = 751;
+  const SAVE_KEY = 'fraction-land-game-v17-svg-fixed';
+  const PLAYER_COLORS = ['#4059a8', '#f2d94e', '#d64d48'];
+  const PLAYER_LIGHT = ['#edf2ff', '#fff8df', '#fee2e2'];
+  const PLAYER_NAMES = ['파랑', '노랑', '빨강'];
+  const PLAYER_SCORE_COLORS = ['#2450b8', '#8a6500', '#b33232'];
+  const FIXED_EDGES = new Set([
+    'h:0:1',
+    'v:0:5',
+    'v:0:8',
+    'h:4:2',
+    'h:4:4',
+    'v:3:5',
+    'h:4:6',
+    'v:5:1',
+    'v:6:3',
+    'h:6:3',
+    'h:6:6',
+    'h:7:5',
+    'h:8:1',
+    'h:8:4'
+  ]);
+  // 25개 도형의 단일 기준 데이터.
+  // 게임판과 문제 팝업이 모두 아래 데이터 + drawFigure() 하나만 사용한다.
+  // 따라서 게임판 도형 = 팝업 도형 = 정답 판정이 항상 일치한다.
+  const figures = [
+    { id:'f01', col:1, row:0, type:'polygon', parts:8,  num:1,  color:'#f6a12a', edgeTop:true, filledIndices:[0] },              // 1/8
+    { id:'f02', col:2, row:0, type:'polygon', parts:6,  num:5,  color:'#ffe31a', edgeTop:true, filledIndices:[0,1,2,3,4] },      // 5/6
+    { id:'f03', col:6, row:0, type:'square4', parts:4,  num:2,  color:'#f13a8b', filledIndices:[0,1] },                           // 2/4 = 1/2
+
+    { id:'f04', col:1, row:1, type:'circle', parts:16, num:8,  color:'#a9def7', filledIndices:[0,1,2,3,4,5,6,7] },               // 8/16 = 1/2
+    { id:'f05', col:3, row:1, type:'trapezoid3', parts:3, num:2, color:'#32b85f', filledIndices:[0,1] },                          // 2/3
+    { id:'f06', col:6, row:1, type:'circle', parts:16, num:2,  color:'#a9def7', filledIndices:[0,1] },                             // 2/16 = 1/8
+    { id:'f07', col:7, row:1, type:'polygon', parts:5,  num:2,  color:'#f3a8ca', filledIndices:[0,1] },                            // 2/5
+
+    { id:'f08', col:0, row:2, type:'bar', parts:5, num:3, color:'#f22b2b', filledIndices:[2,3,4] },                               // 3/5
+    { id:'f09', col:4, row:2, type:'strip11', parts:11, num:10, color:'#c8dcff', filledIndices:[0,1,2,3,4,5,6,7,8,9] },          // 10/11
+
+    { id:'f10', col:2, row:3, type:'square4', parts:4, num:3, color:'#f13a8b', filledIndices:[1,2,3] },                            // 3/4
+    { id:'f11', col:4, row:3, type:'circle', parts:16, num:6, color:'#a9def7', filledIndices:[0,1,2,3,4,5] },                    // 6/16 = 3/8
+    { id:'f12', col:6, row:3, type:'polygon', parts:6, num:2, color:'#ffe31a', edgeTop:true, filledIndices:[0,1] },               // 2/6 = 1/3
+
+    { id:'f13', col:1, row:4, type:'polygon', parts:8, num:3, color:'#f6a12a', edgeTop:true, filledIndices:[0,1,2] },             // 3/8
+    { id:'f14', col:2, row:4, type:'polygon', parts:6, num:1, color:'#ffe31a', edgeTop:true, filledIndices:[0] },                 // 1/6
+    { id:'f15', col:5, row:4, type:'bar', parts:5, num:1, color:'#f22b2b', filledIndices:[0] },                                   // 1/5
+    { id:'f16', col:7, row:4, type:'circle', parts:16, num:4, color:'#a9def7', filledIndices:[0,1,2,3] },                         // 4/16 = 1/4
+
+    { id:'f17', col:1, row:5, type:'polygon', parts:5, num:4, color:'#f3a8ca', filledIndices:[0,1,2,3] },                         // 4/5
+    { id:'f18', col:3, row:5, type:'strip11', parts:11, num:3, color:'#c8dcff', filledIndices:[0,1,2] },                          // 3/11
+    { id:'f19', col:6, row:5, type:'polygon', parts:8, num:6, color:'#f6a12a', edgeTop:true, filledIndices:[0,1,2,3,4,5] },       // 6/8 = 3/4
+
+    { id:'f20', col:2, row:6, type:'square4', parts:4, num:1, color:'#f13a8b', filledIndices:[0] },                                // 1/4
+    { id:'f21', col:3, row:6, type:'circle', parts:16, num:12, color:'#a9def7', filledIndices:[0,1,2,3,4,5,6,7,8,9,10,11] },     // 12/16 = 3/4
+    { id:'f22', col:5, row:6, type:'polygon', parts:6, num:4, color:'#ffe31a', edgeTop:true, filledIndices:[5,0,1,2] },            // 4/6 = 2/3
+
+    { id:'f23', col:1, row:7, type:'polygon', parts:6, num:3, color:'#ffe31a', edgeTop:true, filledIndices:[0,1,2] },              // 3/6 = 1/2
+    { id:'f24', col:4, row:7, type:'trapezoid3', parts:3, num:1, color:'#32b85f', filledIndices:[0] },                            // 1/3
+    { id:'f25', col:7, row:7, type:'polygon', parts:5, num:3, color:'#f3a8ca', filledIndices:[0,1,2] }                             // 3/5
+  ];
+
+  const board = document.getElementById('board');
+  const setupModal = document.getElementById('setupModal');
+  const questionModal = document.getElementById('questionModal');
+  const resultModal = document.getElementById('resultModal');
+  const confirmModal = document.getElementById('confirmModal');
+  const scoreList = document.getElementById('scoreList');
+  const turnCard = document.getElementById('turnCard');
+  const turnDot = document.getElementById('turnDot');
+  const turnName = document.getElementById('turnName');
+  const statusBox = document.getElementById('statusBox');
+  const nameFields = document.getElementById('nameFields');
+  const continueBtn = document.getElementById('continueBtn');
+  const toast = document.getElementById('toast');
+
+  let playerCount = 2;
+  let selectedClass = '';
+  let selectedFirstPlayer = 0;
+  let state = createEmptyState();
+  let undoStack = [];
+  let questionQueue = [];
+  let questionIndex = 0;
+  let answeringPlayer = 0;
+  let answerLocked = false;
+  let toastTimer = null;
+  let pendingConfirmAction = null;
+
+  function createEmptyState() {
+    return {
+      players: [],
+      currentPlayer: 0,
+      edges: {},
+      claims: [],
+      moveCount: 0,
+      gameOver: false,
+      started: false,
+      startPlayer: 0
+    };
+  }
+
+  function svgEl(tag, attrs = {}) {
+    const el = document.createElementNS(NS, tag);
+    Object.entries(attrs).forEach(([key, value]) => el.setAttribute(key, String(value)));
+    return el;
+  }
+
+  function pointX(col) { return GRID_X + col * CELL; }
+  function pointY(row) { return GRID_Y + row * CELL; }
+
+  function edgeKey(type, row, col) { return `${type}:${row}:${col}`; }
+
+  function parseEdgeKey(key) {
+    const [type, row, col] = key.split(':');
+    return { type, row: Number(row), col: Number(col) };
+  }
+
+  function isEdgeOccupied(key) {
+    return FIXED_EDGES.has(key) || state.edges[key] !== undefined;
+  }
+
+  function cloneState(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function gcd(a, b) {
+    a = Math.abs(a); b = Math.abs(b);
+    while (b) [a, b] = [b, a % b];
+    return a || 1;
+  }
+
+  function fractionClass(num, den) {
+    const g = gcd(num, den);
+    let d = den / g;
+    while (d % 2 === 0) d /= 2;
+    while (d % 5 === 0) d /= 5;
+    return d === 1 ? 'finite' : 'repeat';
+  }
+
+  function classLabel(value) {
+    return value === 'finite' ? '유한소수로 나타낼 수 있는 분수' : '순환소수로만 나타낼 수 있는 분수';
+  }
+
+  function validateFigureDefinitions() {
+    // 점검용 코드가 실제 게임 렌더링을 중단시키지 않도록 오류는 기록만 한다.
+    // 게임판/팝업/정답은 모두 figures 데이터를 직접 사용한다.
+    const errors = [];
+    const ids = new Set();
+    for (const fig of figures) {
+      if (ids.has(fig.id)) errors.push(`중복 도형 ID: ${fig.id}`);
+      ids.add(fig.id);
+
+      if (!Number.isInteger(fig.parts) || fig.parts <= 0 ||
+          !Number.isInteger(fig.num) || fig.num < 0 || fig.num > fig.parts) {
+        errors.push(`잘못된 분수 데이터: ${fig.id}`);
+        continue;
+      }
+
+      if (fig.filledIndices) {
+        const unique = new Set(fig.filledIndices);
+        if (unique.size !== fig.num ||
+            [...unique].some(i => !Number.isInteger(i) || i < 0 || i >= fig.parts)) {
+          errors.push(`색칠 조각 데이터 불일치: ${fig.id}`);
+        }
+      }
+
+      fractionClass(fig.num, fig.parts);
+    }
+
+    if (figures.length !== 25) errors.push(`도형 수 오류: ${figures.length}`);
+    if (errors.length) console.error('[분수 땅따먹기 데이터 점검]', errors.join(' / '));
+    return errors;
+  }
+
+  function fractionHtml(num, den) {
+    return `<span class="inline-fraction" aria-label="${den}분의 ${num}">
+      <span>${num}</span>
+      <span class="fraction-line" aria-hidden="true"></span>
+      <span>${den}</span>
+    </span>`;
+  }
+
+  function initSetup() {
+    renderNameFields();
+    document.getElementById('cancelSetupBtn').classList.add('hidden');
+    renderAll();
+    const saved = safeReadSave();
+    continueBtn.classList.toggle('hidden', !saved);
+  }
+
+  function renderNameFields(existingNames = []) {
+    nameFields.innerHTML = '';
+    for (let i = 0; i < playerCount; i++) {
+      const wrap = document.createElement('label');
+      wrap.className = 'name-field';
+      const savedName = existingNames[i] || `학생 ${i + 1}`;
+      wrap.innerHTML = `<span class="swatch" style="background:${PLAYER_COLORS[i]}"></span>
+        <input type="text" maxlength="10" value="${escapeHtml(savedName)}" aria-label="${i + 1}번 참가자 이름" />`;
+      nameFields.appendChild(wrap);
+    }
+    renderFirstPlayerButtons();
+  }
+
+  function renderFirstPlayerButtons() {
+    const box = document.getElementById('firstPlayerButtons');
+    if (!box) return;
+    const inputs = [...nameFields.querySelectorAll('input')];
+    box.innerHTML = '';
+    for (let i = 0; i < playerCount; i++) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = i === selectedFirstPlayer ? 'on' : '';
+      btn.textContent = (inputs[i]?.value.trim() || `학생 ${i + 1}`);
+      btn.addEventListener('click', () => {
+        selectedFirstPlayer = i;
+        renderFirstPlayerButtons();
+      });
+      box.appendChild(btn);
+    }
+  }
+
+  function startNewGame() {
+    const inputs = [...nameFields.querySelectorAll('input')];
+    state = createEmptyState();
+    state.players = inputs.map((input, i) => ({
+      name: input.value.trim() || `학생 ${i + 1}`,
+      color: PLAYER_COLORS[i],
+      light: PLAYER_LIGHT[i],
+      score: 0
+    }));
+    state.started = true;
+    state.startPlayer = selectedFirstPlayer;
+    state.currentPlayer = selectedFirstPlayer;
+    undoStack = [];
+    setupModal.classList.add('hidden');
+    document.getElementById('cancelSetupBtn').classList.add('hidden');
+    resultModal.classList.add('hidden');
+    renderAll();
+    saveGame();
+    showToast('게임을 시작합니다.');
+  }
+
+  function openSettings() {
+    if (!state.started || !state.players.length) {
+      resetToSetup();
+      return;
+    }
+
+    playerCount = state.players.length;
+    selectedFirstPlayer = Number.isInteger(state.startPlayer) ? state.startPlayer : state.currentPlayer;
+    document.querySelectorAll('[data-count]').forEach(btn => {
+      btn.classList.toggle('selected', Number(btn.dataset.count) === playerCount);
+    });
+    renderNameFields(state.players.map(player => player.name));
+    document.getElementById('cancelSetupBtn').classList.remove('hidden');
+    continueBtn.classList.add('hidden');
+    setupModal.classList.remove('hidden');
+  }
+
+  function closeSetup() {
+    if (!state.started) return;
+    playerCount = state.players.length;
+    selectedFirstPlayer = Number.isInteger(state.startPlayer) ? state.startPlayer : state.currentPlayer;
+    setupModal.classList.add('hidden');
+    renderAll();
+  }
+
+  function renderAll() {
+    renderBoard();
+    renderScoreboard();
+    renderTurn();
+    document.getElementById('endGameBtn').disabled = !state.started || state.gameOver;
+    document.getElementById('undoBtn').disabled = !undoStack.length || state.gameOver;
+    document.getElementById('modeBadge').textContent = `${playerCount}인용 · 9 × 9`;
+  }
+
+  function renderBoard() {
+    board.innerHTML = '';
+
+    const baseLayer = svgEl('g', { id:'baseLayer' });
+    const figureLayer = svgEl('g', { id:'figureLayer' });
+    const fixedLayer = svgEl('g', { id:'fixedLayer' });
+    const dotLayer = svgEl('g', { id:'dotLayer' });
+    const claimLayer = svgEl('g', { id:'claimLayer' });
+    const edgeLayer = svgEl('g', { id:'edgeLayer' });
+    const hitLayer = svgEl('g', { id:'hitLayer' });
+    board.append(baseLayer, figureLayer, fixedLayer, dotLayer, claimLayer, edgeLayer, hitLayer);
+
+    // 외부 이미지 없이 SVG만으로 게임판을 만든다.
+    baseLayer.appendChild(svgEl('rect', {
+      x:0, y:0, width:BOARD_WIDTH, height:BOARD_HEIGHT,
+      fill:'#ffffff'
+    }));
+
+    // 25개 도형을 팝업과 같은 drawFigure() 함수로 직접 그림.
+    figures.forEach(fig => {
+      const cx = pointX(fig.col) + CELL / 2;
+      const cy = pointY(fig.row) + CELL / 2;
+      drawFigure(figureLayer, fig, cx, cy, figureBoardSize(fig));
+    });
+
+    // 처음부터 그어져 있는 검은 선.
+    FIXED_EDGES.forEach(key => drawFixedEdge(fixedLayer, key));
+
+    // 9 × 9 점.
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID; c++) {
+        dotLayer.appendChild(svgEl('circle', {
+          cx:pointX(c), cy:pointY(r), r:3.7, fill:'#202020'
+        }));
+      }
+    }
+
+    state.claims.forEach(claim => drawClaim(claimLayer, claim));
+    Object.entries(state.edges).forEach(([key, playerIndex]) => {
+      drawEdge(edgeLayer, key, state.players[playerIndex]?.color || '#334155');
+    });
+
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID - 1; c++) createHitEdge(hitLayer, 'h', r, c);
+    }
+    for (let r = 0; r < GRID - 1; r++) {
+      for (let c = 0; c < GRID; c++) createHitEdge(hitLayer, 'v', r, c);
+    }
+  }
+
+  function drawEdge(layer, key, color) {
+    const { type, row, col } = parseEdgeKey(key);
+    let x1, y1, x2, y2;
+    if (type === 'h') {
+      x1 = pointX(col); y1 = pointY(row); x2 = pointX(col + 1); y2 = y1;
+    } else {
+      x1 = pointX(col); y1 = pointY(row); x2 = x1; y2 = pointY(row + 1);
+    }
+    layer.appendChild(svgEl('line', { x1, y1, x2, y2, stroke:color, class:'drawn-edge' }));
+  }
+
+  function drawFixedEdge(layer, key) {
+    const { type, row, col } = parseEdgeKey(key);
+    let x1, y1, x2, y2;
+    if (type === 'h') {
+      x1 = pointX(col); y1 = pointY(row); x2 = pointX(col + 1); y2 = y1;
+    } else {
+      x1 = pointX(col); y1 = pointY(row); x2 = x1; y2 = pointY(row + 1);
+    }
+    layer.appendChild(svgEl('line', { x1, y1, x2, y2, class:'fixed-edge' }));
+  }
+
+  function createHitEdge(layer, type, row, col) {
+    const key = edgeKey(type, row, col);
+    let x1, y1, x2, y2;
+    if (type === 'h') {
+      x1 = pointX(col); y1 = pointY(row); x2 = pointX(col + 1); y2 = y1;
+    } else {
+      x1 = pointX(col); y1 = pointY(row); x2 = x1; y2 = pointY(row + 1);
+    }
+
+    const group = svgEl('g');
+    const hit = svgEl('line', { x1, y1, x2, y2, class:'edge-hit', 'data-key':key });
+    const preview = svgEl('line', { x1, y1, x2, y2, class:'edge-preview' });
+    if (isEdgeOccupied(key) || edgeInsideClaim(type, row, col) || state.gameOver) {
+      preview.classList.add('disabled');
+    }
+    hit.addEventListener('click', () => handleEdgeTap(key));
+    group.append(hit, preview);
+    layer.appendChild(group);
+  }
+
+  function drawClaim(layer, claim) {
+    const player = state.players[claim.player] || { color:'#64748b', light:'#e2e8f0', name:'?' };
+    const inset = 4;
+    const x = pointX(claim.x1) + inset;
+    const y = pointY(claim.y1) + inset;
+    const width = Math.max(1, (claim.x2 - claim.x1) * CELL - inset * 2);
+    const height = Math.max(1, (claim.y2 - claim.y1) * CELL - inset * 2);
+
+    layer.appendChild(svgEl('rect', {
+      x, y, width, height,
+      rx: Math.min(10, width / 5, height / 5),
+      fill: player.light,
+      opacity: .70,
+      stroke: 'none'
+    }));
+
+    if (claim.score !== null && claim.score !== undefined) {
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      const fontSize = Math.max(9, Math.min(17, width * .24, height * .34));
+      const text = svgEl('text', {
+        x: cx,
+        y: cy + 1,
+        fill: PLAYER_SCORE_COLORS[claim.player] || '#24324a',
+        class: 'claim-label',
+        'font-size': fontSize
+      });
+      text.textContent = `${claim.score >= 0 ? '+' : ''}${claim.score}`;
+      layer.appendChild(text);
+    }
+  }
+
+  function figureBoardSize(fig) {
+    if (fig.type === 'circle') return 53;
+    if (fig.type === 'bar') return 55;
+    if (fig.type === 'strip11') return 58;
+    if (fig.type === 'trapezoid3') return 56;
+    if (fig.type === 'square4') return 50;
+    return fig.parts === 5 ? 52 : 54;
+  }
+
+  function drawQuestionFigure(svg, fig) {
+    // 팝업도 게임판과 정확히 같은 SVG 도형 생성 함수를 사용한다.
+    // 별도 PNG/스프라이트/크롭 이미지가 없으므로 서로 달라질 수 없다.
+    const size = (fig.type === 'bar' || fig.type === 'strip11' || fig.type === 'trapezoid3') ? 148 : 128;
+    drawFigure(svg, fig, 100, 100, size);
+  }
+
+  function drawFigure(layer, fig, cx, cy, size) {
+    const group = svgEl('g', { transform:`translate(${cx} ${cy})` });
+    const filled = new Set(fig.filledIndices || Array.from({ length:fig.num }, (_, i) => i));
+    const lineColor = '#263244';
+    const outerWidth = Math.min(3.2, Math.max(1.7, size * .045));
+    const innerWidth = Math.min(2.35, Math.max(1.05, size * .027));
+    const dash = `${Math.max(3.2, size*.065)} ${Math.max(2.2, size*.045)}`;
+
+    if (fig.type === 'circle') {
+      const r = size / 2;
+      for (let i = 0; i < fig.parts; i++) {
+        const a1 = -Math.PI / 2 + i * Math.PI * 2 / fig.parts;
+        const a2 = -Math.PI / 2 + (i + 1) * Math.PI * 2 / fig.parts;
+        const x1 = Math.cos(a1) * r, y1 = Math.sin(a1) * r;
+        const x2 = Math.cos(a2) * r, y2 = Math.sin(a2) * r;
+        group.appendChild(svgEl('path', {
+          d:`M 0 0 L ${x1} ${y1} A ${r} ${r} 0 0 1 ${x2} ${y2} Z`,
+          fill:filled.has(i) ? fig.color : '#ffffff', stroke:'none'
+        }));
+      }
+      for (let i = 0; i < fig.parts; i++) {
+        const a = -Math.PI / 2 + i * Math.PI * 2 / fig.parts;
+        group.appendChild(svgEl('line', {
+          x1:0, y1:0, x2:Math.cos(a)*(r-1), y2:Math.sin(a)*(r-1),
+          stroke:lineColor, 'stroke-width':innerWidth,
+          'stroke-linecap':'round', 'stroke-dasharray':dash
+        }));
+      }
+      group.appendChild(svgEl('circle', { cx:0, cy:0, r, fill:'none', stroke:lineColor, 'stroke-width':outerWidth }));
+      group.appendChild(svgEl('circle', { cx:0, cy:0, r:Math.max(2, size*.045), fill:'#202020' }));
+
+    } else if (fig.type === 'polygon') {
+      const n = fig.parts;
+      const r = size / 2;
+      const start = fig.edgeTop ? (-Math.PI / 2 - Math.PI / n) : -Math.PI / 2;
+      const pts = Array.from({ length:n }, (_, i) => {
+        const a = start + i * Math.PI * 2 / n;
+        return [Math.cos(a) * r, Math.sin(a) * r];
+      });
+      for (let i = 0; i < n; i++) {
+        const p1 = pts[i], p2 = pts[(i + 1) % n];
+        group.appendChild(svgEl('polygon', {
+          points:`0,0 ${p1[0]},${p1[1]} ${p2[0]},${p2[1]}`,
+          fill:filled.has(i) ? fig.color : '#ffffff', stroke:'none'
+        }));
+      }
+      pts.forEach(p => group.appendChild(svgEl('line', {
+        x1:0, y1:0, x2:p[0], y2:p[1],
+        stroke:lineColor, 'stroke-width':innerWidth,
+        'stroke-linecap':'round', 'stroke-dasharray':dash
+      })));
+      group.appendChild(svgEl('polygon', {
+        points:pts.map(p => p.join(',')).join(' '),
+        fill:'none', stroke:lineColor, 'stroke-width':outerWidth, 'stroke-linejoin':'round'
+      }));
+      group.appendChild(svgEl('circle', { cx:0, cy:0, r:Math.max(1.8, size*.038), fill:'#202020' }));
+
+    } else if (fig.type === 'square4') {
+      const s = size * .82;
+      const cell = s / 2;
+      let idx = 0;
+      for (let r = 0; r < 2; r++) {
+        for (let c = 0; c < 2; c++, idx++) {
+          group.appendChild(svgEl('rect', {
+            x:-s/2 + c*cell, y:-s/2 + r*cell, width:cell, height:cell,
+            fill:filled.has(idx) ? fig.color : '#ffffff', stroke:'none'
+          }));
+        }
+      }
+      group.appendChild(svgEl('line', { x1:0, y1:-s/2, x2:0, y2:s/2, stroke:lineColor, 'stroke-width':innerWidth, 'stroke-dasharray':dash }));
+      group.appendChild(svgEl('line', { x1:-s/2, y1:0, x2:s/2, y2:0, stroke:lineColor, 'stroke-width':innerWidth, 'stroke-dasharray':dash }));
+      group.appendChild(svgEl('rect', { x:-s/2, y:-s/2, width:s, height:s, fill:'none', stroke:lineColor, 'stroke-width':outerWidth }));
+
+    } else if (fig.type === 'bar') {
+      const w = size, h = size * .46, cell = w / fig.parts;
+      for (let i = 0; i < fig.parts; i++) {
+        group.appendChild(svgEl('rect', {
+          x:-w/2 + i*cell, y:-h/2, width:cell, height:h,
+          fill:filled.has(i) ? fig.color : '#ffffff', stroke:'none'
+        }));
+      }
+      for (let i = 1; i < fig.parts; i++) {
+        const x = -w/2 + i*cell;
+        group.appendChild(svgEl('line', { x1:x, y1:-h/2, x2:x, y2:h/2, stroke:lineColor, 'stroke-width':innerWidth, 'stroke-dasharray':dash }));
+      }
+      group.appendChild(svgEl('rect', { x:-w/2, y:-h/2, width:w, height:h, fill:'none', stroke:lineColor, 'stroke-width':outerWidth }));
+
+    } else if (fig.type === 'strip11') {
+      const w = size, h = size * .52, cell = w / 11;
+      for (let i = 0; i < 11; i++) {
+        group.appendChild(svgEl('rect', {
+          x:-w/2 + i*cell, y:-h/2, width:cell, height:h,
+          fill:filled.has(i) ? fig.color : '#ffffff', stroke:'none'
+        }));
+      }
+      for (let i = 1; i < 11; i++) {
+        const x = -w/2 + i*cell;
+        group.appendChild(svgEl('line', {
+          x1:x, y1:-h/2+2, x2:x, y2:h/2-2,
+          stroke:'#465365', 'stroke-width':Math.max(.9, innerWidth*.75),
+          'stroke-linecap':'round', 'stroke-dasharray':`${Math.max(3,size*.055)} ${Math.max(2,size*.035)}`
+        }));
+      }
+      group.appendChild(svgEl('rect', { x:-w/2, y:-h/2, width:w, height:h, fill:'none', stroke:lineColor, 'stroke-width':outerWidth }));
+
+    } else if (fig.type === 'trapezoid3') {
+      const w = size, h = size * .46;
+      const bl = [-w/2, h/2], br = [w/2, h/2];
+      const tl = [-w/4, -h/2], tr = [w/4, -h/2];
+      const bc = [0, h/2];
+      const pieces = [
+        [bl, tl, bc],
+        [tl, tr, bc],
+        [tr, br, bc]
+      ];
+      pieces.forEach((p, i) => group.appendChild(svgEl('polygon', {
+        points:p.map(q => q.join(',')).join(' '),
+        fill:filled.has(i) ? fig.color : '#ffffff', stroke:'none'
+      })));
+      [tl,tr].forEach(p => group.appendChild(svgEl('line', {
+        x1:p[0], y1:p[1], x2:bc[0], y2:bc[1],
+        stroke:lineColor, 'stroke-width':innerWidth,
+        'stroke-linecap':'round', 'stroke-dasharray':dash
+      })));
+      group.appendChild(svgEl('polygon', {
+        points:[bl,tl,tr,br].map(p => p.join(',')).join(' '),
+        fill:'none', stroke:lineColor, 'stroke-width':outerWidth, 'stroke-linejoin':'round'
+      }));
+    }
+
+    layer.appendChild(group);
+    return group;
+  }
+
+  function edgeInsideClaim(type, row, col) {
+    const mx = type === 'h' ? col + .5 : col;
+    const my = type === 'h' ? row : row + .5;
+    return state.claims.some(claim => mx > claim.x1 && mx < claim.x2 && my > claim.y1 && my < claim.y2);
+  }
+
+  function handleEdgeTap(key) {
+    if (!state.started || state.gameOver || !questionModal.classList.contains('hidden')) return;
+    if (isEdgeOccupied(key)) {
+      showToast('이미 그어진 선입니다.');
+      return;
+    }
+    const edge = parseEdgeKey(key);
+    if (edgeInsideClaim(edge.type, edge.row, edge.col)) {
+      showToast('이미 만들어진 직사각형 안에는 새로운 선을 그을 수 없습니다.');
+      return;
+    }
+
+    undoStack.push(cloneState(state));
+    const player = state.currentPlayer;
+    state.edges[key] = player;
+    state.moveCount++;
+
+    const completed = findNewRectangles(key);
+    if (completed.length) {
+      const createdClaims = completed.map(rect => {
+        const insideFigures = figures.filter(fig => fig.col >= rect.x1 && fig.col < rect.x2 && fig.row >= rect.y1 && fig.row < rect.y2);
+        const claim = {
+          ...rect,
+          id:`c${Date.now()}_${Math.random().toString(36).slice(2,7)}`,
+          player,
+          score:null,
+          figureIds:insideFigures.map(f => f.id)
+        };
+        state.claims.push(claim);
+        return claim;
+      });
+
+      renderAll();
+      resolveClaims(createdClaims, player);
+    } else {
+      finishTurn();
+    }
+  }
+
+  function findNewRectangles(newEdgeKey) {
+    const candidates = [];
+    for (let y1 = 0; y1 < GRID - 1; y1++) {
+      for (let y2 = y1 + 1; y2 < GRID; y2++) {
+        for (let x1 = 0; x1 < GRID - 1; x1++) {
+          for (let x2 = x1 + 1; x2 < GRID; x2++) {
+            const rect = { x1, x2, y1, y2 };
+            if (!edgeOnRect(newEdgeKey, rect)) continue;
+            if (!rectInteriorFree(rect)) continue;
+            if (rectPerimeterComplete(rect)) {
+              rect.area = (x2 - x1) * (y2 - y1);
+              candidates.push(rect);
+            }
+          }
+        }
+      }
+    }
+
+    // 이미 차지한 영역과 겹치는 직사각형은 rectInteriorFree()에서 제외된다.
+    // 같은 한 선으로 여러 개의 새 직사각형이 동시에 완성되는 경우에는
+    // 서로 겹치지 않는 새 직사각형만 인정한다.
+    candidates.sort((a, b) => b.area - a.area || a.y1 - b.y1 || a.x1 - b.x1);
+    const accepted = [];
+    const usedCells = new Set();
+    for (const rect of candidates) {
+      const cells = [];
+      let overlaps = false;
+      for (let r = rect.y1; r < rect.y2; r++) {
+        for (let c = rect.x1; c < rect.x2; c++) {
+          const key = `${r}:${c}`;
+          if (usedCells.has(key)) overlaps = true;
+          cells.push(key);
+        }
+      }
+      if (!overlaps) {
+        accepted.push(rect);
+        cells.forEach(cell => usedCells.add(cell));
+      }
+    }
+    return accepted;
+  }
+
+  function edgeOnRect(key, rect) {
+    const e = parseEdgeKey(key);
+    if (e.type === 'h') {
+      return (e.row === rect.y1 || e.row === rect.y2) && e.col >= rect.x1 && e.col < rect.x2;
+    }
+    return (e.col === rect.x1 || e.col === rect.x2) && e.row >= rect.y1 && e.row < rect.y2;
+  }
+
+  function rectInteriorFree(rect) {
+    // 한 번 차지한 영역은 다시 차지할 수 없다.
+    // 기존 직사각형을 완전히 포함하는 큰 직사각형도 인정하지 않는다.
+    // 대신 기존 영역의 경계를 이용해 그 주변의 남은 영역에서
+    // 새로운 직사각형을 만드는 것은 허용한다.
+    return !state.claims.some(claim => rectanglesOverlapInterior(rect, claim));
+  }
+
+  function rectanglesOverlapInterior(a, b) {
+    return Math.max(a.x1, b.x1) < Math.min(a.x2, b.x2) && Math.max(a.y1, b.y1) < Math.min(a.y2, b.y2);
+  }
+
+  function rectPerimeterComplete(rect) {
+    for (let c = rect.x1; c < rect.x2; c++) {
+      if (!isEdgeOccupied(edgeKey('h', rect.y1, c))) return false;
+      if (!isEdgeOccupied(edgeKey('h', rect.y2, c))) return false;
+    }
+    for (let r = rect.y1; r < rect.y2; r++) {
+      if (!isEdgeOccupied(edgeKey('v', r, rect.x1))) return false;
+      if (!isEdgeOccupied(edgeKey('v', r, rect.x2))) return false;
+    }
+    return true;
+  }
+
+  function resolveClaims(claims, player) {
+    questionQueue = [];
+    claims.forEach(claim => {
+      const figs = claim.figureIds.map(id => figures.find(f => f.id === id)).filter(Boolean);
+      if (figs.length === 0) {
+        claim.score = 1;
+        state.players[player].score += 1;
+      } else {
+        claim.score = 0;
+        figs.forEach(fig => questionQueue.push({ claimId:claim.id, figure:fig }));
+      }
+    });
+
+    renderAll();
+    if (!questionQueue.length) {
+      showToast('그림이 없는 직사각형: +1점');
+      finishTurn();
+      return;
+    }
+
+    answeringPlayer = player;
+    questionIndex = 0;
+    openQuestion();
+  }
+
+  function openQuestion() {
+    answerLocked = false;
+    selectedClass = '';
+    document.getElementById('numeratorInput').value = '';
+    document.getElementById('denominatorInput').value = '';
+    document.querySelectorAll('.class-choice .choice-btn').forEach(btn => btn.classList.remove('selected'));
+    const feedback = document.getElementById('feedback');
+    feedback.className = 'feedback';
+    feedback.textContent = '';
+    document.getElementById('submitAnswerBtn').style.display = '';
+    document.getElementById('nextQuestionBtn').style.display = 'none';
+
+    const item = questionQueue[questionIndex];
+    const player = state.players[answeringPlayer];
+    const badge = document.getElementById('questionBadge');
+    badge.textContent = `${questionIndex + 1} / ${questionQueue.length}`;
+    badge.style.background = player.color;
+    document.getElementById('questionLead').textContent = `${player.name}님, 색칠한 부분을 분수로 나타내고 알맞은 종류를 고르세요.`;
+
+    const qSvg = document.getElementById('questionFigure');
+    qSvg.innerHTML = '';
+    drawQuestionFigure(qSvg, item.figure);
+    questionModal.classList.remove('hidden');
+    setTimeout(() => document.getElementById('numeratorInput').focus(), 50);
+  }
+
+  function submitAnswer() {
+    if (answerLocked) return;
+    const item = questionQueue[questionIndex];
+    const n = Number(document.getElementById('numeratorInput').value);
+    const d = Number(document.getElementById('denominatorInput').value);
+    if (!Number.isInteger(n) || !Number.isInteger(d) || n < 0 || d <= 0 || !selectedClass) {
+      showToast('분자, 분모, 소수의 종류를 모두 입력하세요.');
+      return;
+    }
+
+    const fig = item.figure;
+    const sameValue = n * fig.parts === d * fig.num;
+    const expectedClass = fractionClass(fig.num, fig.parts);
+    const correct = sameValue && selectedClass === expectedClass;
+    const delta = correct ? 2 : -1;
+
+    state.players[answeringPlayer].score += delta;
+    const claim = state.claims.find(c => c.id === item.claimId);
+    if (claim) claim.score += delta;
+
+    const feedback = document.getElementById('feedback');
+    const g = gcd(fig.num, fig.parts);
+    const simpleNum = fig.num / g;
+    const simpleDen = fig.parts / g;
+    if (correct) {
+      feedback.className = 'feedback good';
+      feedback.innerHTML =
+        `<span>정답입니다. +2점</span>` +
+        `<span class="answer-line">정답: ${fractionHtml(simpleNum, simpleDen)}, ${classLabel(expectedClass)}</span>`;
+    } else {
+      feedback.className = 'feedback bad';
+      feedback.innerHTML =
+        `<span>아쉽습니다. -1점</span>` +
+        `<span class="answer-line">정답: ${fractionHtml(simpleNum, simpleDen)}, ${classLabel(expectedClass)}</span>`;
+    }
+
+    answerLocked = true;
+    document.getElementById('submitAnswerBtn').style.display = 'none';
+    const nextBtn = document.getElementById('nextQuestionBtn');
+    nextBtn.style.display = '';
+    nextBtn.textContent = questionIndex === questionQueue.length - 1 ? '확인' : '다음 문제';
+    renderScoreboard();
+    renderTurn();
+  }
+
+  function nextQuestion() {
+    if (!answerLocked) return;
+    questionIndex++;
+    if (questionIndex < questionQueue.length) {
+      openQuestion();
+    } else {
+      questionModal.classList.add('hidden');
+      renderAll();
+      finishTurn();
+    }
+  }
+
+  function finishTurn() {
+    if (noLegalEdges()) {
+      endGame(true);
+      return;
+    }
+    state.currentPlayer = (state.currentPlayer + 1) % state.players.length;
+    statusBox.textContent = '선 하나를 눌러 직사각형을 완성하세요.';
+    renderAll();
+    saveGame();
+  }
+
+  function noLegalEdges() {
+    for (let r = 0; r < GRID; r++) {
+      for (let c = 0; c < GRID - 1; c++) {
+        const key = edgeKey('h', r, c);
+        if (!isEdgeOccupied(key) && !edgeInsideClaim('h', r, c)) return false;
+      }
+    }
+    for (let r = 0; r < GRID - 1; r++) {
+      for (let c = 0; c < GRID; c++) {
+        const key = edgeKey('v', r, c);
+        if (!isEdgeOccupied(key) && !edgeInsideClaim('v', r, c)) return false;
+      }
+    }
+    return true;
+  }
+
+  function renderScoreboard() {
+    scoreList.innerHTML = '';
+    state.players.forEach((player, i) => {
+      const row = document.createElement('div');
+      row.className = `player-card${i === state.currentPlayer && !state.gameOver ? ' active' : ''}`;
+      row.style.setProperty('--active-color', player.color);
+      row.innerHTML = `
+        <div class="stone" style="background:${player.color}"></div>
+        <div class="player-info">
+          <div class="player-name">${escapeHtml(player.name)}</div>
+          <div class="player-role">${PLAYER_NAMES[i]}색${state.startPlayer === i ? ' · 시작 플레이어' : ''}</div>
+        </div>
+        <div class="player-score" style="color:${PLAYER_SCORE_COLORS[i]}">${player.score}점</div>`;
+      scoreList.appendChild(row);
+    });
+  }
+
+  function renderTurn() {
+    if (!state.players.length) {
+      turnName.textContent = '게임 준비';
+      statusBox.textContent = '두 점 사이의 선을 눌러 시작하세요.';
+      turnDot.className = 'turn-stone hidden';
+      turnCard.style.background = 'var(--soft-blue)';
+      return;
+    }
+    if (state.gameOver) {
+      turnName.textContent = '게임 종료';
+      statusBox.textContent = '점수를 확인하거나 새 게임을 시작하세요.';
+      turnDot.className = 'turn-stone hidden';
+      turnCard.style.background = '#f8fafc';
+      return;
+    }
+    const player = state.players[state.currentPlayer];
+    turnName.textContent = `${player.name}의 차례`;
+    statusBox.textContent = '두 점 사이의 빈 선 하나를 눌러 직사각형을 완성하세요.';
+    turnDot.className = 'turn-stone';
+    turnDot.style.background = player.color;
+    turnCard.style.background = player.light;
+  }
+
+  function showGameResult() {
+    if (!state.players.length) return;
+    const ranked = state.players.map((p, i) => ({...p, index:i})).sort((a,b) => b.score - a.score);
+    const top = ranked[0].score;
+    const winners = ranked.filter(p => p.score === top);
+    document.getElementById('resultLead').textContent = winners.length > 1
+      ? `${winners.map(w => w.name).join(', ')} 공동 우승입니다!`
+      : `${winners[0].name} 우승입니다!`;
+    document.getElementById('winnerList').innerHTML = ranked.map((p, i) => `
+      <div class="winner-row">
+        <span class="winner-rank">${i + 1}</span>
+        <span class="score-color" style="background:${p.color}"></span>
+        <span>${escapeHtml(p.name)}</span>
+        <strong>${p.score}점</strong>
+      </div>`).join('');
+    resultModal.classList.remove('hidden');
+  }
+
+  function endGame(auto = false) {
+    if (!state.started || state.gameOver) return;
+    state.gameOver = true;
+    renderAll();
+    saveGame();
+    showGameResult();
+    if (auto) showToast('더 그을 수 있는 선이 없어 자동으로 종료했습니다.');
+  }
+
+  function saveGame() {
+    try {
+      localStorage.setItem(SAVE_KEY, JSON.stringify(state));
+      const resumeBtn = document.getElementById('resumeBtn');
+      resumeBtn.textContent = '자동 저장됨';
+      setTimeout(() => { resumeBtn.textContent = '저장 완료'; }, 900);
+    } catch (err) {
+      console.warn('저장 실패', err);
+    }
+  }
+
+  function safeReadSave() {
+    try {
+      const raw = localStorage.getItem(SAVE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || !parsed.started || !Array.isArray(parsed.players)) return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  }
+
+  function continueSavedGame() {
+    const saved = safeReadSave();
+    if (!saved) {
+      showToast('이어 할 게임이 없습니다.');
+      return;
+    }
+    state = saved;
+    playerCount = state.players.length;
+    selectedFirstPlayer = state.startPlayer || 0;
+    undoStack = [];
+    setupModal.classList.add('hidden');
+    resultModal.classList.add('hidden');
+    renderAll();
+    if (state.gameOver) showGameResult();
+    else showToast('저장한 게임을 불러왔습니다.');
+  }
+
+  function resetToSetup() {
+    localStorage.removeItem(SAVE_KEY);
+    state = createEmptyState();
+    undoStack = [];
+    playerCount = 2;
+    selectedFirstPlayer = 0;
+    document.querySelectorAll('[data-count]').forEach(btn => btn.classList.toggle('selected', btn.dataset.count === '2'));
+    renderNameFields();
+    document.getElementById('cancelSetupBtn').classList.add('hidden');
+    continueBtn.classList.add('hidden');
+    resultModal.classList.add('hidden');
+    questionModal.classList.add('hidden');
+    setupModal.classList.remove('hidden');
+    renderAll();
+  }
+
+  function undoLastMove() {
+    if (!undoStack.length || state.gameOver) {
+      showToast('되돌릴 선이 없습니다.');
+      return;
+    }
+    state = undoStack.pop();
+    playerCount = state.players.length;
+    selectedFirstPlayer = state.startPlayer || 0;
+    questionQueue = [];
+    questionIndex = 0;
+    answeringPlayer = state.currentPlayer;
+    answerLocked = false;
+    selectedClass = '';
+    questionModal.classList.add('hidden');
+    resultModal.classList.add('hidden');
+    renderAll();
+    saveGame();
+    showToast('마지막 선을 취소했습니다.');
+  }
+
+  function openConfirm({ title, message, okText, action }) {
+    document.getElementById('confirmTitle').textContent = title;
+    document.getElementById('confirmMessage').textContent = message;
+    document.getElementById('confirmOkBtn').textContent = okText;
+    pendingConfirmAction = action;
+    confirmModal.classList.remove('hidden');
+  }
+
+  function closeConfirm() {
+    pendingConfirmAction = null;
+    confirmModal.classList.add('hidden');
+  }
+
+  function showToast(message) {
+    toast.textContent = message;
+    toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => toast.classList.remove('show'), 1900);
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
+  }
+
+  document.querySelectorAll('[data-count]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const currentNames = [...nameFields.querySelectorAll('input')].map(input => input.value);
+      playerCount = Number(btn.dataset.count);
+      if (selectedFirstPlayer >= playerCount) selectedFirstPlayer = 0;
+      document.querySelectorAll('[data-count]').forEach(b => b.classList.toggle('selected', b === btn));
+      renderNameFields(currentNames);
+    });
+  });
+
+  nameFields.addEventListener('input', renderFirstPlayerButtons);
+
+  document.querySelectorAll('.class-choice .choice-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (answerLocked) return;
+      selectedClass = btn.dataset.class;
+      document.querySelectorAll('.class-choice .choice-btn').forEach(b => b.classList.toggle('selected', b === btn));
+    });
+  });
+
+  document.getElementById('startBtn').addEventListener('click', startNewGame);
+  document.getElementById('cancelSetupBtn').addEventListener('click', closeSetup);
+  continueBtn.addEventListener('click', continueSavedGame);
+  document.getElementById('submitAnswerBtn').addEventListener('click', submitAnswer);
+  document.getElementById('nextQuestionBtn').addEventListener('click', nextQuestion);
+  document.getElementById('newGameBtn').addEventListener('click', openSettings);
+  document.getElementById('resultNewBtn').addEventListener('click', resetToSetup);
+  document.getElementById('closeResultBtn').addEventListener('click', () => {
+    resultModal.classList.add('hidden');
+    renderAll();
+    // Google Sites 임베드에서 모달을 닫은 직후 레이아웃이 남는 경우를 방지
+    requestAnimationFrame(() => window.dispatchEvent(new Event('resize')));
+  });
+  document.getElementById('endGameBtn').addEventListener('click', () => {
+    if (!state.started || state.gameOver) return;
+    openConfirm({
+      title:'게임 종료',
+      message:'현재 점수를 최종 점수로 하여 게임을 종료할까요?',
+      okText:'게임 종료',
+      action:() => endGame(false)
+    });
+  });
+  document.getElementById('undoBtn').addEventListener('click', undoLastMove);
+  document.getElementById('confirmCancelBtn').addEventListener('click', closeConfirm);
+  document.getElementById('confirmOkBtn').addEventListener('click', () => {
+    const action = pendingConfirmAction;
+    closeConfirm();
+    if (typeof action === 'function') action();
+  });
+  document.getElementById('resumeBtn').addEventListener('click', () => showToast('진행 상황은 이 기기에 자동 저장됩니다.'));
+  document.getElementById('denominatorInput').addEventListener('keydown', e => {
+    if (e.key === 'Enter') submitAnswer();
+  });
+
+  initSetup();
+  validateFigureDefinitions();
+})();
+</script>
+</body>
+</html>
