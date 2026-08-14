@@ -620,6 +620,88 @@
       .modal-actions, .modal-actions.two-right { grid-template-columns:1fr; }
       .controls { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     }
+
+
+    /* ===== Google Sites + GitHub 공통 데스크톱/태블릿 가로 화면 최적화 =====
+       - 페이지 전체 스크롤은 막고 오른쪽 패널만 세로 스크롤
+       - 게임판 크기는 남은 세로 공간에 자동으로 맞춤
+       - GitHub처럼 넓은 화면에서도 왼쪽 패널이 지나치게 넓어지지 않도록 전체 폭을 제한
+       - iframe(구글 사이트)과 단독 페이지(GitHub) 모두 현재 viewport 기준으로 동작 */
+    @media (min-width: 861px) and (orientation: landscape) {
+      html, body {
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      body {
+        height: 100dvh;
+        min-height: 0;
+        padding: 8px;
+      }
+
+      .app {
+        width: min(100%, 1120px);
+        height: calc(100dvh - 16px);
+        min-height: 0;
+        gap: 8px;
+      }
+
+      .topbar {
+        min-height: 44px;
+        padding: 5px 12px;
+        border-radius: 14px;
+      }
+
+      .title-wrap h1 { font-size: clamp(18px, 1.8vw, 24px); }
+      .title-wrap p { margin-top: 2px; font-size: 11px; }
+
+      .game-layout {
+        flex: 1 1 0;
+        min-height: 0;
+        grid-template-columns: minmax(0, 1fr) clamp(330px, 31vw, 390px);
+        gap: 8px;
+      }
+
+      .board-panel {
+        min-height: 0;
+        padding: 8px;
+        gap: 8px;
+        overflow: hidden;
+      }
+
+      .turn-message {
+        min-height: 46px;
+        padding: 5px 10px;
+      }
+
+      .board-wrap {
+        flex: 1 1 0;
+        min-height: 0;
+        padding-top: 0;
+        overflow: hidden;
+      }
+
+      .board-frame {
+        width: auto;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        aspect-ratio: 529 / 540;
+        flex: 0 1 auto;
+      }
+
+      .side-panel {
+        height: 100%;
+        min-height: 0;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
+    }
+
   </style>
 </head>
 <body>
