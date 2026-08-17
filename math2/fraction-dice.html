@@ -1,0 +1,1092 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>분수 주사위게임</title>
+<style>
+  :root{
+    --bg:#f2f4f8;
+    --card:#ffffff;
+    --ink:#243041;
+    --muted:#68738a;
+    --line:#dbe1eb;
+    --blue:#4159a1;
+    --ok:#17713a;
+    --bad:#b23b3b;
+    --shadow:0 10px 26px rgba(26,40,74,.12);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:Arial,"Noto Sans KR","Malgun Gothic",sans-serif;color:var(--ink)}
+  button,input{font:inherit}
+  button{touch-action:manipulation}
+
+  .app{
+    width:100%;
+    height:100dvh;
+    overflow:hidden;
+    padding:clamp(6px,1.2vw,12px);
+    display:grid;
+    grid-template-columns:minmax(0,1fr) minmax(330px,400px);
+    gap:clamp(8px,1vw,12px);
+  }
+  .board-card,.side{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:var(--shadow);min-width:0;min-height:0}
+  .board-card{display:grid;place-items:center;overflow:hidden;padding:clamp(3px,.45vw,6px)}
+  .board-wrap{
+    aspect-ratio:643/654;
+    width:min(100%, calc((100dvh - 24px) * 643 / 654), calc(100vw - 430px));
+    height:auto;
+    max-height:calc(100dvh - 24px);
+    min-width:0;
+    min-height:0;
+  }
+  svg{display:block;width:100%;height:100%;user-select:none;-webkit-user-select:none;touch-action:manipulation}
+  #boardSvg{shape-rendering:geometricPrecision;text-rendering:geometricPrecision}
+  #boardSvg image{image-rendering:-webkit-optimize-contrast;image-rendering:crisp-edges}
+  #moveFeedback{pointer-events:none}
+  #tokens{pointer-events:none}
+  .hit-node{fill:transparent;stroke:transparent;cursor:pointer;pointer-events:all}
+
+  .side{display:flex;flex-direction:column;overflow:hidden}
+  .topbar{display:flex;align-items:center;gap:8px;padding:clamp(7px,.8vw,10px);border-bottom:1px solid var(--line);flex:0 0 auto}
+  .title{font-size:clamp(16px,1.5vw,22px);font-weight:900;color:#2f4285;letter-spacing:-.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+  .icon-btn{border:1px solid var(--line);background:#fff;border-radius:11px;padding:8px 10px;font-weight:800;cursor:pointer;color:#38455c}
+  .icon-btn:hover{background:#f8faff}
+  .panel-scroll{min-height:0;overflow:hidden;padding:8px 10px 9px;display:flex;flex:1 1 auto;flex-direction:column;gap:7px;overscroll-behavior:contain}
+
+  .players{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px;flex:0 0 auto}
+  .player-card{border:2px solid transparent;background:#f7f9fd;border-radius:14px;padding:6px 8px;text-align:center;min-width:0}
+  .player-card.active{border-color:#4f68b5;background:#eef2ff}
+  .pname{font-weight:900;font-size:clamp(13px,1.05vw,15px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .player-dot{display:inline-grid;place-items:center;width:16px;height:16px;border-radius:50%;margin-right:6px;vertical-align:-2px;box-shadow:inset 0 0 0 2px rgba(255,255,255,.9),0 0 0 1px rgba(36,48,65,.12)}
+  .pstatus{margin-top:2px;font-size:11px;color:var(--muted)}
+
+  .step-card{border:1px solid var(--line);border-radius:16px;background:#fff;padding:8px 10px;flex:0 0 auto}
+  /* 단계별로 한눈에 구분되는 연한 파스텔 카드 */
+  .step-one{background:#f5f9ff;border-color:#cbdcf5;box-shadow:inset 4px 0 0 #9fc1ec}
+  .step-two{background:#f4fbf6;border-color:#c9e6d2;box-shadow:inset 4px 0 0 #9bd1aa}
+  .step-three{background:#faf6ff;border-color:#ded2f1;box-shadow:inset 4px 0 0 #c3ade7}
+  .step-one .badge{background:#e7f0ff;color:#4d6590}
+  .step-two .badge{background:#e7f6ec;color:#47745a}
+  .step-three .badge{background:#eee7fb;color:#665587}
+  .step-one .dice-tray,.step-one .fraction-box{background:rgba(255,255,255,.76)}
+  .step-two .choice-grid button:not(.selected-ok):not(.selected-bad){background:rgba(255,255,255,.72);border:1px solid #d8eadf}
+  .step-three .remain-badge{background:rgba(255,255,255,.76);border-color:#ddd2f1}
+  .step-head{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:5px}
+  .step-title{font-size:clamp(14px,1.1vw,17px);font-weight:900}
+  .badge{font-size:11px;font-weight:900;background:#eef2f8;color:#5a6880;border-radius:999px;padding:4px 8px;white-space:nowrap}
+
+  .dice-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(105px,.72fr);gap:10px;align-items:stretch}
+  .dice-tray{
+    position:relative;min-height:90px;border:1px solid #d8dee9;border-radius:15px;
+    background:linear-gradient(180deg,#fbfcfe 0%,#f0f3f8 100%);overflow:hidden;
+    display:flex;align-items:center;justify-content:center;padding:8px 8px 14px;
+  }
+  .dice-tray::after{content:"";position:absolute;left:10%;right:10%;bottom:7px;height:10px;border-radius:50%;background:rgba(41,50,68,.08);filter:blur(4px)}
+  .dice-pair{display:flex;align-items:flex-end;justify-content:center;gap:14px;position:relative;z-index:2}
+  .die-shell{display:flex;flex-direction:column;align-items:center;gap:3px;position:relative}
+  .die-label{font-size:10px;color:#667187;font-weight:900;line-height:1;white-space:nowrap}
+  .die-face{
+    --die-size:clamp(48px,4.8vw,58px);
+    width:var(--die-size);height:var(--die-size);border-radius:13px;background:#fff;
+    border:2px solid #cfd4dd;box-shadow:0 8px 11px rgba(38,46,61,.20),inset 0 -4px 7px rgba(25,33,46,.06),inset 0 2px 2px rgba(255,255,255,.9);
+    display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:9px;
+    transform-origin:center;will-change:transform;
+  }
+  .pip{width:clamp(8px,.85vw,10px);height:clamp(8px,.85vw,10px);border-radius:50%;background:#111;align-self:center;justify-self:center;box-shadow:inset 0 1px 1px rgba(255,255,255,.16)}
+  .die-shell.throw-left .die-face{animation:diceThrowLeft .9s cubic-bezier(.18,.72,.22,1)}
+  .die-shell.throw-right .die-face{animation:diceThrowRight .94s cubic-bezier(.18,.72,.22,1)}
+  .die-shell.throw-left::after,.die-shell.throw-right::after{
+    content:"";position:absolute;bottom:15px;width:46px;height:10px;border-radius:50%;background:rgba(20,27,39,.18);filter:blur(4px);z-index:-1;
+    animation:diceShadow .9s ease-out;
+  }
+  @keyframes diceThrowLeft{
+    0%{transform:translate(0,0) rotate(0deg) scale(1)}
+    18%{transform:translate(-16px,-39px) rotate(-135deg) scale(1.05)}
+    42%{transform:translate(9px,-25px) rotate(225deg) scale(1.02)}
+    64%{transform:translate(-5px,-10px) rotate(430deg) scale(.98)}
+    80%{transform:translate(3px,-5px) rotate(520deg) scale(1.02)}
+    100%{transform:translate(0,0) rotate(540deg) scale(1)}
+  }
+  @keyframes diceThrowRight{
+    0%{transform:translate(0,0) rotate(0deg) scale(1)}
+    18%{transform:translate(16px,-42px) rotate(145deg) scale(1.05)}
+    42%{transform:translate(-10px,-27px) rotate(-225deg) scale(1.02)}
+    64%{transform:translate(6px,-11px) rotate(-420deg) scale(.98)}
+    80%{transform:translate(-3px,-5px) rotate(-510deg) scale(1.02)}
+    100%{transform:translate(0,0) rotate(-540deg) scale(1)}
+  }
+  @keyframes diceShadow{0%{transform:scale(1);opacity:.22}30%{transform:scale(.45);opacity:.08}68%{transform:scale(.78);opacity:.15}100%{transform:scale(1);opacity:.22}}
+
+  .fraction-box{border:1px solid #d8dee9;border-radius:15px;background:#fafbfe;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:5px 6px;min-width:0}
+  .fraction-label{font-size:10px;color:#68738a;font-weight:900;margin-bottom:5px;text-align:center;white-space:nowrap}
+  .frac{display:inline-grid;grid-template-rows:auto 2px auto;min-width:48px;text-align:center;line-height:1.03;font-weight:900}
+  .frac .bar{height:2px;background:currentColor;margin:4px 0}
+  .frac.big{font-size:clamp(27px,2.7vw,37px)}
+  .primary,.choice-grid button,.select-btn,.start-wide{border:0;border-radius:12px;font-weight:900;cursor:pointer}
+  .primary{width:100%;padding:9px 10px;background:#2f468f;color:#fff;font-size:clamp(14px,1.15vw,17px);margin-top:6px}
+  .primary:disabled,.choice-grid button:disabled{opacity:.45;cursor:not-allowed}
+
+  .choice-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
+  .choice-grid button{padding:8px 4px;background:#eef2fa;color:#25314a;font-size:clamp(12px,1vw,15px)}
+  .choice-grid button.selected-ok{background:#e9faef;color:#16763a;outline:2px solid #59bc76}
+  .choice-grid button.selected-bad{background:#fff1f1;color:#b63e3e;outline:2px solid #e07b7b}
+
+  .move-info{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center}
+  .move-guide{border-radius:13px;background:#f4f7ff;padding:10px 11px;font-size:12px;line-height:1.45;color:#38507a;font-weight:800}
+  .remain-badge{background:#edf5ff;border:2px solid #d1e3ff;border-radius:14px;padding:6px 10px;text-align:center;min-width:82px}
+  .remain-badge strong{display:block;font-size:10px;color:#607491;margin-bottom:1px}
+  .remain-badge span{font-size:clamp(20px,1.8vw,27px);font-weight:900;color:#1d5a9c}
+
+  .message{border-radius:13px;padding:7px 9px;min-height:36px;background:#fff9e9;border:1px solid #f0e3b7;color:#37445b;font-size:clamp(12px,.98vw,14px);line-height:1.32;font-weight:800;white-space:pre-line;flex:0 0 auto}
+  .message.ok{background:#edf9f1;border-color:#cfead8;color:var(--ok)}
+  .message.bad{background:#fff2f2;border-color:#f0d1d1;color:var(--bad)}
+  .winner{font-size:clamp(18px,1.8vw,24px);font-weight:900;color:#155c35;text-align:center;padding:2px}
+
+  .wrong-ring{animation:wrongPulse .9s ease-out}
+  .correct-ring{animation:correctPulse .9s ease-in-out infinite alternate}
+  @keyframes wrongPulse{0%{opacity:.2;transform:scale(.72);transform-origin:center}40%{opacity:1;transform:scale(1.12);transform-origin:center}100%{opacity:1;transform:scale(1);transform-origin:center}}
+  @keyframes correctPulse{from{opacity:.55}to{opacity:1}}
+
+  .modal-backdrop{position:fixed;inset:0;background:rgba(23,31,53,.18);display:grid;place-items:center;padding:12px;z-index:30}
+  .modal-backdrop[hidden]{display:none}
+  .modal{width:min(720px,92vw);max-height:min(84dvh,640px);overflow:auto;background:#f6f7fb;border-radius:20px;box-shadow:0 18px 46px rgba(0,0,0,.16);padding:clamp(14px,1.6vw,20px)}
+  .prep-title{margin:0 0 14px;text-align:center;font-size:clamp(22px,2.3vw,30px);font-weight:900;color:#2f4285;letter-spacing:-.03em}
+  .prep-section{margin-bottom:14px}
+  .prep-label{font-size:clamp(14px,1.05vw,17px);font-weight:900;margin-bottom:8px}
+  .select-grid{display:grid;gap:8px}
+  .select-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .select-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .select-btn{padding:12px 10px;background:#e9ecf4;border:2px solid #cfd6e6;color:#51607e;font-size:clamp(15px,1.25vw,18px)}
+  .select-btn.active{background:#dfe5f2;border-color:#4a63b1;color:#334986}
+  .name-grid{display:grid;gap:9px}
+  .name-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .name-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .name-field input{width:100%;padding:18px 16px;border-radius:16px;border:2px solid #cfd6e6;background:#eceff5;font-size:clamp(18px,1.65vw,22px);font-weight:800;color:#27354b;outline:none}
+  .starter-panel{background:#eee6cc;border:1.5px solid #e0c870;border-radius:22px;padding:16px 18px}
+  .starter-title{font-size:clamp(18px,1.35vw,20px);font-weight:900;color:#6b5825;margin-bottom:4px}
+  .starter-sub{font-size:clamp(14px,1vw,16px);color:#7a6a38;margin-bottom:14px;font-weight:700}
+  .modal-actions{margin-top:16px;display:flex;justify-content:flex-start;align-items:center;gap:10px;flex-wrap:wrap}
+  .start-wide{background:#465da3;color:#fff;padding:12px 22px;min-width:min(260px,100%);font-size:clamp(18px,1.45vw,22px)}
+  .setup-cancel{border:1px solid #cfd6e6;border-radius:12px;background:#fff;color:#51607e;padding:12px 20px;font-weight:900;cursor:pointer;font-size:clamp(15px,1.15vw,18px)}
+  .rules-title{margin:0 0 10px;font-size:clamp(22px,2vw,28px);color:#2f4285}
+  .rules-list{margin:0;padding-left:22px;color:#334159;line-height:1.75;font-size:14px;word-break:keep-all;overflow-wrap:normal}
+  .rules-list li{margin-bottom:3px;word-break:keep-all;overflow-wrap:normal}
+  .close-row{display:flex;justify-content:flex-end;margin-top:15px}
+  .close-btn{border:0;border-radius:12px;padding:10px 14px;font-weight:900;cursor:pointer;background:#e9eef7;color:#334159}
+  .rule-chip{display:inline-block;border-radius:999px;padding:2px 7px;font-size:12px;font-weight:900;margin:0 2px}
+  .natural{background:#eff6ff;color:#2465ad}.finite{background:#ecfbf0;color:#2b7c41}.repeat{background:#fff0f5;color:#b83c68}
+
+  @media (max-width:860px){
+    .app{grid-template-columns:minmax(0,1fr) minmax(300px,360px)}
+    .board-wrap{width:min(100%, calc((100dvh - 24px) * 643 / 654), calc(100vw - 390px))}
+    .dice-pair{gap:10px}
+  }
+  @media (min-width:691px){
+    .panel-scroll{overflow:hidden}
+  }
+  @media (max-width:690px){
+    .app{grid-template-columns:1fr;grid-template-rows:minmax(0,1fr) minmax(250px,1fr)}
+    .panel-scroll{overflow:auto}
+    .board-wrap{width:min(100%, calc(53dvh * 643 / 654));max-height:53dvh}
+    .modal{width:min(92vw,640px)}
+    .start-wide{min-width:100%}
+    .setup-cancel{width:100%}
+  }
+  @media (max-height:700px) and (min-width:691px){
+    .topbar{padding:7px 9px}.panel-scroll{padding:8px;gap:7px}
+    .step-card{padding:8px}.primary{padding:9px}.choice-grid button{padding:8px 3px}.message{min-height:37px;padding:7px 9px}
+    .dice-tray{min-height:91px;padding-top:8px;padding-bottom:14px}.die-face{--die-size:50px;padding:7px}.fraction-box{padding:5px}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="board-card">
+    <div class="board-wrap">
+      <svg id="boardSvg" viewBox="0 0 643 654" role="img" aria-label="분수 주사위게임 게임판">
+        <defs>
+          <pattern id="boardChecks" width="34" height="34" patternUnits="userSpaceOnUse">
+            <rect width="34" height="34" fill="#ffe8ef"/>
+            <rect x="0" y="0" width="17" height="17" fill="#ffdbe6"/>
+            <rect x="17" y="17" width="17" height="17" fill="#ffdbe6"/>
+          </pattern>
+          <filter id="nodeShadow" x="-30%" y="-30%" width="160%" height="160%">
+            <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity="0.16"/>
+          </filter>
+          <marker id="arrowBlue" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L14,7 L0,14 Z" fill="#2cb8e6"/>
+          </marker>
+          <marker id="arrowPink" markerWidth="14" markerHeight="14" refX="10" refY="7" orient="auto" markerUnits="userSpaceOnUse">
+            <path d="M0,0 L14,7 L0,14 Z" fill="#f06aa0"/>
+          </marker>
+        </defs>
+        <g id="boardArtwork">
+          <rect x="4" y="4" width="635" height="646" fill="#cdeee7" stroke="#1ab3c8" stroke-width="4"/>
+          <rect x="10" y="10" width="623" height="634" fill="none" stroke="#6f7d80" stroke-width="1.5" opacity="0.8"/>
+          <rect x="27" y="27" width="589" height="600" fill="#fffafb" stroke="#53565d" stroke-width="2"/>
+          <rect x="36" y="36" width="571" height="582" fill="url(#boardChecks)" stroke="#4f4f56" stroke-width="2.2"/>
+
+          <g fill="none" stroke="#4b4d55" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" shape-rendering="geometricPrecision">
+            <line x1="105" y1="101" x2="199" y2="101"/>
+            <line x1="199" y1="101" x2="273" y2="101"/>
+            <line x1="273" y1="101" x2="356" y2="101"/>
+            <line x1="356" y1="101" x2="435" y2="101"/>
+            <line x1="435" y1="101" x2="529" y2="101"/>
+            <line x1="529" y1="101" x2="529" y2="199"/>
+            <line x1="529" y1="199" x2="529" y2="280"/>
+            <line x1="529" y1="280" x2="529" y2="363"/>
+            <line x1="529" y1="363" x2="529" y2="439"/>
+            <line x1="529" y1="439" x2="529" y2="529"/>
+            <line x1="529" y1="529" x2="439" y2="529"/>
+            <line x1="439" y1="529" x2="358" y2="529"/>
+            <line x1="358" y1="529" x2="275" y2="529"/>
+            <line x1="275" y1="529" x2="201" y2="529"/>
+            <line x1="201" y1="529" x2="105" y2="529"/>
+            <line x1="105" y1="529" x2="105" y2="439"/>
+            <line x1="105" y1="439" x2="105" y2="363"/>
+            <line x1="105" y1="363" x2="105" y2="280"/>
+            <line x1="105" y1="280" x2="105" y2="200"/>
+            <line x1="105" y1="200" x2="105" y2="101"/>
+            <line x1="105" y1="101" x2="181" y2="180"/>
+            <line x1="181" y1="180" x2="249" y2="251"/>
+            <line x1="249" y1="251" x2="317" y2="321"/>
+            <line x1="529" y1="101" x2="453" y2="180"/>
+            <line x1="453" y1="180" x2="385" y2="251"/>
+            <line x1="385" y1="251" x2="317" y2="321"/>
+            <line x1="105" y1="529" x2="173" y2="462"/>
+            <line x1="173" y1="462" x2="241" y2="396"/>
+            <line x1="241" y1="396" x2="317" y2="321"/>
+            <line x1="529" y1="529" x2="461" y2="462"/>
+            <line x1="461" y1="462" x2="393" y2="396"/>
+            <line x1="393" y1="396" x2="317" y2="321"/>
+          </g>
+
+          <g fill="none" stroke="#2cb8e6" stroke-width="8" stroke-linecap="round" marker-end="url(#arrowBlue)">
+            <path d="M566 510 L566 445"/>
+            <path d="M498 58 L434 58"/>
+            <path d="M58 128 L58 193"/>
+            <path d="M128 570 L192 570"/>
+          </g>
+          <g fill="none" stroke="#f06aa0" stroke-width="7" stroke-linecap="round" marker-end="url(#arrowPink)">
+            <path d="M187 133 L225 177"/>
+            <path d="M501 177 L466 224"/>
+            <path d="M362 306 L402 349"/>
+          </g>
+
+          <g id="boardNodes" filter="url(#nodeShadow)">
+            <g><circle cx="105" cy="101" r="33" fill="#95dc63" stroke="#4f8035" stroke-width="4"/><circle cx="105" cy="101" r="22" fill="#7bc751" stroke="#63a542" stroke-width="2"/></g>
+            <g><circle cx="529" cy="101" r="33" fill="#95dc63" stroke="#4f8035" stroke-width="4"/><circle cx="529" cy="101" r="22" fill="#7bc751" stroke="#63a542" stroke-width="2"/></g>
+            <g><circle cx="105" cy="529" r="33" fill="#95dc63" stroke="#4f8035" stroke-width="4"/><circle cx="105" cy="529" r="22" fill="#7bc751" stroke="#63a542" stroke-width="2"/></g>
+            <g><circle cx="317" cy="321" r="33" fill="#95dc63" stroke="#4f8035" stroke-width="4"/><circle cx="317" cy="321" r="22" fill="#7bc751" stroke="#63a542" stroke-width="2"/></g>
+            <line x1="529" y1="529" x2="585" y2="529" stroke="#4b4d55" stroke-width="4" stroke-linecap="round"/>
+            <g><circle cx="529" cy="529" r="33" fill="#95dc63" stroke="#4f8035" stroke-width="4"/><circle cx="529" cy="529" r="22" fill="#7bc751" stroke="#63a542" stroke-width="2"/><text x="529" y="529" text-anchor="middle" dominant-baseline="middle" font-size="18" font-weight="900" fill="#1d3515">출발</text></g>
+            <g><circle cx="585" cy="529" r="22" fill="#ffffff" stroke="#4f8035" stroke-width="3.5"/><circle cx="585" cy="529" r="17" fill="#eff9e8" stroke="#9acb79" stroke-width="1.5"/><text x="585" y="529" text-anchor="middle" dominant-baseline="middle" font-size="13" font-weight="900" fill="#32612b">도착</text></g>
+            <g><circle cx="199" cy="101" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="199" cy="101" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="273" cy="101" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="273" cy="101" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="356" cy="101" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="356" cy="101" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="435" cy="101" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="435" cy="101" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="529" cy="199" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="529" cy="199" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="529" cy="280" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="529" cy="280" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="529" cy="363" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="529" cy="363" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="529" cy="439" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="529" cy="439" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="439" cy="529" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="439" cy="529" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="358" cy="529" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="358" cy="529" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="275" cy="529" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="275" cy="529" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="201" cy="529" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="201" cy="529" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="105" cy="439" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="105" cy="439" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="105" cy="363" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="105" cy="363" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="105" cy="280" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="105" cy="280" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="105" cy="200" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="105" cy="200" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="181" cy="180" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="181" cy="180" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="249" cy="251" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="249" cy="251" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="453" cy="180" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="453" cy="180" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="385" cy="251" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="385" cy="251" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="241" cy="396" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="241" cy="396" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="173" cy="462" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="173" cy="462" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="393" cy="396" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="393" cy="396" r="6.3" fill="#5553ad" stroke="none"/></g> <g><circle cx="461" cy="462" r="18" fill="#6f6dca" stroke="#504ca0" stroke-width="3.2"/><circle cx="461" cy="462" r="6.3" fill="#5553ad" stroke="none"/></g>
+          </g>
+        </g>
+        <g id="hitNodes"></g>
+        <g id="moveFeedback"></g>
+        <g id="tokens"></g>
+      </svg>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="topbar">
+      <div class="title">🎲 분수 주사위게임</div>
+      <button class="icon-btn" id="rulesBtn">규칙</button>
+      <button class="icon-btn" id="newBtn">새 게임</button>
+    </div>
+    <div class="panel-scroll">
+      <div class="players" id="playersBar"></div>
+
+      <div class="step-card step-one">
+        <div class="step-head"><div class="step-title">1. 주사위로 분수 만들기</div><span class="badge">첫째=분모 · 둘째=분자</span></div>
+        <div class="dice-layout">
+          <div class="dice-tray" aria-label="주사위 영역">
+            <div class="dice-pair">
+              <div class="die-shell" id="dieShell1">
+                <div class="die-face" id="die1" aria-label="첫 번째 주사위"></div>
+                <div class="die-label">분모</div>
+              </div>
+              <div class="die-shell" id="dieShell2">
+                <div class="die-face" id="die2" aria-label="두 번째 주사위"></div>
+                <div class="die-label">분자</div>
+              </div>
+            </div>
+          </div>
+          <div class="fraction-box">
+            <div class="fraction-label">만들어진 분수</div>
+            <div class="frac big"><span id="rawNum">?</span><span class="bar"></span><span id="rawDen">?</span></div>
+          </div>
+        </div>
+        <button class="primary" id="rollBtn">주사위 던지기</button>
+      </div>
+
+      <div class="step-card step-two">
+        <div class="step-head"><div class="step-title">2. 수의 종류 선택하기</div><span class="badge" id="classBadge">대기</span></div>
+        <div class="choice-grid" id="choices">
+          <button data-kind="natural">자연수<br><small>1칸</small></button>
+          <button data-kind="finite">유한소수<br><small>3칸</small></button>
+          <button data-kind="repeat">순환소수<br><small>5칸</small></button>
+        </div>
+      </div>
+
+      <div class="step-card step-three">
+        <div class="step-head"><div class="step-title">3. 말 직접 이동하기</div><span class="badge" id="moveBadge">대기</span></div>
+        <div class="move-info">
+          
+          <div class="remain-badge"><strong>남은 칸</strong><span id="remainCount">-</span></div>
+        </div>
+      </div>
+
+      <div class="message" id="message">새 게임을 시작하면 선택한 학생이 먼저 진행합니다.</div>
+    </div>
+  </aside>
+</div>
+
+<div class="modal-backdrop" id="setupModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="setupTitle">
+    <h1 class="prep-title" id="setupTitle">분수 주사위게임 준비</h1>
+
+    <div class="prep-section">
+      <div class="prep-label">게임 인원</div>
+      <div class="select-grid two">
+        <button class="select-btn active" id="twoBtn">2인용</button>
+        <button class="select-btn" id="threeBtn">3인용</button>
+      </div>
+    </div>
+
+    <div class="prep-section">
+      <div class="prep-label">학생 이름</div>
+      <div class="name-grid two" id="nameGrid">
+        <div class="name-field"><input id="name1" maxlength="10" value="학생 1" aria-label="학생 1 이름" /></div>
+        <div class="name-field"><input id="name2" maxlength="10" value="학생 2" aria-label="학생 2 이름" /></div>
+        <div class="name-field" id="name3Wrap" hidden><input id="name3" maxlength="10" value="학생 3" aria-label="학생 3 이름" /></div>
+      </div>
+    </div>
+
+    <div class="prep-section starter-panel">
+      <div class="starter-title">첫 번째 시작할 사람은 누구인가요?</div>
+      <div class="starter-sub">선택한 학생이 먼저 시작합니다.</div>
+      <div class="select-grid two" id="starterGrid">
+        <button class="select-btn active" data-start="0" id="starter0">학생 1</button>
+        <button class="select-btn" data-start="1" id="starter1">학생 2</button>
+        <button class="select-btn" data-start="2" id="starter2" hidden>학생 3</button>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="start-wide" id="startBtn">게임 시작</button>
+      <button class="setup-cancel" id="cancelSetup" hidden>닫기</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-backdrop" id="rulesModal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="rulesTitle">
+    <h2 class="rules-title" id="rulesTitle">게임 규칙</h2>
+    <ol class="rules-list">
+      <li>각 사람은 <b>말 2개</b>를 대기 장소에 두고 시작합니다.</li>
+      <li>주사위 두 개를 던집니다. <b>첫째는 분모, 둘째는 분자</b>입니다.</li>
+      <li>만든 분수를 <span class="rule-chip natural">자연수</span>, <span class="rule-chip finite">유한소수</span>, <span class="rule-chip repeat">순환소수</span> 중에서 고릅니다. <b>틀리면 다음 사람 차례</b>입니다.</li>
+      <li>정답이면 자연수 <b>1칸</b>, 유한소수 <b>3칸</b>, 순환소수 <b>5칸</b>을 직접 이동합니다.</li>
+      <li>자기 말이 있는 칸에 도착하면 <b>두 말을 업고</b>, 이후 함께 이동합니다.</li>
+      <li><b>분홍색 화살표가 시작되는 초록색 칸에 정확히 멈추면</b> 다음 이동부터 화살표 방향으로 갑니다. 그냥 지나가면 원래 길로 갑니다.</li>
+      <li>상대 말이 있는 칸에 도착하여 상대 말을 잡으면 <b>한 번 더 주사위를 던질 수 있고</b>, 잡힌 상대 말은 대기 장소로 갑니다.</li>
+      <li>한 바퀴 돌아 출발점을 지나 <b>도착</b>하면 완주입니다. 출발점에 정확히 멈췄다면 다음 이동 때 도착으로 갑니다. <b>말 2개가 모두 도착하면 승리</b>합니다.</li>
+    </ol>
+    <div class="close-row"><button class="close-btn" id="closeRules">닫기</button></div>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const $ = s => document.querySelector(s);
+  const $$ = s => Array.from(document.querySelectorAll(s));
+  const playerColors = ['#e84f4f','#2f7de1','#e3a31a'];
+  const tokenStroke = ['#8f2626','#194f9c','#9a6810'];
+
+  // 업로드한 원본 게임판 이미지의 실제 원 중심 좌표에 맞춘 클릭 위치
+  const coords = {
+    START:[529,529], DEST:[585,529], R1:[529,439], R2:[529,363], R3:[529,280], R4:[529,199], TR:[529,101],
+    T1:[435,101], T2:[356,101], T3:[273,101], T4:[199,101], TL:[105,101],
+    L1:[105,200], L2:[105,280], L3:[105,363], L4:[105,439], BL:[105,529],
+    B1:[201,529], B2:[275,529], B3:[358,529], B4:[439,529],
+    TRD1:[453,180], TRD2:[385,251], C:[317,321], TRD3:[241,396], TRD4:[173,462],
+    TLD1:[181,180], TLD2:[249,251], TLD3:[393,396], TLD4:[461,462]
+  };
+  const greenNodes = new Set(['START','DEST','TR','TL','BL','C']);
+  const outer = ['START','R1','R2','R3','R4','TR','T1','T2','T3','T4','TL','L1','L2','L3','L4','BL','B1','B2','B3','B4'];
+  const diagTRBL = ['TR','TRD1','TRD2','C','TRD3','TRD4','BL'];
+  const diagTLBR = ['TL','TLD1','TLD2','C','TLD3','TLD4','START'];
+  // 중앙 칸(C)에 정확히 멈춘 뒤에는 분홍색 화살표 방향으로 출발점까지 갑니다.
+  const diagCStart = ['C','TLD3','TLD4','START'];
+
+  const pipMap = {
+    1:[[2,2]],
+    2:[[1,1],[3,3]],
+    3:[[1,1],[2,2],[3,3]],
+    4:[[1,1],[3,1],[1,3],[3,3]],
+    5:[[1,1],[3,1],[2,2],[1,3],[3,3]],
+    6:[[1,1],[3,1],[1,2],[3,2],[1,3],[3,3]]
+  };
+
+  let setupCount = 2;
+  let startIndex = 0;
+  let players = [];
+  let turn = 0;
+  let stage = 'roll';
+  let die1 = 1, die2 = 1;
+  let expectedKind = null;
+  let moveTotal = 0;
+  let moveRemaining = 0;
+  let gameOver = false;
+  let rolling = false;
+  let wrongNode = null;
+  let correctNode = null;
+  let feedbackTimer = null;
+  let diceShuffleTimer = null;
+  let diceFinishTimer = null;
+  let activeMoveStackId = null;
+  let gameStarted = false;
+
+  function gcd(a,b){ while(b){ [a,b] = [b, a % b]; } return Math.abs(a); }
+  function classify(num, den){
+    const g = gcd(num, den);
+    num /= g; den /= g;
+    if(den === 1) return 'natural';
+    let d = den;
+    while(d % 2 === 0) d /= 2;
+    while(d % 5 === 0) d /= 5;
+    return d === 1 ? 'finite' : 'repeat';
+  }
+  function kindLabel(kind){ return kind === 'natural' ? '자연수' : (kind === 'finite' ? '유한소수' : '순환소수'); }
+  function stepsFor(kind){ return kind === 'natural' ? 1 : (kind === 'finite' ? 3 : 5); }
+  function randomDie(){
+    if(window.crypto && crypto.getRandomValues){ const arr = new Uint32Array(1); crypto.getRandomValues(arr); return (arr[0] % 6) + 1; }
+    return Math.floor(Math.random() * 6) + 1;
+  }
+  function esc(s){ return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function drawDie(el, value){
+    el.innerHTML = pipMap[value].map(([c,r]) => `<span class="pip" style="grid-column:${c};grid-row:${r}"></span>`).join('');
+    el.setAttribute('aria-label', `${value}이 나온 주사위`);
+  }
+
+  function currentSetupNames(){
+    return [$('#name1').value.trim() || '학생 1', $('#name2').value.trim() || '학생 2', $('#name3').value.trim() || '학생 3'];
+  }
+
+  function drawHitNodes(){
+    let html = '';
+    Object.entries(coords).forEach(([key,[x,y]]) => {
+      const r = greenNodes.has(key) ? 36 : 27;
+      html += `<circle class="hit-node" data-node="${key}" cx="${x}" cy="${y}" r="${r}" />`;
+    });
+    $('#hitNodes').innerHTML = html;
+  }
+
+  function applyLandingRoute(player){
+    // 윷놀이의 지름길은 해당 초록색 칸에 '정확히 멈췄을 때' 다음 이동부터 적용합니다.
+    if(player.node === 'TR') player.route = 'diagTRBL';
+    else if(player.node === 'TL') player.route = 'diagTLBR';
+    else if(player.node === 'C') player.route = 'diagCStart';
+    else if(player.node === 'BL' || player.node === 'START') player.route = 'outer';
+  }
+
+  function stepOnce(player){
+    // 처음에는 WAIT에서 시작하고, 한 바퀴 뒤 START에 도착한 말은
+    // 다음 한 칸으로 화면의 '도착'을 직접 눌러 도착 처리합니다.
+    if(player.node === 'START' && player.hasLeft){
+      player.node = 'DEST';
+      return player.node;
+    }
+    if(player.route === 'outer'){
+      let idx = outer.indexOf(player.node);
+      if(idx < 0) idx = 0; // WAIT -> R1
+      player.node = outer[(idx + 1) % outer.length];
+      return player.node;
+    }
+    let path;
+    if(player.route === 'diagTRBL') path = diagTRBL;
+    else if(player.route === 'diagTLBR') path = diagTLBR;
+    else if(player.route === 'diagCStart') path = diagCStart;
+    else { player.route = 'outer'; return stepOnce(player); }
+
+    let idx = path.indexOf(player.node);
+    if(idx < 0){ player.route = 'outer'; return stepOnce(player); }
+    if(idx < path.length - 1){ player.node = path[idx + 1]; return player.node; }
+    player.route = 'outer';
+    return stepOnce(player);
+  }
+
+  function previewNextNode(player){
+    const temp = { node:player.node, route:player.route, hasLeft:player.hasLeft };
+    return stepOnce(temp);
+  }
+
+  function getAllPieces(){
+    const out = [];
+    players.forEach((player, pi) => {
+      player.pieces.forEach(piece => out.push({ player, pi, piece }));
+    });
+    return out;
+  }
+
+  function getStackPieces(player, stackId){
+    return player.pieces.filter(piece => !piece.finished && piece.stackId === stackId);
+  }
+
+  function movableStacks(player){
+    const seen = new Set();
+    const groups = [];
+    player.pieces.forEach(piece => {
+      if(piece.finished || seen.has(piece.stackId)) return;
+      seen.add(piece.stackId);
+      const pieces = getStackPieces(player, piece.stackId);
+      if(pieces.length) groups.push({ stackId:piece.stackId, pieces, lead:pieces[0] });
+    });
+    return groups;
+  }
+
+  function renderTokens(){
+    const groups = {};
+
+    // 출발 전 말과 도착한 말을 출발/도착 아래에 좌우로 균형 있게 배치합니다.
+    // 각 학생은 자신의 한 줄을 사용하므로 3인 게임에서도 서로 겹치지 않습니다.
+    const waitingSlots = [
+      [[484,580],[510,580]],   // 학생 1 - 출발 전
+      [[484,607],[510,607]],   // 학생 2 - 출발 전
+      [[484,634],[510,634]]    // 학생 3 - 출발 전
+    ];
+    const arrivedSlots = [
+      [[574,580],[600,580]],   // 학생 1 - 도착
+      [[574,607],[600,607]],   // 학생 2 - 도착
+      [[574,634],[600,634]]    // 학생 3 - 도착
+    ];
+
+    getAllPieces().forEach(({pi,piece}) => {
+      let key;
+      if(piece.finished || piece.node === 'DEST') key = `DEST_${pi}`;
+      else if(piece.node === 'WAIT') key = `WAIT_${pi}`;
+      else key = piece.node;
+      (groups[key] ??= []).push({pi,piece});
+    });
+
+    let html = '';
+    const offsetsByCount = {
+      1:[[0,0]],
+      2:[[-12,0],[12,0]],
+      3:[[-13,8],[13,8],[0,-13]],
+      4:[[-13,-10],[13,-10],[-13,10],[13,10]],
+      5:[[-16,-10],[0,-13],[16,-10],[-9,12],[9,12]],
+      6:[[-17,-11],[0,-14],[17,-11],[-17,11],[0,14],[17,11]]
+    };
+
+    Object.entries(groups).forEach(([node, items]) => {
+      const waiting = node.startsWith('WAIT_');
+      const arrived = node.startsWith('DEST_');
+      const baseNode = (waiting || arrived) ? null : (coords[node] || coords.START);
+      const offsets = offsetsByCount[Math.min(items.length,6)] || offsetsByCount[6];
+
+      items.forEach(({pi,piece},j) => {
+        let x, y, dx = 0, dy = 0;
+        if(waiting){
+          const slots = waitingSlots[pi] || waitingSlots[0];
+          [x,y] = slots[piece.id % slots.length];
+        } else if(arrived){
+          const slots = arrivedSlots[pi] || arrivedSlots[0];
+          [x,y] = slots[piece.id % slots.length];
+        } else {
+          [x,y] = baseNode;
+          [dx,dy] = offsets[j % offsets.length];
+        }
+
+        const sameStack = !waiting && !arrived && items.filter(it => it.pi === pi && it.piece.stackId === piece.stackId).length > 1;
+        const smallHomeToken = waiting || arrived || node === 'START';
+        const r = smallHomeToken ? 8.5 : (sameStack ? 12 : 11);
+        const strokeWidth = smallHomeToken ? 3 : 4;
+        // 도착한 말은 같은 색을 유지하되 채도/선명도를 낮춰 아직 이동 중인 말과 확실히 구분합니다.
+        const innerOpacity = arrived ? .34 : .97;
+        const outerStrokeOpacity = arrived ? .55 : 1;
+        html += `<g transform="translate(${x+dx} ${y+dy})">
+          <circle r="${r+3.5}" fill="#fff" stroke="${tokenStroke[pi]}" stroke-opacity="${outerStrokeOpacity}" stroke-width="${strokeWidth}"/>
+          <circle r="${r}" fill="${playerColors[pi]}" opacity="${innerOpacity}"/>
+        </g>`;
+      });
+    });
+    $('#tokens').innerHTML = html;
+  }
+
+  function clearMoveFeedback(){
+    wrongNode = null;
+    correctNode = null;
+    clearTimeout(feedbackTimer);
+    $('#moveFeedback').innerHTML = '';
+  }
+
+  function renderMoveFeedback(){
+    if(!wrongNode || !coords[wrongNode]){
+      $('#moveFeedback').innerHTML = '';
+      return;
+    }
+    const [wx,wy] = coords[wrongNode];
+    const wr = greenNodes.has(wrongNode) ? 42 : 31;
+    const correctNodes = Array.isArray(correctNode) ? correctNode : (correctNode ? [correctNode] : []);
+    let correctHtml = '';
+    correctNodes.filter((n,i,a) => n && coords[n] && a.indexOf(n) === i).forEach((node, idx) => {
+      const [cx,cy] = coords[node];
+      const cr = greenNodes.has(node) ? 42 : 31;
+      correctHtml += `<g class="correct-ring">
+        <circle cx="${cx}" cy="${cy}" r="${cr}" fill="none" stroke="#1e8fdf" stroke-width="7"/>
+        ${idx === 0 ? `<rect x="${cx-28}" y="${cy-cr-31}" width="56" height="24" rx="12" fill="#1e8fdf"/><text x="${cx}" y="${cy-cr-14}" text-anchor="middle" font-size="12" font-weight="900" fill="#fff">다음 칸</text>` : ''}
+      </g>`;
+    });
+    $('#moveFeedback').innerHTML = `<g class="wrong-ring">
+        <circle cx="${wx}" cy="${wy}" r="${wr}" fill="rgba(255,255,255,.16)" stroke="#e04444" stroke-width="7"/>
+        <path d="M${wx-11} ${wy-11} L${wx+11} ${wy+11} M${wx+11} ${wy-11} L${wx-11} ${wy+11}" stroke="#e04444" stroke-width="7" stroke-linecap="round"/>
+      </g>${correctHtml}`;
+  }
+
+  function showWrongNode(node, nextNodes){
+    wrongNode = node;
+    correctNode = nextNodes;
+    renderMoveFeedback();
+    clearTimeout(feedbackTimer);
+    feedbackTimer = setTimeout(clearMoveFeedback, 1250);
+  }
+
+  function renderPlayers(){
+    $('#playersBar').innerHTML = players.map((p, i) => {
+      const finished = p.pieces.filter(piece => piece.finished).length;
+      let status = `도착 ${finished}/2`;
+      if(finished === 2) status = '말 2개 도착';
+      return `<div class="player-card ${i === turn && !gameOver ? 'active' : ''}"><div class="pname"><span class="player-dot" style="background:${playerColors[i]}"></span>${esc(p.name)}</div><div class="pstatus">${status}</div></div>`;
+    }).join('');
+  }
+
+  function setMessage(text, type=''){
+    const box = $('#message');
+    box.className = 'message' + (type ? ' ' + type : '');
+    box.textContent = text;
+  }
+
+  function resetChoiceMarks(){ $$('#choices button').forEach(btn => btn.classList.remove('selected-ok','selected-bad')); }
+
+  function updateUI(){
+    drawDie($('#die1'), die1);
+    drawDie($('#die2'), die2);
+    $('#rawNum').textContent = (stage === 'roll' || rolling) ? '?' : die2;
+    $('#rawDen').textContent = (stage === 'roll' || rolling) ? '?' : die1;
+    $('#rollBtn').disabled = stage !== 'roll' || gameOver || rolling;
+    $$('#choices button').forEach(btn => btn.disabled = stage !== 'classify' || gameOver || rolling);
+    $('#classBadge').textContent = stage === 'classify' ? '선택 중' : (stage === 'move' ? '완료' : '대기');
+    $('#moveBadge').textContent = stage === 'move' ? '이동 중' : '대기';
+    $('#remainCount').textContent = stage === 'move' ? moveRemaining : '-';
+
+    renderPlayers();
+    renderTokens();
+  }
+
+  function refreshSetupNames(){
+    const names = currentSetupNames();
+    $('#starter0').textContent = names[0];
+    $('#starter1').textContent = names[1];
+    $('#starter2').textContent = names[2];
+  }
+
+  function setStarter(index){
+    startIndex = index;
+    $$('#starterGrid .select-btn').forEach(btn => btn.classList.toggle('active', Number(btn.dataset.start) === index));
+  }
+
+  function setPlayerCount(count){
+    setupCount = count;
+    $('#twoBtn').classList.toggle('active', count === 2);
+    $('#threeBtn').classList.toggle('active', count === 3);
+    $('#name3Wrap').hidden = count !== 3;
+    $('#starter2').hidden = count !== 3;
+    $('#nameGrid').className = 'name-grid ' + (count === 2 ? 'two' : 'three');
+    $('#starterGrid').className = 'select-grid ' + (count === 2 ? 'two' : 'three');
+    if(startIndex >= count) startIndex = 0;
+    setStarter(startIndex);
+    refreshSetupNames();
+  }
+
+  function cancelDiceAnimation(){
+    if(diceShuffleTimer){ clearInterval(diceShuffleTimer); diceShuffleTimer = null; }
+    if(diceFinishTimer){ clearTimeout(diceFinishTimer); diceFinishTimer = null; }
+    rolling = false;
+    $('#dieShell1')?.classList.remove('throw-left');
+    $('#dieShell2')?.classList.remove('throw-right');
+  }
+
+  function startGame(){
+    cancelDiceAnimation();
+    const names = currentSetupNames();
+    players = Array.from({length:setupCount}, (_,i) => ({
+      name:names[i],
+      pieces:[
+        { id:0, node:'WAIT', route:'outer', hasLeft:false, finished:false, stackId:`p${i}-0` },
+        { id:1, node:'WAIT', route:'outer', hasLeft:false, finished:false, stackId:`p${i}-1` }
+      ]
+    }));
+    turn = startIndex;
+    stage = 'roll';
+    expectedKind = null;
+    moveTotal = 0;
+    moveRemaining = 0;
+    activeMoveStackId = null;
+    gameOver = false;
+    gameStarted = true;
+    rolling = false;
+    die1 = 1; die2 = 1;
+    clearMoveFeedback();
+    resetChoiceMarks();
+    $('#setupModal').hidden = true;
+    $('#cancelSetup').hidden = false;
+    setMessage(`${players[turn].name} 차례입니다. 주사위를 던지세요.`);
+    updateUI();
+  }
+
+  function rollDice(){
+    if(stage !== 'roll' || gameOver || rolling) return;
+    rolling = true;
+    $('#rollBtn').disabled = true;
+    clearMoveFeedback();
+    $('#rawNum').textContent = '?';
+    $('#rawDen').textContent = '?';
+
+    const shell1 = $('#dieShell1');
+    const shell2 = $('#dieShell2');
+    shell1.classList.remove('throw-left');
+    shell2.classList.remove('throw-right');
+    void shell1.offsetWidth;
+    shell1.classList.add('throw-left');
+    shell2.classList.add('throw-right');
+
+    const final1 = randomDie();
+    const final2 = randomDie();
+    let ticks = 0;
+    diceShuffleTimer = setInterval(() => {
+      drawDie($('#die1'), randomDie());
+      drawDie($('#die2'), randomDie());
+      ticks++;
+      if(ticks >= 11 && diceShuffleTimer){ clearInterval(diceShuffleTimer); diceShuffleTimer = null; }
+    }, 70);
+
+    diceFinishTimer = setTimeout(() => {
+      if(diceShuffleTimer){ clearInterval(diceShuffleTimer); diceShuffleTimer = null; }
+      die1 = final1;
+      die2 = final2;
+      drawDie($('#die1'), die1);
+      drawDie($('#die2'), die2);
+      shell1.classList.remove('throw-left');
+      shell2.classList.remove('throw-right');
+      expectedKind = classify(die2, die1);
+      moveTotal = stepsFor(expectedKind);
+      moveRemaining = 0;
+      stage = 'classify';
+      rolling = false;
+      resetChoiceMarks();
+      setMessage(`분수 ${die2}/${die1}는 어떤 수인지 고르세요.`);
+      diceFinishTimer = null;
+      updateUI();
+    }, 930);
+  }
+
+  function chooseKind(kind, button){
+    if(stage !== 'classify' || gameOver || rolling) return;
+    resetChoiceMarks();
+    if(kind === expectedKind){
+      button.classList.add('selected-ok');
+      stage = 'move';
+      moveRemaining = moveTotal;
+      activeMoveStackId = null;
+      setMessage(`정답입니다. ${kindLabel(kind)}이므로 ${moveTotal}칸 이동합니다.
+게임판에서 직접 이동하세요.`, 'ok');
+      updateUI();
+    } else {
+      button.classList.add('selected-bad');
+      const wrongName = players[turn].name;
+      turn = (turn + 1) % players.length;
+      stage = 'roll';
+      expectedKind = null;
+      moveTotal = 0;
+      moveRemaining = 0;
+      activeMoveStackId = null;
+      clearMoveFeedback();
+      setMessage(`${wrongName} 오답!
+${players[turn].name} 차례입니다. 주사위를 던지세요.`, 'bad');
+      updateUI();
+      resetChoiceMarks();
+    }
+  }
+
+  function resetPieceToStart(piece, ownerIndex){
+    piece.node = 'WAIT';
+    piece.route = 'outer';
+    piece.hasLeft = false;
+    piece.finished = false;
+    piece.stackId = `p${ownerIndex}-${piece.id}-${Date.now()}-${Math.random()}`;
+  }
+
+  function mergeOwnPiecesAtLanding(player, movedPieces){
+    if(!movedPieces.length || ['WAIT','DEST'].includes(movedPieces[0].node)) return movedPieces;
+    const node = movedPieces[0].node;
+    const route = movedPieces[0].route;
+    const others = player.pieces.filter(piece => !piece.finished && piece.node === node && !movedPieces.includes(piece));
+    if(!others.length) return movedPieces;
+    const merged = [...movedPieces, ...others];
+    const stackId = movedPieces[0].stackId;
+    merged.forEach(piece => {
+      piece.stackId = stackId;
+      piece.node = node;
+      piece.route = route;
+      piece.hasLeft = true;
+    });
+    return merged;
+  }
+
+  function captureOpponentsAt(node){
+    const captured = [];
+    players.forEach((other, idx) => {
+      if(idx === turn) return;
+      const caught = other.pieces.filter(piece => !piece.finished && piece.node === node);
+      if(caught.length){
+        caught.forEach(piece => resetPieceToStart(piece, idx));
+        captured.push({name:other.name, count:caught.length});
+      }
+    });
+    return captured;
+  }
+
+  function endTurn(message='', type=''){
+    turn = (turn + 1) % players.length;
+    stage = 'roll';
+    expectedKind = null;
+    moveTotal = 0;
+    moveRemaining = 0;
+    activeMoveStackId = null;
+    resetChoiceMarks();
+    clearMoveFeedback();
+    setMessage(message || `${players[turn].name} 차례입니다. 주사위를 던지세요.`, type);
+    updateUI();
+  }
+
+  function finishMove(movedPieces){
+    if(!movedPieces.length) return;
+    movedPieces.forEach(piece => applyLandingRoute(piece));
+    const merged = mergeOwnPiecesAtLanding(players[turn], movedPieces);
+    const node = merged[0].node;
+    const captured = captureOpponentsAt(node);
+    const moverName = players[turn].name;
+    const details = [];
+    if(merged.length > movedPieces.length) details.push(`말 ${merged.length}개를 업었습니다!`);
+    if(captured.length) details.push(captured.map(c => `${c.name}의 말 ${c.count}개`).join(', ') + '를 잡았습니다!');
+    const detailText = details.length ? ` ${details.join(' ')}` : '';
+
+    if(captured.length){
+      stage = 'roll';
+      expectedKind = null;
+      moveTotal = 0;
+      moveRemaining = 0;
+      activeMoveStackId = null;
+      resetChoiceMarks();
+      clearMoveFeedback();
+      setMessage(`${moverName} 이동 완료!${detailText}
+${moverName} 한 번 더! 주사위를 던지세요.`, 'ok');
+      updateUI();
+      return;
+    }
+
+    const nextTurn = (turn + 1) % players.length;
+    const nextName = players[nextTurn].name;
+    const turnText = `${nextName} 차례입니다. 주사위를 던지세요.`;
+    const moveMessage = `${moverName} 이동 완료!${detailText}
+${turnText}`;
+    endTurn(moveMessage, details.length ? 'ok' : '');
+  }
+
+  function finishPiecesAtHome(movedPieces){
+    movedPieces.forEach(piece => {
+      piece.node = 'DEST';
+      piece.route = 'outer';
+      piece.hasLeft = true;
+      piece.finished = true;
+    });
+    const player = players[turn];
+    const finishedCount = player.pieces.filter(piece => piece.finished).length;
+    if(finishedCount >= 2){
+      gameOver = true;
+      activeMoveStackId = null;
+      $('#message').className = 'message ok';
+      $('#message').innerHTML = `<div class="winner">🎉 ${esc(player.name)} 승리!</div><div style="text-align:center">말 2개가 모두 도착했습니다.</div>`;
+      updateUI();
+      return true;
+    }
+    const moverName = player.name;
+    const nextTurn = (turn + 1) % players.length;
+    endTurn(`${moverName}의 말 ${movedPieces.length}개가 도착했습니다.
+${players[nextTurn].name} 차례입니다. 주사위를 던지세요.`, 'ok');
+    return true;
+  }
+
+  function getCurrentMoveOptions(){
+    const player = players[turn];
+    let stacks = movableStacks(player);
+    if(activeMoveStackId){
+      stacks = stacks.filter(group => group.stackId === activeMoveStackId);
+    }
+    return stacks.map(group => ({...group, nextNode:previewNextNode(group.lead)}));
+  }
+
+  function handleBoardClick(node){
+    if(stage !== 'move' || gameOver) return;
+    const options = getCurrentMoveOptions();
+    if(!options.length){
+      setMessage('이동할 수 있는 말이 없습니다.', 'bad');
+      return;
+    }
+    let matching = options.filter(option => option.nextNode === node);
+
+    if(!matching.length){
+      showWrongNode(node, options.map(option => option.nextNode));
+      setMessage('잘못된 칸입니다. 잠깐 표시된 다음 칸으로 이동하세요.', 'bad');
+      return;
+    }
+
+    const chosen = matching[0];
+    if(!activeMoveStackId) activeMoveStackId = chosen.stackId;
+    const movingPieces = getStackPieces(players[turn], activeMoveStackId);
+    clearMoveFeedback();
+    movingPieces.forEach(piece => {
+      stepOnce(piece);
+      if(piece.node !== 'START') piece.hasLeft = true;
+    });
+    moveRemaining -= 1;
+
+    if(movingPieces[0].node === 'DEST'){
+      finishPiecesAtHome(movingPieces);
+      return;
+    }
+
+
+    if(moveRemaining > 0){
+      setMessage(`이동했습니다. 남은 칸은 ${moveRemaining}칸입니다.`, 'ok');
+      updateUI();
+      return;
+    }
+
+    finishMove(movingPieces);
+  }
+
+  function validateGameModel(){
+    if(2 !== 2) throw new Error('말 개수 설정 오류');
+    const required = new Set([...outer, ...diagTRBL, ...diagTLBR, ...diagCStart, 'DEST']);
+    for(const node of required){
+      if(!coords[node]) throw new Error(`게임판 좌표 누락: ${node}`);
+    }
+    if(outer[0] !== 'START' || outer[1] !== 'R1') throw new Error('바깥길 시작 순서 오류');
+    const waitTest = {node:'WAIT', route:'outer', hasLeft:false};
+    if(stepOnce(waitTest) !== 'R1') throw new Error('대기 말의 첫 이동 오류');
+    const finishTest = {node:'START', route:'outer', hasLeft:true};
+    if(stepOnce(finishTest) !== 'DEST') throw new Error('출발점 다음 칸 도착 처리 오류');
+    const arrivedTest = {id:0,node:'DEST',route:'outer',hasLeft:true,finished:true,stackId:'arrived-test'};
+    if(!arrivedTest.finished || arrivedTest.node !== 'DEST') throw new Error('도착 말 표시 상태 오류');
+    const homeApproachTest = {node:'B4', route:'outer', hasLeft:true};
+    if(stepOnce(homeApproachTest) !== 'START' || stepOnce(homeApproachTest) !== 'DEST'){
+      throw new Error('마지막 칸 → 출발점 → 도착 경로 오류');
+    }
+
+    // 윷놀이식 지름길 검증: 모서리/중앙에 정확히 멈춘 뒤의 다음 이동 방향을 검사합니다.
+    const trLand = {node:'TR', route:'outer', hasLeft:true};
+    applyLandingRoute(trLand);
+    if(trLand.route !== 'diagTRBL' || previewNextNode(trLand) !== 'TRD1') throw new Error('오른쪽 위 지름길 진입 오류');
+
+    const tlLand = {node:'TL', route:'outer', hasLeft:true};
+    applyLandingRoute(tlLand);
+    if(tlLand.route !== 'diagTLBR' || previewNextNode(tlLand) !== 'TLD1') throw new Error('왼쪽 위 지름길 진입 오류');
+
+    const centerFromRight = {node:'C', route:'diagTRBL', hasLeft:true};
+    applyLandingRoute(centerFromRight);
+    if(centerFromRight.route !== 'diagCStart' || previewNextNode(centerFromRight) !== 'TLD3') throw new Error('중앙칸 출발점 방향 지름길 오류');
+
+    // 중앙을 지나치기만 하는 경우에는 기존 대각선 길을 계속 갑니다.
+    const passCenter = {node:'TRD2', route:'diagTRBL', hasLeft:true};
+    if(stepOnce(passCenter) !== 'C' || stepOnce(passCenter) !== 'TRD3') throw new Error('중앙 통과 경로 오류');
+
+    const centerToStart = {node:'C', route:'diagCStart', hasLeft:true};
+    if(stepOnce(centerToStart) !== 'TLD3' || stepOnce(centerToStart) !== 'TLD4' || stepOnce(centerToStart) !== 'START'){
+      throw new Error('중앙에서 출발점까지 지름길 연결 오류');
+    }
+    if(!(coords.R1[1] > coords.R2[1] && coords.R2[1] > coords.R3[1] && coords.R3[1] > coords.R4[1] && coords.R4[1] > coords.TR[1])){
+      throw new Error('오른쪽 이동 순서와 좌표가 일치하지 않습니다.');
+    }
+    if(stepsFor('natural') !== 1 || stepsFor('finite') !== 3 || stepsFor('repeat') !== 5){
+      throw new Error('수의 종류별 이동 칸 수 오류');
+    }
+
+    // 주사위 1~6의 36가지 분수를 전부 검증합니다. 행=분모, 열=분자.
+    const expectedKinds = [
+      ['natural','natural','natural','natural','natural','natural'],
+      ['finite','natural','finite','natural','finite','natural'],
+      ['repeat','repeat','natural','repeat','repeat','natural'],
+      ['finite','finite','finite','natural','finite','finite'],
+      ['finite','finite','finite','finite','natural','finite'],
+      ['repeat','repeat','finite','repeat','repeat','natural']
+    ];
+    for(let den = 1; den <= 6; den++){
+      for(let num = 1; num <= 6; num++){
+        const got = classify(num, den);
+        const want = expectedKinds[den - 1][num - 1];
+        if(got !== want) throw new Error(`분수 판정 오류: ${num}/${den} → ${got}, 정답 ${want}`);
+      }
+    }
+  }
+
+  validateGameModel();
+  drawHitNodes();
+  players = [
+    {name:'학생 1', pieces:[
+      {id:0,node:'WAIT',route:'outer',hasLeft:false,finished:false,stackId:'p0-0'},
+      {id:1,node:'WAIT',route:'outer',hasLeft:false,finished:false,stackId:'p0-1'}
+    ]},
+    {name:'학생 2', pieces:[
+      {id:0,node:'WAIT',route:'outer',hasLeft:false,finished:false,stackId:'p1-0'},
+      {id:1,node:'WAIT',route:'outer',hasLeft:false,finished:false,stackId:'p1-1'}
+    ]}
+  ];
+  drawDie($('#die1'), 1);
+  drawDie($('#die2'), 1);
+  updateUI();
+  refreshSetupNames();
+  setPlayerCount(2);
+
+  $('#twoBtn').addEventListener('click', () => setPlayerCount(2));
+  $('#threeBtn').addEventListener('click', () => setPlayerCount(3));
+  ['#name1','#name2','#name3'].forEach(sel => $(sel).addEventListener('input', refreshSetupNames));
+  $$('#starterGrid .select-btn').forEach(btn => btn.addEventListener('click', () => setStarter(Number(btn.dataset.start))));
+  $('#startBtn').addEventListener('click', startGame);
+  $('#newBtn').addEventListener('click', () => { $('#cancelSetup').hidden = !gameStarted; $('#setupModal').hidden = false; refreshSetupNames(); setPlayerCount(setupCount); });
+  $('#cancelSetup').addEventListener('click', () => { if(gameStarted) $('#setupModal').hidden = true; });
+  $('#setupModal').addEventListener('click', e => { if(gameStarted && e.target === $('#setupModal')) $('#setupModal').hidden = true; });
+  $('#rulesBtn').addEventListener('click', () => { $('#rulesModal').hidden = false; });
+  $('#closeRules').addEventListener('click', () => { $('#rulesModal').hidden = true; });
+  $('#rulesModal').addEventListener('click', e => { if(e.target === $('#rulesModal')) $('#rulesModal').hidden = true; });
+  $('#rollBtn').addEventListener('click', rollDice);
+  $('#choices').addEventListener('click', e => {
+    const btn = e.target.closest('button[data-kind]');
+    if(btn) chooseKind(btn.dataset.kind, btn);
+  });
+  $('#boardSvg').addEventListener('click', e => {
+    const target = e.target.closest('[data-node]');
+    if(target) handleBoardClick(target.getAttribute('data-node'));
+  });
+})();
+</script>
+</body>
+</html>
